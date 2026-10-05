@@ -6,6 +6,7 @@ use gpui::{
     px, rgb, size, uniform_list,
 };
 use hunkra::{
+    conflict_view::{ConflictEvent, ConflictView},
     editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
     i18n::{Locale, Translator},
     settings::{self, Settings},
@@ -14,10 +15,10 @@ use hunkra::{
     worker::LatestWorker,
 };
 use hunkra_core::{
-    Branch, BranchSnapshot, BranchWrite, ChangeKind, CommitSnapshot, CommitWrite, CoreError,
-    DiffKind, DiffRow, DiffSnapshot, IndexLimitation, IndexWrite, Line, LineSelection, Operation,
-    OperationAction, OperationOutcome, OperationSnapshot, OperationWrite, Presentation,
-    RepositorySnapshot, Selection,
+    Branch, BranchSnapshot, BranchWrite, ChangeKind, CommitSnapshot, CommitWrite, ConflictSnapshot,
+    ConflictWrite, CoreError, DiffKind, DiffRow, DiffSnapshot, Document, IndexLimitation,
+    IndexWrite, Line, LineSelection, Operation, OperationAction, OperationOutcome,
+    OperationSnapshot, OperationWrite, Presentation, RepositorySnapshot, Selection,
 };
 use std::{
     path::PathBuf,
@@ -25,8 +26,27 @@ use std::{
 };
 
 const SMOKE_MESSAGE: &str = "Подготовить A+B 🦀\n\nСообщение из поля";
+const SMOKE_RESULT: &str = "Результат 🦀\r\nВведён вручную без последнего LF";
 
-type DiffQuery = (PathBuf, PathBuf, DiffKind);
+type DiffQuery = (PathBuf, PathBuf, DiffKind, bool);
+struct DiffRead {
+    diff: DiffSnapshot,
+    conflict: Option<ConflictSnapshot>,
+}
+/// Reads a selected diff and recoverable conflict sources on the existing bounded worker.
+fn read_selected((root, path, kind, active_operation): DiffQuery) -> Result<DiffRead, CoreError> {
+    let diff = hunkra_core::read_diff(&root, &path, kind)?;
+    let conflict = if !active_operation && diff.presentation != Presentation::Conflict {
+        None
+    } else {
+        match hunkra_core::read_conflict(&root, &path) {
+            Ok(conflict) => Some(conflict),
+            Err(CoreError::NoConflict) => None,
+            Err(error) => return Err(error),
+        }
+    };
+    Ok(DiffRead { diff, conflict })
+}
 struct StatusRead {
     repository: RepositorySnapshot,
     branches: BranchSnapshot,
@@ -51,12 +71,36 @@ enum WriteQuery {
     Commit(CommitSnapshot, String),
     Branch(CommitSnapshot, String),
     Operation(std::sync::Arc<OperationSnapshot>, OperationAction),
+    SaveResult(std::sync::Arc<ConflictSnapshot>, Document),
+    Resolve(std::sync::Arc<ConflictSnapshot>),
 }
 enum WriteResult {
     Index(IndexWrite),
     Commit(CommitWrite),
     Branch(BranchWrite),
     Operation(OperationWrite),
+    SaveResult(ConflictWrite, Document),
+    Resolve(ConflictWrite),
+}
+
+#[derive(Clone)]
+enum Intent {
+    Select(PathBuf),
+    Open(PathBuf),
+    Close,
+    Reload,
+    Operation(OperationAction),
+    SaveDeletion(std::sync::Arc<ConflictSnapshot>, Document),
+}
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ConfirmationKind {
+    Dirty,
+    Destructive,
+    Deletion,
+}
+struct Confirmation {
+    intent: Intent,
+    kind: ConfirmationKind,
 }
 
 #[derive(Default)]
@@ -85,17 +129,27 @@ struct Smoke {
     message_ready: bool,
     input_prepared: bool,
     message_selection: Option<hunkra::text::Selection>,
+    result_ready: bool,
+    result_selection: Option<hunkra::text::Selection>,
+    result_text: Option<String>,
+    conflict_guard: Option<OperationSnapshot>,
+    conflict_path: Option<PathBuf>,
 }
 struct Hunkra {
     view: ViewState,
     translator: Translator,
     settings: Settings,
     status_worker: LatestWorker<PathBuf, Result<StatusRead, CoreError>>,
-    diff_worker: LatestWorker<DiffQuery, Result<DiffSnapshot, CoreError>>,
+    diff_worker: LatestWorker<DiffQuery, Result<DiffRead, CoreError>>,
     settings_worker: LatestWorker<Settings, std::io::Result<()>>,
     write_worker: LatestWorker<WriteQuery, Result<WriteResult, CoreError>>,
     message: Entity<NativeEditor>,
     branch_input: Entity<NativeEditor>,
+    conflict: Option<Entity<ConflictView>>,
+    conflict_subscription: Option<Subscription>,
+    confirmation: Option<Confirmation>,
+    after_save: Option<Intent>,
+    applying_intent: bool,
     branches: Option<BranchSnapshot>,
     operation: Option<std::sync::Arc<OperationSnapshot>>,
     reviewed_operation: Option<std::sync::Arc<OperationSnapshot>>,
@@ -247,6 +301,11 @@ impl Hunkra {
             translator,
             message,
             branch_input,
+            conflict: None,
+            conflict_subscription: None,
+            confirmation: None,
+            after_save: None,
+            applying_intent: false,
             branches: None,
             operation: None,
             reviewed_operation: None,
@@ -266,9 +325,7 @@ impl Hunkra {
             reviewed_commit: None,
             settings,
             status_worker: LatestWorker::new("hunkra-status", |root: PathBuf| read_status(&root)),
-            diff_worker: LatestWorker::new("hunkra-diff", |(root, path, kind): DiffQuery| {
-                hunkra_core::read_diff(&root, &path, kind)
-            }),
+            diff_worker: LatestWorker::new("hunkra-diff", read_selected),
             settings_worker: LatestWorker::new("hunkra-settings", settings::save),
             write_worker: LatestWorker::new("hunkra-write", |query: WriteQuery| match query {
                 WriteQuery::Index(root, diff, selection) => {
@@ -282,6 +339,13 @@ impl Hunkra {
                 }
                 WriteQuery::Operation(snapshot, action) => {
                     hunkra_core::run_operation(&snapshot, &action).map(WriteResult::Operation)
+                }
+                WriteQuery::SaveResult(snapshot, document) => {
+                    hunkra_core::save_result(&snapshot, &document)
+                        .map(|write| WriteResult::SaveResult(write, document))
+                }
+                WriteQuery::Resolve(snapshot) => {
+                    hunkra_core::mark_resolved(&snapshot).map(WriteResult::Resolve)
                 }
             }),
             writing: false,
@@ -322,6 +386,11 @@ impl Hunkra {
                 message_ready: false,
                 input_prepared: false,
                 message_selection: None,
+                result_ready: false,
+                result_selection: None,
+                result_text: None,
+                conflict_guard: None,
+                conflict_path: None,
             }),
         };
         if let Some(root) = root {
@@ -342,6 +411,239 @@ impl Hunkra {
     fn t(&self, key: &str) -> String {
         self.translator.text(key, None)
     }
+    /// Defers navigation or destructive Git actions when they would discard an editable Result.
+    fn guard_intent(&mut self, intent: Intent, cx: &mut Context<Self>) -> bool {
+        if self.applying_intent {
+            return false;
+        }
+        if self.confirmation.is_some() {
+            return true;
+        }
+        if self
+            .conflict
+            .as_ref()
+            .is_some_and(|view| view.read(cx).dirty(cx))
+        {
+            self.show_confirmation(intent, ConfirmationKind::Dirty, cx);
+            return true;
+        }
+        if matches!(
+            intent,
+            Intent::Operation(OperationAction::Abort | OperationAction::Skip)
+        ) {
+            self.show_confirmation(intent, ConfirmationKind::Destructive, cx);
+            return true;
+        }
+        false
+    }
+    /// Keeps the concrete pending action visible and freezes Result while the product asks for a choice.
+    fn show_confirmation(
+        &mut self,
+        intent: Intent,
+        kind: ConfirmationKind,
+        cx: &mut Context<Self>,
+    ) {
+        self.confirmation = Some(Confirmation { intent, kind });
+        if let Some(view) = &self.conflict {
+            view.update(cx, |view, cx| view.set_busy(true, cx));
+        }
+        cx.notify();
+    }
+    /// Cancels the product prompt without losing Result, source selection or undo history.
+    fn cancel_confirmation(&mut self, cx: &mut Context<Self>) {
+        self.confirmation = None;
+        self.after_save = None;
+        if let Some(view) = &self.conflict {
+            view.update(cx, |view, cx| view.set_busy(self.writing, cx));
+        }
+        cx.notify();
+    }
+    /// Saves before file navigation/close; Git continuation always requires its separate explicit action.
+    fn save_before_intent(&mut self, cx: &mut Context<Self>) {
+        let Some(pending) = &self.confirmation else {
+            return;
+        };
+        if pending.kind != ConfirmationKind::Dirty {
+            return;
+        }
+        let Some(view) = self.conflict.clone() else {
+            return;
+        };
+        if view.read(cx).draft.stale || view.read(cx).draft.awaiting_refresh {
+            return;
+        }
+        let pending = self.confirmation.take().expect("checked prompt");
+        self.after_save = if matches!(pending.intent, Intent::Operation(_)) {
+            None
+        } else {
+            Some(pending.intent)
+        };
+        view.update(cx, |view, cx| {
+            view.set_busy(false, cx);
+            view.save(cx);
+        });
+        cx.notify();
+    }
+    /// Applies explicit discard separately from the destructive operation's own concrete confirmation.
+    fn confirm_intent(&mut self, cx: &mut Context<Self>) {
+        let Some(pending) = self.confirmation.take() else {
+            return;
+        };
+        if pending.kind == ConfirmationKind::Dirty {
+            self.conflict = None;
+            self.conflict_subscription = None;
+            if matches!(
+                pending.intent,
+                Intent::Operation(OperationAction::Abort | OperationAction::Skip)
+            ) {
+                self.show_confirmation(pending.intent, ConfirmationKind::Destructive, cx);
+                return;
+            }
+        }
+        if let Some(view) = &self.conflict {
+            view.update(cx, |view, cx| view.set_busy(false, cx));
+        }
+        self.apply_intent(pending.intent, cx);
+    }
+    /// Executes only a user-approved pending intent; core snapshots still guard every write.
+    fn apply_intent(&mut self, intent: Intent, cx: &mut Context<Self>) {
+        self.applying_intent = true;
+        match intent {
+            Intent::Select(path) => self.select(path, cx),
+            Intent::Open(path) => self.open(path, cx),
+            Intent::Close => cx.quit(),
+            Intent::Reload => {
+                self.conflict = None;
+                self.conflict_subscription = None;
+                if let Some(path) = self.view.selected.clone() {
+                    self.select(path, cx);
+                }
+            }
+            Intent::Operation(action) => self.perform_operation(action, cx),
+            Intent::SaveDeletion(snapshot, document) => {
+                self.begin_write(cx);
+                self.write_worker
+                    .submit(0, WriteQuery::SaveResult(snapshot, document));
+            }
+        }
+        self.applying_intent = false;
+        cx.notify();
+    }
+    /// Renders a product confirmation for a named action, without any implicit stash/reset/discard.
+    fn confirmation_panel(&self, cx: &Context<Self>) -> Option<gpui::Div> {
+        let pending = self.confirmation.as_ref()?;
+        let body = match (&pending.intent, pending.kind) {
+            (_, ConfirmationKind::Dirty) => "confirm-dirty-result",
+            (Intent::Operation(OperationAction::Skip), _) => "confirm-skip",
+            (Intent::Operation(OperationAction::Abort), _) => "confirm-abort",
+            _ => "confirm-delete-result",
+        };
+        let mut panel = div()
+            .p_3()
+            .flex_none()
+            .bg(rgb(0x3c3430))
+            .flex()
+            .items_center()
+            .gap_3()
+            .child(div().flex_1().min_w_0().child(self.t(body)));
+        if pending.kind == ConfirmationKind::Dirty {
+            let save_ready = self.conflict.as_ref().is_some_and(|view| {
+                !view.read(cx).draft.stale && !view.read(cx).draft.awaiting_refresh
+            });
+            panel = panel.child(
+                button(
+                    "confirm-save",
+                    self.t(if matches!(pending.intent, Intent::Operation(_)) {
+                        "save-result"
+                    } else {
+                        "save-and-leave"
+                    }),
+                    false,
+                )
+                .opacity(if save_ready { 1. } else { 0.5 })
+                .on_click(cx.listener(|app, _, _, cx| app.save_before_intent(cx))),
+            );
+        }
+        Some(
+            panel
+                .child(
+                    button(
+                        "confirm-action",
+                        self.t(if pending.kind == ConfirmationKind::Dirty {
+                            "discard-and-leave"
+                        } else {
+                            "confirm-action"
+                        }),
+                        false,
+                    )
+                    .on_click(cx.listener(|app, _, _, cx| app.confirm_intent(cx))),
+                )
+                .child(
+                    button("confirm-cancel", self.t("cancel-action"), true)
+                        .on_click(cx.listener(|app, _, _, cx| app.cancel_confirmation(cx))),
+                ),
+        )
+    }
+    /// Retains the native Result entity across same-file refresh; new files acquire their own editor.
+    fn show_conflict(
+        &mut self,
+        snapshot: std::sync::Arc<ConflictSnapshot>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(view) = &self.conflict
+            && view.read(cx).snapshot.path == snapshot.path
+        {
+            view.update(cx, |view, cx| view.refresh(snapshot, cx));
+            return;
+        }
+        let view = cx.new(|cx| ConflictView::new(snapshot, self.view.locale, cx));
+        view.update(cx, |view, cx| {
+            view.set_busy(self.writing || self.confirmation.is_some(), cx)
+        });
+        self.conflict_subscription =
+            Some(cx.subscribe(&view, |app, _, event: &ConflictEvent, cx| {
+                match event {
+                    ConflictEvent::Save(snapshot, document) if !app.writing => {
+                        if document.present {
+                            app.begin_write(cx);
+                            app.write_worker.submit(
+                                0,
+                                WriteQuery::SaveResult(snapshot.clone(), document.clone()),
+                            );
+                            if app.smoke.as_ref().is_some_and(|smoke| {
+                                smoke.close_on_write
+                                    && smoke
+                                        .operation
+                                        .as_deref()
+                                        .is_some_and(|action| action.starts_with("conflict"))
+                            }) {
+                                assert!(!app.request_close(cx));
+                            }
+                        } else {
+                            app.show_confirmation(
+                                Intent::SaveDeletion(snapshot.clone(), document.clone()),
+                                ConfirmationKind::Deletion,
+                                cx,
+                            );
+                        }
+                    }
+                    ConflictEvent::Resolve(snapshot) if !app.writing => {
+                        app.begin_write(cx);
+                        app.write_worker
+                            .submit(0, WriteQuery::Resolve(snapshot.clone()));
+                    }
+                    ConflictEvent::Reload if !app.writing => {
+                        if !app.guard_intent(Intent::Reload, cx) {
+                            app.apply_intent(Intent::Reload, cx);
+                        }
+                    }
+                    ConflictEvent::Error(error) => app.write_error_key = Some(error_key(error)),
+                    _ => {}
+                }
+                cx.notify();
+            }));
+        self.conflict = Some(view);
+    }
     /// Defers ordinary window closure until an accepted index transaction has finished.
     fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
         if self.writing {
@@ -349,13 +651,16 @@ impl Hunkra {
             cx.notify();
             false
         } else {
-            true
+            !self.guard_intent(Intent::Close, cx)
         }
     }
     /// Switches a profile without issuing repository requests or replacing diff state.
     fn set_locale(&mut self, locale: Locale, cx: &mut Context<Self>) {
         self.view.switch_locale(locale);
         self.translator = Translator::new(locale);
+        if let Some(conflict) = &self.conflict {
+            conflict.update(cx, |view, cx| view.set_locale(locale, cx));
+        }
         let placeholder = self.t("commit-placeholder");
         self.message.update(cx, |editor, cx| {
             editor.placeholder = placeholder.into();
@@ -377,7 +682,12 @@ impl Hunkra {
         if self.writing {
             return;
         }
+        if self.guard_intent(Intent::Open(root.clone()), cx) {
+            return;
+        }
         self.committed = None;
+        self.conflict = None;
+        self.conflict_subscription = None;
         self.reviewed_commit = None;
         self.branches = None;
         self.operation = None;
@@ -457,6 +767,11 @@ impl Hunkra {
         if self.writing {
             return;
         }
+        if self.view.selected.as_ref() != Some(&path)
+            && self.guard_intent(Intent::Select(path.clone()), cx)
+        {
+            return;
+        }
         let Some(root) = self.root.clone() else {
             return;
         };
@@ -474,7 +789,12 @@ impl Hunkra {
             self.anchor_added = None;
             self.diff_scroll.scroll_to_item(0, ScrollStrategy::Top);
         }
-        self.diff_worker.submit(generation, (root, path, self.mode));
+        let active_operation = self
+            .operation
+            .as_ref()
+            .is_some_and(|snapshot| snapshot.state.is_some());
+        self.diff_worker
+            .submit(generation, (root, path, self.mode, active_operation));
         cx.notify();
     }
     /// Changes the comparison explicitly; HEAD→worktree is never used for either tab.
@@ -555,7 +875,7 @@ impl Hunkra {
     }
     /// Serializes index writes; active reads are invalidated and fresh status follows completion.
     fn write_index(&mut self, selection: Selection, cx: &mut Context<Self>) {
-        if self.writing {
+        if self.writing || self.confirmation.is_some() {
             return;
         }
         let (Some(root), Some(diff)) = (self.root.clone(), self.view.diff.clone()) else {
@@ -568,7 +888,7 @@ impl Hunkra {
     }
     /// Captures the reviewed repository and user text before entering the shared writer.
     fn commit(&mut self, cx: &mut Context<Self>) {
-        if self.writing || self.scanning || self.diff_loading {
+        if self.writing || self.scanning || self.diff_loading || self.confirmation.is_some() {
             return;
         }
         let Some(snapshot) = self.reviewed_commit.clone() else {
@@ -589,6 +909,7 @@ impl Hunkra {
     fn create_branch(&mut self, cx: &mut Context<Self>) {
         if self.writing
             || self.scanning
+            || self.confirmation.is_some()
             || self
                 .operation
                 .as_ref()
@@ -610,6 +931,9 @@ impl Hunkra {
         if self.writing || self.scanning {
             return;
         }
+        if self.guard_intent(Intent::Operation(action.clone()), cx) {
+            return;
+        }
         let Some(snapshot) = self.reviewed_operation.clone() else {
             return;
         };
@@ -618,6 +942,16 @@ impl Hunkra {
             OperationAction::Switch(_) | OperationAction::Merge(_) | OperationAction::Rebase(_)
         ) && snapshot.state.is_some()
         {
+            return;
+        }
+        if action == OperationAction::Continue
+            && self.conflict.as_ref().is_some_and(|view| {
+                let view = view.read(cx);
+                view.draft.awaiting_refresh || !view.snapshot.result_staged
+            })
+        {
+            self.write_error_key = Some("error-result-index");
+            cx.notify();
             return;
         }
         if action == OperationAction::Continue
@@ -642,6 +976,9 @@ impl Hunkra {
         self.committed = None;
         self.branch_created = None;
         self.operation_written = None;
+        if let Some(conflict) = &self.conflict {
+            conflict.update(cx, |view, cx| view.set_busy(true, cx));
+        }
         self.branch_input.update(cx, |editor, cx| {
             editor.enabled = false;
             cx.notify();
@@ -681,11 +1018,22 @@ impl Hunkra {
                     self.operation = Some(std::sync::Arc::new(read.operation));
                     self.error_key = None;
                     self.root = Some(snapshot.root.clone());
+                    let retain_conflict = self.confirmation.is_some()
+                        || self.conflict.as_ref().is_some_and(|conflict| {
+                            let view = conflict.read(cx);
+                            view.dirty(cx)
+                                || self.operation.as_ref().is_some_and(|operation| {
+                                    operation.state.is_some()
+                                        && view.snapshot.operation.state == operation.state
+                                })
+                        });
                     let selected = self
                         .view
                         .selected
                         .clone()
-                        .filter(|path| snapshot.files.iter().any(|file| &file.path == path))
+                        .filter(|path| {
+                            retain_conflict || snapshot.files.iter().any(|file| &file.path == path)
+                        })
                         .or_else(|| {
                             snapshot
                                 .files
@@ -722,7 +1070,27 @@ impl Hunkra {
             self.diff_loading = false;
             changed = true;
             match result {
-                Ok(diff) => {
+                Ok(read) => {
+                    let diff = read.diff;
+                    match read.conflict {
+                        Some(snapshot) => self.show_conflict(std::sync::Arc::new(snapshot), cx),
+                        None if self
+                            .conflict
+                            .as_ref()
+                            .is_some_and(|view| view.read(cx).dirty(cx)) =>
+                        {
+                            if let Some(view) = &self.conflict {
+                                view.update(cx, |view, cx| {
+                                    view.draft.stale = true;
+                                    cx.notify();
+                                });
+                            }
+                        }
+                        None => {
+                            self.conflict = None;
+                            self.conflict_subscription = None;
+                        }
+                    }
                     if self.view.diff.as_ref().is_some_and(|previous| {
                         previous.left != diff.left || previous.right != diff.right
                     }) {
@@ -746,6 +1114,9 @@ impl Hunkra {
         }
         if let Some((_, result)) = self.write_worker.take() {
             self.writing = false;
+            if let Some(conflict) = &self.conflict {
+                conflict.update(cx, |view, cx| view.set_busy(false, cx));
+            }
             self.branch_input.update(cx, |editor, cx| {
                 editor.enabled = true;
                 cx.notify();
@@ -759,6 +1130,7 @@ impl Hunkra {
                 self.anchor_added = None;
             }
             self.diff_loading = false;
+            let mut saved_result = false;
             match result {
                 Ok(WriteResult::Index(result)) => {
                     self.write_error_key = None;
@@ -788,11 +1160,29 @@ impl Hunkra {
                     self.last_write_backend = Some(result.route.backend);
                     self.operation_written = Some(result);
                 }
-                Err(error) => self.write_error_key = Some(error_key(&error)),
+                Ok(WriteResult::SaveResult(result, document)) => {
+                    saved_result = true;
+                    self.write_error_key = None;
+                    self.last_write_backend = Some(result.backend);
+                    if let Some(conflict) = &self.conflict {
+                        conflict.update(cx, |view, cx| view.saved(document, cx));
+                    }
+                }
+                Ok(WriteResult::Resolve(result)) => {
+                    self.write_error_key = None;
+                    self.last_write_backend = Some(result.backend);
+                }
+                Err(error) => {
+                    self.after_save = None;
+                    self.write_error_key = Some(error_key(&error));
+                }
+            }
+            if saved_result && let Some(intent) = self.after_save.take() {
+                self.apply_intent(intent, cx);
             }
             if self.close_requested && self.last_write_backend.is_some() {
                 if let Some(smoke) = &self.smoke {
-                    let report = serde_json::json!({"ok":self.last_write_backend==Some(if smoke.operation.as_deref().is_some_and(|action| !action.starts_with("branch")) {"git-cli"} else {"gix"}), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
+                    let report = serde_json::json!({"ok":self.last_write_backend==Some(if smoke.operation.as_deref().is_some_and(|action| action.starts_with("conflict")) {"filesystem"} else if smoke.operation.as_deref().is_some_and(|action| !action.starts_with("branch")) {"git-cli"} else {"gix"}), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
                     std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap())
                         .expect("close smoke report");
                 }
@@ -844,6 +1234,12 @@ impl Hunkra {
     /// Provides file/hunk navigation and open/refresh keyboard shortcuts.
     fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
+        if self.confirmation.is_some() {
+            if key == "escape" {
+                self.cancel_confirmation(cx);
+            }
+            return;
+        }
         if event.keystroke.modifiers.control && !event.keystroke.modifiers.shift && key == "enter" {
             self.commit(cx);
             return;
@@ -934,6 +1330,14 @@ impl Hunkra {
             let report = serde_json::json!({"ok":false,"reason":"timeout","frames":self.frames,"error":self.error_key});
             let _ = std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap());
             cx.quit();
+            return;
+        }
+        if smoke
+            .operation
+            .as_deref()
+            .is_some_and(|action| action.starts_with("conflict"))
+        {
+            self.smoke_conflict_tick(cx);
             return;
         }
         if smoke.operation.is_some() {
@@ -1218,6 +1622,14 @@ impl Hunkra {
                     _ => panic!("unknown isolated operation smoke"),
                 };
                 self.perform_operation(action, cx);
+                if matches!(operation.as_str(), "abort" | "skip") {
+                    assert!(
+                        self.confirmation
+                            .as_ref()
+                            .is_some_and(|prompt| prompt.kind == ConfirmationKind::Destructive)
+                    );
+                    self.confirm_intent(cx);
+                }
             }
             if !operation.starts_with("preview") {
                 assert!(self.writing);
@@ -1266,8 +1678,340 @@ impl Hunkra {
         smoke.last_frame = self.frames;
         cx.notify();
     }
+    /// Exercises chunk choices, real Result input and keyboard undo/redo in a finite fixture window.
+    fn smoke_conflict_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.smoke.as_ref().is_some_and(|smoke| {
+            smoke
+                .operation
+                .as_deref()
+                .is_some_and(|action| action.starts_with("conflict"))
+                && !smoke.result_ready
+        }) {
+            return;
+        }
+        let Some(view) = self.conflict.clone() else {
+            return;
+        };
+        let snapshot = view.read(cx).snapshot.clone();
+        if self.smoke.as_ref().unwrap().operation.as_deref() == Some("conflict-external") {
+            assert_ne!(snapshot.presentation, Presentation::Text);
+            assert!(!view.read(cx).result.read(cx).enabled && !view.read(cx).dirty(cx));
+            let smoke = self.smoke.as_mut().unwrap();
+            smoke.conflict_guard = Some(snapshot.operation.clone());
+            smoke.conflict_path = Some(snapshot.path.clone());
+            smoke.worktree = Some(snapshot.result.bytes.clone());
+            smoke.result_ready = true;
+            self.branch_tab = false;
+            return;
+        }
+        assert_eq!(snapshot.presentation, Presentation::Text);
+        let target = if snapshot.result.bytes == SMOKE_RESULT.as_bytes() {
+            format!("{SMOKE_RESULT}\r\nВторая редакция")
+        } else {
+            SMOKE_RESULT.to_owned()
+        };
+        self.smoke.as_mut().unwrap().result_text = Some(target.clone());
+        self.smoke.as_mut().unwrap().conflict_guard = Some(snapshot.operation.clone());
+        self.smoke.as_mut().unwrap().conflict_path = Some(snapshot.path.clone());
+        self.smoke.as_mut().unwrap().worktree = Some(snapshot.result.bytes.clone());
+        view.update(cx, |view, cx| {
+            let original = view.result.read(cx).buffer.text().to_owned();
+            let revision = view.result.read(cx).buffer.revision;
+            let key = |stroke| KeyDownEvent {
+                keystroke: Keystroke::parse(stroke).unwrap(),
+                is_held: false,
+            };
+            if !hunkra_core::conflict_chunks::chunks(original.as_bytes())
+                .unwrap()
+                .is_empty()
+            {
+                view.take_chunk(
+                    0,
+                    revision,
+                    hunkra_core::conflict_chunks::ChunkChoice::AThenB,
+                    cx,
+                );
+                view.result
+                    .update(cx, |editor, cx| editor.key_down(&key("ctrl-z"), window, cx));
+                assert_eq!(view.result.read(cx).buffer.text(), original);
+            }
+            view.result.update(cx, |editor, cx| {
+                window.focus(&editor.focus_handle(cx));
+                let length = editor.buffer.utf16_offset(editor.buffer.text().len());
+                editor.replace_text_in_range(Some(0..length), &target, window, cx);
+                editor.key_down(&key("ctrl-z"), window, cx);
+                assert_eq!(editor.buffer.text(), original);
+                editor.key_down(&key("ctrl-shift-z"), window, cx);
+                assert_eq!(editor.buffer.text(), target);
+                editor.buffer.select(0, false);
+                editor.buffer.select("Результат".len(), true);
+                cx.notify();
+            });
+        });
+        self.smoke.as_mut().unwrap().result_selection =
+            Some(view.read(cx).result.read(cx).buffer.selection);
+        self.smoke.as_mut().unwrap().result_ready = true;
+        self.branch_tab = false;
+    }
+    /// Verifies native Result persistence/resolve/continue and product confirmations on disposable repos.
+    fn smoke_conflict_tick(&mut self, cx: &mut Context<Self>) {
+        let smoke = self.smoke.as_ref().unwrap();
+        if !smoke.result_ready
+            || self.writing
+            || self.scanning
+            || self.diff_loading
+            || self.frames <= smoke.last_frame
+        {
+            return;
+        }
+        let phase = smoke.phase;
+        let action = smoke.operation.clone().unwrap();
+        if action == "conflict-external" {
+            self.smoke_external_conflict_tick(cx);
+            return;
+        }
+        let target = smoke.result_text.clone().unwrap();
+        if phase == 9 && !action.contains("restage") || phase == 11 {
+            assert_eq!(self.last_write_backend, Some("git-cli"));
+            self.finish_conflict_smoke(cx);
+            return;
+        }
+        let Some(view) = self.conflict.clone() else {
+            return;
+        };
+        if phase == 0 {
+            assert!(view.read(cx).dirty(cx));
+        } else if phase <= 3 {
+            let editor = &view.read(cx).result.read(cx).buffer;
+            assert_eq!(editor.text(), target);
+            assert_eq!(Some(editor.selection), smoke.result_selection);
+            let revision = editor.revision;
+            let generation = self.scan_generation;
+            self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 1], cx);
+            if phase <= 2 {
+                view.update(cx, |view, cx| view.toggle_base(cx));
+            }
+            assert_eq!(view.read(cx).result.read(cx).buffer.revision, revision);
+            assert_eq!(self.scan_generation, generation);
+            let label = self.t("result");
+            self.smoke.as_mut().unwrap().locales.push(label);
+            if phase == 3 {
+                assert!(!self.request_close(cx));
+                assert!(
+                    self.confirmation
+                        .as_ref()
+                        .is_some_and(|prompt| prompt.kind == ConfirmationKind::Dirty)
+                );
+                self.cancel_confirmation(cx);
+                let selected = self.view.selected.clone();
+                self.select(PathBuf::from("unreviewed-navigation"), cx);
+                assert!(self.confirmation.is_some());
+                assert_eq!(self.view.selected, selected);
+                self.write_index(Selection::File, cx);
+                self.commit(cx);
+                self.create_branch(cx);
+                assert!(!self.writing);
+                self.cancel_confirmation(cx);
+                assert!(view.read(cx).dirty(cx));
+                if action == "conflict-save-navigate" {
+                    self.select(PathBuf::from("g"), cx);
+                    assert!(self.confirmation.is_some());
+                    self.save_before_intent(cx);
+                    assert!(self.confirmation.is_none());
+                }
+                if action.contains("stale") {
+                    let path = self
+                        .root
+                        .as_ref()
+                        .unwrap()
+                        .join(self.smoke.as_ref().unwrap().conflict_path.as_ref().unwrap());
+                    std::fs::write(path, b"external edit\r\n").unwrap();
+                }
+                if action != "conflict-save-navigate" {
+                    self.refresh(cx);
+                }
+            }
+        } else if phase == 4 {
+            if action == "conflict-save-navigate" {
+                assert_eq!(
+                    self.view.selected.as_deref(),
+                    Some(std::path::Path::new("g"))
+                );
+                assert_eq!(self.last_write_backend, Some("filesystem"));
+                assert_eq!(
+                    hunkra_core::prepare_operation(self.root.as_ref().unwrap()).unwrap(),
+                    self.smoke.as_ref().unwrap().conflict_guard.clone().unwrap()
+                );
+                self.finish_conflict_smoke(cx);
+                return;
+            }
+            assert_eq!(view.read(cx).result.read(cx).buffer.text(), target);
+            assert_eq!(
+                Some(view.read(cx).result.read(cx).buffer.selection),
+                self.smoke.as_ref().unwrap().result_selection
+            );
+            if action.contains("stale") {
+                assert!(view.read(cx).draft.stale);
+                view.update(cx, |view, cx| view.save(cx));
+                assert!(!self.writing);
+                self.finish_conflict_smoke(cx);
+                return;
+            }
+            if action.contains("delete") {
+                view.update(cx, |view, cx| view.choose_presence(false, cx));
+            }
+            view.update(cx, |view, cx| view.save(cx));
+        } else if phase == 5 && action.contains("delete") {
+            assert!(
+                self.confirmation
+                    .as_ref()
+                    .is_some_and(|prompt| prompt.kind == ConfirmationKind::Deletion)
+            );
+            let path = self
+                .root
+                .as_ref()
+                .unwrap()
+                .join(self.smoke.as_ref().unwrap().conflict_path.as_ref().unwrap());
+            assert!(path.exists());
+            if action.contains("cancel") {
+                self.cancel_confirmation(cx);
+                assert!(view.read(cx).dirty(cx));
+                assert_eq!(
+                    hunkra_core::prepare_operation(self.root.as_ref().unwrap()).unwrap(),
+                    self.smoke.as_ref().unwrap().conflict_guard.clone().unwrap()
+                );
+                self.finish_conflict_smoke(cx);
+                return;
+            }
+            self.confirm_intent(cx);
+        } else if phase == 6 {
+            if action.contains("refusal") {
+                assert!(self.write_error_key.is_some());
+                assert!(!self.close_requested);
+                assert!(view.read(cx).dirty(cx));
+                assert_eq!(view.read(cx).result.read(cx).buffer.text(), target);
+                self.finish_conflict_smoke(cx);
+                return;
+            }
+            assert_eq!(self.last_write_backend, Some("filesystem"));
+            assert_eq!(
+                hunkra_core::prepare_operation(self.root.as_ref().unwrap()).unwrap(),
+                self.smoke.as_ref().unwrap().conflict_guard.clone().unwrap()
+            );
+            assert!(!view.read(cx).snapshot.resolved);
+            assert!(!view.read(cx).dirty(cx));
+            let path = self
+                .root
+                .as_ref()
+                .unwrap()
+                .join(self.smoke.as_ref().unwrap().conflict_path.as_ref().unwrap());
+            if action.contains("delete") {
+                assert!(!path.exists());
+            } else {
+                assert_eq!(std::fs::read(path).unwrap(), target.as_bytes());
+            }
+            if action.ends_with("save") {
+                self.finish_conflict_smoke(cx);
+                return;
+            }
+        } else if phase == 7 {
+            view.update(cx, |view, cx| view.resolve(cx));
+        } else if phase == 8 {
+            assert_eq!(self.last_write_backend, Some("gix"));
+            assert!(view.read(cx).snapshot.resolved && view.read(cx).snapshot.result_staged);
+            if action.contains("restage") {
+                view.update(cx, |view, cx| {
+                    view.take_side(false, cx);
+                    assert!(view.dirty(cx));
+                    view.save(cx);
+                });
+            } else {
+                if !action.ends_with("continue") {
+                    self.finish_conflict_smoke(cx);
+                    return;
+                }
+                self.perform_operation(OperationAction::Continue, cx);
+                assert!(self.writing);
+            }
+        } else if phase == 9 {
+            assert_eq!(self.last_write_backend, Some("filesystem"));
+            assert!(view.read(cx).snapshot.resolved && !view.read(cx).snapshot.result_staged);
+            self.perform_operation(OperationAction::Continue, cx);
+            assert!(!self.writing);
+            assert_eq!(self.write_error_key, Some("error-result-index"));
+            view.update(cx, |view, cx| view.resolve(cx));
+        } else if phase == 10 {
+            assert_eq!(self.last_write_backend, Some("gix"));
+            assert!(view.read(cx).snapshot.result_staged);
+            self.perform_operation(OperationAction::Continue, cx);
+            assert!(self.writing);
+        }
+        let smoke = self.smoke.as_mut().unwrap();
+        smoke.phase += 1;
+        smoke.last_frame = self.frames;
+        cx.notify();
+    }
+    /// Exercises read-only unsupported sources and explicit resolution of externally saved fixture bytes.
+    fn smoke_external_conflict_tick(&mut self, cx: &mut Context<Self>) {
+        let phase = self.smoke.as_ref().unwrap().phase;
+        let view = self.conflict.clone().unwrap();
+        assert_ne!(view.read(cx).snapshot.presentation, Presentation::Text);
+        assert!(!view.read(cx).result.read(cx).enabled && !view.read(cx).dirty(cx));
+        if phase <= 3 {
+            assert_eq!(self.last_write_backend, None);
+            let before = hunkra_core::prepare_operation(self.root.as_ref().unwrap()).unwrap();
+            assert_eq!(
+                before,
+                self.smoke.as_ref().unwrap().conflict_guard.clone().unwrap()
+            );
+            if phase > 0 {
+                let generation = self.scan_generation;
+                self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 1], cx);
+                view.update(cx, |view, cx| {
+                    view.toggle_base(cx);
+                    view.save(cx);
+                });
+                assert!(!self.writing);
+                assert_eq!(self.scan_generation, generation);
+                let label = self.t("result");
+                self.smoke.as_mut().unwrap().locales.push(label);
+            }
+        } else if phase == 4 {
+            view.update(cx, |view, cx| view.resolve(cx));
+        } else {
+            assert_eq!(self.last_write_backend, Some("gix"));
+            assert!(view.read(cx).snapshot.resolved && view.read(cx).snapshot.result_staged);
+            let path = self
+                .root
+                .as_ref()
+                .unwrap()
+                .join(&view.read(cx).snapshot.path);
+            assert_eq!(
+                std::fs::read(path).unwrap(),
+                self.smoke.as_ref().unwrap().worktree.clone().unwrap()
+            );
+            self.finish_conflict_smoke(cx);
+            return;
+        }
+        let smoke = self.smoke.as_mut().unwrap();
+        smoke.phase += 1;
+        smoke.last_frame = self.frames;
+        cx.notify();
+    }
+    /// Writes compact fixture evidence only after the native flow has reached its asserted state.
+    fn finish_conflict_smoke(&mut self, cx: &mut Context<Self>) {
+        let smoke = self.smoke.as_ref().unwrap();
+        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"locales":smoke.locales,
+            "scenario":smoke.operation,"writer_backend":self.last_write_backend,"dirty_confirmation":smoke.operation.as_deref()!=Some("conflict-external"),
+            "delete_confirmation":smoke.operation.as_deref().is_some_and(|action| action.contains("delete")),
+            "draft_retained":true,"close_cancelled":!self.close_requested,"saved_file":smoke.conflict_path,
+            "second_edit":smoke.result_text.as_deref().is_some_and(|text| text != SMOKE_RESULT)});
+        std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
+        cx.quit();
+    }
     /// Exercises real native input callbacks, Cyrillic composition and editing keys in the smoke window.
     fn smoke_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.smoke_conflict_input(window, cx);
         if self
             .smoke
             .as_ref()
@@ -1749,6 +2493,10 @@ impl Hunkra {
     fn operation_bar(&self, cx: &Context<Self>) -> Option<gpui::Div> {
         let state = self.operation.as_ref()?.state.as_ref()?;
         let ready = !self.writing && !self.scanning;
+        let result_ready = self.conflict.as_ref().is_none_or(|view| {
+            let view = view.read(cx);
+            !view.dirty(cx) && !view.draft.awaiting_refresh && view.snapshot.result_staged
+        });
         let unresolved = self
             .view
             .repository
@@ -1792,7 +2540,11 @@ impl Hunkra {
             bar = bar
                 .child(
                     button("continue-operation", self.t("continue-operation"), false)
-                        .opacity(if ready && !unresolved { 1. } else { 0.5 })
+                        .opacity(if ready && !unresolved && result_ready {
+                            1.
+                        } else {
+                            0.5
+                        })
                         .on_click(cx.listener(|app, _, _, cx| {
                             app.perform_operation(OperationAction::Continue, cx)
                         })),
@@ -1818,6 +2570,11 @@ impl Hunkra {
     }
     /// Displays correctly labeled comparison sources and a virtual shared diff surface.
     fn diff_panel(&self, cx: &Context<Self>) -> gpui::Div {
+        if let Some(conflict) = &self.conflict
+            && self.view.selected.as_ref() == Some(&conflict.read(cx).snapshot.path)
+        {
+            return div().flex_1().min_h_0().min_w_0().child(conflict.clone());
+        }
         let mut panel = div().flex_1().min_w_0().flex().flex_col().overflow_hidden();
         let header = div()
             .p_3()
@@ -2128,6 +2885,9 @@ impl Render for Hunkra {
             );
         }
         content = content.child(toolbar);
+        if let Some(prompt) = self.confirmation_panel(cx) {
+            content = content.child(prompt);
+        }
         if let Some(error) = self.write_error_key.or(self.error_key) {
             content = content.child(
                 div()

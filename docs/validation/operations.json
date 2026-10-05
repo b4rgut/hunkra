@@ -5,7 +5,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "branch",
       "write_backend": "gix",
       "write_error": null,
@@ -17,7 +17,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "c5a7f495ba5e82c891e5c3ac310a1ea80ff47387",
+      "head": "cd99ceba78f53d25fb311a20ab9ae5a622bcb2c1",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -27,7 +27,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "branch",
       "write_backend": "gix",
       "write_error": null,
@@ -39,7 +39,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "ccce23f7f8caecf2683e9179d27a792b30afa5255cd3b15b518e5c448a343fb6",
+      "head": "55c9af995df0d0e291bb0b7261f61412bec09320d244389ed771e0dcc6749dd5",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -49,7 +49,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "branch-refusal",
       "write_backend": null,
       "write_error": "error-branch-exists",
@@ -61,7 +61,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "dc27dbb3fbe372c3355fe791ac82e6cb275c533f",
+      "head": "911ba9b795b6ea6ade6f5c1ee1294f25c30765d6",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -83,7 +83,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "553e733b231fb6bfb38433ed503ee7d03766227e",
+      "head": "7cfb13564d719b625b209a39beacfccfbff155c5",
       "branch": "other",
       "operation": null,
       "progress": null,
@@ -101,7 +101,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "merge",
       "write_backend": "git-cli",
       "write_error": null,
@@ -113,7 +113,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "b959cf6d80a800bf7cabef37d69676260d913cf4",
+      "head": "c36174ffab80b7eca7f59c4b3d7bfce459cbae8a",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -123,7 +123,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 12,
       "action": "merge-hook",
       "write_backend": null,
       "write_error": "error-operation-execution",
@@ -135,7 +135,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "897b40d410858bfb91e458bd986c74ebf32fa45e",
+      "head": "4b8bc109d9867f45c4ce4f2c7699e6fc766e1b33",
       "branch": "main",
       "operation": "Merge",
       "progress": null,
@@ -145,7 +145,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 12,
       "action": "merge",
       "write_backend": "git-cli",
       "write_error": null,
@@ -157,7 +157,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "a7a45235848d3468ad0f6b4f6334bf2cb8c0d330",
+      "head": "95843420ddefbbf29d52786b114ed1c4d9b539a7",
       "branch": "main",
       "operation": "Merge",
       "progress": null,
@@ -179,7 +179,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "a7a45235848d3468ad0f6b4f6334bf2cb8c0d330",
+      "head": "95843420ddefbbf29d52786b114ed1c4d9b539a7",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -189,7 +189,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 12,
       "action": "rebase",
       "write_backend": "git-cli",
       "write_error": null,
@@ -201,7 +201,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "af9299fb66c2f79fcbbb30ff17b8ba6a43697129",
+      "head": "3840e5058244d2d0693b536c760ab71afd67f395",
       "branch": null,
       "operation": "Rebase",
       "progress": [
@@ -226,7 +226,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "6d8c144a0ff85ebcd23489e960901f52f5b21227",
+      "head": "7f1f6fd368817c00fa0235dffcd52a175f7bf8c5",
       "branch": null,
       "operation": "Rebase",
       "progress": [
@@ -239,7 +239,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "continue",
       "write_backend": "git-cli",
       "write_error": null,
@@ -251,11 +251,36 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "03f582567dfe063495af43abe2ee65e8b634bfb5",
+      "head": "cd4378c6cef0743aa938e7de3a2e82ccc10bc78c",
       "branch": "topic",
       "operation": null,
       "progress": null,
       "outcome": "Completed",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "action": "skip",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "7274e2f4dd6f5b0cd1260f7d1acc03e4785d7309",
+      "branch": null,
+      "operation": "Rebase",
+      "progress": [
+        2,
+        2
+      ],
+      "outcome": "StoppedWithConflicts",
       "branch_created": null
     },
     {
@@ -273,32 +298,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "f0f6d397301e496f58dd7ee37460c647bb3d1097",
-      "branch": null,
-      "operation": "Rebase",
-      "progress": [
-        2,
-        2
-      ],
-      "outcome": "StoppedWithConflicts",
-      "branch_created": null
-    },
-    {
-      "ok": true,
-      "native_display": true,
-      "frames": 10,
-      "action": "skip",
-      "write_backend": "git-cli",
-      "write_error": null,
-      "route": "RebaseSequencerCoordinator",
-      "message_retained": true,
-      "branch_retained": true,
-      "locales": [
-        "Branches",
-        "Ветки",
-        "Ветки"
-      ],
-      "head": "f0f6d397301e496f58dd7ee37460c647bb3d1097",
+      "head": "7274e2f4dd6f5b0cd1260f7d1acc03e4785d7309",
       "branch": "topic",
       "operation": null,
       "progress": null,
@@ -308,7 +308,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "abort",
       "write_backend": "git-cli",
       "write_error": null,
@@ -320,7 +320,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "6198c3519183c7a50a1df3042465a09b062b88bf",
+      "head": "ba9589ed356af27782de8cbecee62b2b606d55ae",
       "branch": "topic",
       "operation": null,
       "progress": null,

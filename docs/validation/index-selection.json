@@ -1,6 +1,6 @@
 {
   "ok": true,
-  "frames": 17,
+  "frames": 19,
   "file": "Изменения с пробелом.bsl",
   "locales": [
     "Commit",
@@ -20,7 +20,7 @@
     "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
   ],
   "files": 5,
-  "elapsed_ms": 1600,
+  "elapsed_ms": 1693,
   "close_during_write": {
     "ok": true,
     "close_deferred": true,
@@ -33,11 +33,11 @@
     "ok": true,
     "selection_preserved": true,
     "write_error": "error-index-lock",
-    "frames": 13
+    "frames": 14
   },
   "commit_hook_refusal": {
     "ok": true,
-    "frames": 13,
+    "frames": 14,
     "native_display": true,
     "commit_id": null,
     "write_backend": null,
@@ -53,9 +53,9 @@
   },
   "native_commit": {
     "ok": true,
-    "frames": 13,
+    "frames": 14,
     "native_display": true,
-    "commit_id": "98879c0964b4fb5c098b961d469d121af1815e35",
+    "commit_id": "ecc09a463960449f0ed7b2a0065212f9fdb4c5d4",
     "write_backend": "gix",
     "write_error": null,
     "message_cleared": true,
@@ -72,7 +72,7 @@
     "close_deferred": true,
     "writer_finished": true,
     "write_backend": "gix",
-    "commit_id": "bb8927557ab52a36d452242df4751d27ff852e69",
+    "commit_id": "7fd3d86844632b9ceed9f13e97dc11a95f47665c",
     "message_cleared": true
   },
   "oracle": "git version 2.55.0",

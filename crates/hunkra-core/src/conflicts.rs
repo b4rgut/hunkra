@@ -4,7 +4,9 @@ use crate::{
     diff::MAX_BYTES,
     index_format::UndoStages,
     prepare_operation,
-    repository::{RepositoryGuard, at_worktree, blob, capture_guard, check_path, git_error, open},
+    repository::{
+        RepositoryGuard, at_index, at_worktree, blob, capture_guard, check_path, git_error, open,
+    },
 };
 use gix::bstr::ByteSlice;
 use std::{
@@ -33,6 +35,8 @@ pub struct ConflictSnapshot {
     pub result: Document,
     pub presentation: Presentation,
     pub resolved: bool,
+    /// Whether saved Result is the version already recorded in stage zero, after clean conversion.
+    pub result_staged: bool,
     pub operation: OperationSnapshot,
     guard: RepositoryGuard,
     stages: UndoStages,
@@ -232,6 +236,8 @@ pub fn read_conflict(root: &Path, path: &Path) -> Result<ConflictSnapshot, CoreE
             break;
         }
     }
+    let result_staged =
+        resolved && at_index(&repo, &index, path)? == at_worktree(&repo, &index, &root, path)?;
     if capture_guard(&repo, &root, path)? != guard || prepare_operation(&root)? != operation {
         return Err(CoreError::Stale);
     }
@@ -243,6 +249,7 @@ pub fn read_conflict(root: &Path, path: &Path) -> Result<ConflictSnapshot, CoreE
         result,
         presentation,
         resolved,
+        result_staged,
         operation,
         guard,
         stages,
@@ -264,6 +271,7 @@ fn verify(snapshot: &ConflictSnapshot, repo: &gix::Repository) -> Result<(), Cor
         || current.result != snapshot.result
         || current.presentation != snapshot.presentation
         || current.resolved != snapshot.resolved
+        || current.result_staged != snapshot.result_staged
     {
         return Err(CoreError::Stale);
     }
@@ -356,9 +364,6 @@ pub fn save_result(
 
 /// Explicitly records the current working file/deletion in stage zero and its former stages in REUC.
 pub fn mark_resolved(snapshot: &ConflictSnapshot) -> Result<ConflictWrite, CoreError> {
-    if snapshot.resolved {
-        return Err(CoreError::NoConflict);
-    }
     if snapshot
         .stages
         .iter()

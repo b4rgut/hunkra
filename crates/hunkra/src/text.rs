@@ -198,6 +198,36 @@ impl TextBuffer {
         self.unmark();
         true
     }
+    /// Replaces a full document with one minimal scalar-safe undo edit, retaining unchanged bytes.
+    pub fn replace_document(&mut self, text: &str) -> bool {
+        if text == self.text || text.len() > self.limit || text.contains('\0') {
+            return false;
+        }
+        self.unmark();
+        let prefix = self.boundary(
+            self.text
+                .bytes()
+                .zip(text.bytes())
+                .take_while(|(a, b)| a == b)
+                .count(),
+        );
+        let mut suffix = self.text[prefix..]
+            .bytes()
+            .rev()
+            .zip(text[prefix..].bytes().rev())
+            .take_while(|(a, b)| a == b)
+            .count();
+        while !self.text.is_char_boundary(self.text.len() - suffix)
+            || !text.is_char_boundary(text.len() - suffix)
+        {
+            suffix -= 1;
+        }
+        self.replace_bytes(
+            prefix..self.text.len() - suffix,
+            &text[prefix..text.len() - suffix],
+            true,
+        )
+    }
     /// Updates marked text; the native selected range is relative to the inserted text alone.
     pub fn compose(
         &mut self,
@@ -293,6 +323,41 @@ impl TextBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    /// Minimal document edits stay scalar-safe, bounded and reversible with the original selection.
+    fn document_choice_preserves_unicode_context_and_undo() {
+        for (original, desired) in [
+            ("prefix é\r\nконец 🦀", "prefix ê\r\nконец 🦀"),
+            ("🙂common👩‍💻", "🙃common👩‍💻"),
+            ("\u{feff}A\r\nБ", "\u{feff}A\r\n"),
+            ("", "кириллица"),
+            ("é", ""),
+        ] {
+            let mut buffer = TextBuffer::new(1024);
+            buffer.reset(original.into());
+            buffer.select(original.len(), false);
+            buffer.select(0, true);
+            let selection = buffer.selection;
+            assert!(buffer.replace_document(desired));
+            assert_eq!(buffer.text(), desired);
+            assert!(buffer.undo());
+            assert_eq!(buffer.text(), original);
+            assert_eq!(buffer.selection, selection);
+            assert!(buffer.redo());
+            assert_eq!(buffer.text(), desired);
+            let revision = buffer.revision;
+            assert!(!buffer.replace_document(desired));
+            assert!(!buffer.replace_document("\0"));
+            assert!(!buffer.replace_document(&"x".repeat(1025)));
+            assert_eq!(buffer.revision, revision);
+        }
+        let context = "контекст\r\n".repeat(10_000);
+        let mut buffer = TextBuffer::new(2 * context.len() + 1);
+        buffer.reset(format!("{context}A{context}"));
+        assert!(buffer.replace_document(&format!("{context}B{context}")));
+        let edit = buffer.undo.last().unwrap();
+        assert_eq!((&*edit.removed, &*edit.inserted), ("A", "B"));
+    }
     #[test]
     /// Cyrillic, combining marks, joined emoji and CRLF survive grapheme edits plus undo/redo.
     fn unicode_edit_roundtrip() {

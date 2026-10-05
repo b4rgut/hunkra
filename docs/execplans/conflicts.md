@@ -32,6 +32,8 @@ Wayland сценарии проверяются раздельно; physical key
 без фактической проверки. После каждого checkpoint обновить TASKS/agent-state.
 
 Проверяющий HNK-021 checkpoint: 5ad92be (`feat(operations): control merge and rebase
-from native branch panels`). HNK-022 verified 2026-10-06: 15 new conflict tests, 84 total headless, strict headless/UI Clippy; HNK-023 native UI in_progress, not certified.
+from native branch panels`). HNK-022 verified 2026-10-06: 15 new conflict tests, 84 total headless, strict headless/UI Clippy; HNK-023 native UI verified below.
 
 Source references: [Git index / REUC](https://git-scm.com/docs/gitformat-index), [Git merge stages / markers](https://git-scm.com/docs/git-merge), exact Git 2.55 source read-cache.c mode preference 2/1/3. Current locked gix-filter 0.35.0 worktree/encode_to_worktree.rs calls encoding_rs Encoder, which uses UTF-8 output for UTF-16 labels; the independent Git cat-file --filters oracle exposed this gap. Those checkout sides are explicitly unsupported before editor writes; external binary/UTF-16 resolution is certified. No change to libc pin or dependencies.
+
+HNK-023 acceptance 2026-10-06: 88 headless tests, 2 isolated input tests, strict Clippy, build-ui; 17 real Wayland Result runs plus 21 prior native regressions pass. See TASKS.md and docs/validation/conflicts.json for actual matrices. Result entities retain text/selection/undo across refresh/locale/Base toggle; a stale draft stays visible and cannot overwrite external changes. Product dirty/delete/abort/skip prompts are separate from developer permission. Save-before-navigation waits for confirmed filesystem persistence. A later Save of an already resolved Result sets result_staged=false and Continue remains blocked until explicit Mark resolved updates stage zero; REUC sources stay recoverable. No clipboard owner mutation or physical input/X11 claim.

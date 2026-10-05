@@ -68,6 +68,17 @@ impl NativeEditor {
         editor.single_line = true;
         editor
     }
+    /// Reveals an existing byte range without changing text or its undo/redo history.
+    pub fn reveal_range(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
+        self.buffer.select(range.start, false);
+        self.buffer.select(range.end, true);
+        self.scroll_row = self.buffer.text()[..self.buffer.boundary(range.start)]
+            .bytes()
+            .filter(|byte| *byte == b'\n')
+            .count();
+        self.horizontal = px(0.);
+        cx.notify();
+    }
     /// Keeps single-line values exact by refusing newline input rather than silently rewriting it.
     fn accepts(&self, text: &str) -> bool {
         !self.single_line || !text.contains(['\n', '\r'])

@@ -296,6 +296,28 @@ fn marker_absence_is_not_resolution_and_literal_markers_are_allowed() {
 }
 
 #[test]
+/// Editing a previously resolved Result never stages implicitly; a second explicit resolve updates it.
+fn saved_result_after_resolution_requires_another_index_action() {
+    let repo = merge("sha1");
+    let snapshot = read_conflict(repo.path(), Path::new("f")).unwrap();
+    save_result(&snapshot, &snapshot.a.worktree).unwrap();
+    mark_resolved(&read_conflict(repo.path(), Path::new("f")).unwrap()).unwrap();
+    let before = read_conflict(repo.path(), Path::new("f")).unwrap();
+    assert!(before.resolved && before.result_staged);
+    let desired = Document::present(b"second result\n".to_vec(), Some(0o100644));
+    save_result(&before, &desired).unwrap();
+    assert_eq!(repo.git(&["show", ":f"]), b"current\n");
+    let after = read_conflict(repo.path(), Path::new("f")).unwrap();
+    assert!(after.resolved && !after.result_staged);
+    mark_resolved(&after).unwrap();
+    assert_eq!(repo.git(&["show", ":f"]), desired.bytes);
+    let recovered = read_conflict(repo.path(), Path::new("f")).unwrap();
+    assert_eq!(recovered.a, before.a);
+    assert_eq!(recovered.b, before.b);
+    assert!(recovered.result_staged);
+}
+
+#[test]
 /// Exact snapshots refuse changed Result, index, operation and raw HEAD identity before any write.
 fn stale_and_foreign_locks_preserve_every_file() {
     for change in [

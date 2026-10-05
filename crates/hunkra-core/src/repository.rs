@@ -317,7 +317,7 @@ fn at_head(repo: &gix::Repository, path: &Path) -> Result<Document, CoreError> {
 }
 
 /// Reads the unconflicted index entry without collapsing missing entries into errors.
-fn at_index(
+pub(crate) fn at_index(
     repo: &gix::Repository,
     index: &gix::index::State,
     path: &Path,
