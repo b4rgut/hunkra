@@ -1,0 +1,463 @@
+{
+  "ok": true,
+  "fixture_only": true,
+  "physical_input_claim": false,
+  "runs": [
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 19,
+      "history_frames": 15,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-pages",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "941900dfd28acd94096f800f54f130f8a62621a3",
+          "offset": 100,
+          "commit": "60b34dac9f16f50dbe25d2811564f88991daa649",
+          "base_id": "7b23ca24b7d009d90573a36db673ea9314bfb622",
+          "parent": "Parent(0)",
+          "file": "файл.txt",
+          "presentation": "Text",
+          "left": "строка 103\r\nбез LF",
+          "right": "строка 104\r\nбез LF",
+          "left_present": true,
+          "right_present": true,
+          "left_mode": 33188,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 17,
+      "history_frames": 14,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-merge",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
+          "offset": 0,
+          "commit": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
+          "base_id": "ba7fba68144681f4ff34eee5b58c8715081893b8",
+          "parent": "Parent(1)",
+          "file": "a",
+          "presentation": "Text",
+          "left": "",
+          "right": "A\n",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        },
+        {
+          "tip": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
+          "offset": 0,
+          "commit": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
+          "base_id": "7b6be5430d663efcc35f2407fb814668412b1abb",
+          "parent": "Parent(0)",
+          "file": "b",
+          "presentation": "Text",
+          "left": "",
+          "right": "B\r\nбез LF",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 20,
+      "history_frames": 15,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-pages",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "1ff13eda8d155615e663e33df88a8a0189112c335e6e51e7d7b610fac00c0d2e",
+          "offset": 100,
+          "commit": "46f7d9b0bd70bc1bb2653f5e5cc1770f101253f4c5e1f97d5d9b3ca65706783f",
+          "base_id": "19931c32ddf3460ef77e276acccb1ba619e8b1f5fa2ba61fee914c66e4ada83c",
+          "parent": "Parent(0)",
+          "file": "файл.txt",
+          "presentation": "Text",
+          "left": "строка 103\r\nбез LF",
+          "right": "строка 104\r\nбез LF",
+          "left_present": true,
+          "right_present": true,
+          "left_mode": 33188,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 17,
+      "history_frames": 13,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-merge",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
+          "offset": 0,
+          "commit": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
+          "base_id": "2cf3071c708e2efbd0c846426436c861896a28b989d63d5f268922dcac7bcac6",
+          "parent": "Parent(1)",
+          "file": "a",
+          "presentation": "Text",
+          "left": "",
+          "right": "A\n",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        },
+        {
+          "tip": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
+          "offset": 0,
+          "commit": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
+          "base_id": "3be93cffc727766416f86081c12521b63a56ec69ed834aa210361926ebe1cd41",
+          "parent": "Parent(0)",
+          "file": "b",
+          "presentation": "Text",
+          "left": "",
+          "right": "B\r\nбез LF",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 17,
+      "history_frames": 14,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-root",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "53047e8bb724f4e47afbb92e229e98f5bd7f5d49",
+          "offset": 0,
+          "commit": "184edae48109143e82abd7e932a84e967f8e13cb",
+          "base_id": null,
+          "parent": "EmptyTree",
+          "file": "file",
+          "presentation": "Text",
+          "left": "",
+          "right": "﻿root\r\nбез LF",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        },
+        {
+          "tip": "53047e8bb724f4e47afbb92e229e98f5bd7f5d49",
+          "offset": 0,
+          "commit": "53047e8bb724f4e47afbb92e229e98f5bd7f5d49",
+          "base_id": "184edae48109143e82abd7e932a84e967f8e13cb",
+          "parent": "Parent(0)",
+          "file": "file",
+          "presentation": "Text",
+          "left": "﻿root\r\nбез LF",
+          "right": "second\n",
+          "left_present": true,
+          "right_present": true,
+          "left_mode": 33188,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 15,
+      "history_frames": 11,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-file:binary",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "offset": 0,
+          "commit": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "base_id": "a6dd4df3a21d160145c7861cb7f63088c9c93dd8811356717200a75a9ccb07a5",
+          "parent": "Parent(0)",
+          "file": "binary",
+          "presentation": "Binary",
+          "left": "",
+          "right": "binary\u0000file",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 15,
+      "history_frames": 12,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-file:large",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "offset": 0,
+          "commit": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "base_id": "a6dd4df3a21d160145c7861cb7f63088c9c93dd8811356717200a75a9ccb07a5",
+          "parent": "Parent(0)",
+          "file": "large",
+          "presentation": "TooLarge",
+          "left": "",
+          "right": "",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 15,
+      "history_frames": 12,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-file:link",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "offset": 0,
+          "commit": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "base_id": "a6dd4df3a21d160145c7861cb7f63088c9c93dd8811356717200a75a9ccb07a5",
+          "parent": "Parent(0)",
+          "file": "link",
+          "presentation": "Text",
+          "left": "",
+          "right": "base",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 40960
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "history_frames": 8,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-empty",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": null,
+          "offset": 0,
+          "commit": null,
+          "base_id": null,
+          "parent": null,
+          "file": null,
+          "presentation": null,
+          "left": null,
+          "right": null,
+          "left_present": null,
+          "right_present": null,
+          "left_mode": null,
+          "right_mode": null
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "history_frames": 10,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-encoding",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "bc50d03235efd19500fd075096d10c4cf527d646",
+          "offset": 0,
+          "commit": "bc50d03235efd19500fd075096d10c4cf527d646",
+          "base_id": "e2a4f378f3f819b1dfd6b6cd04387c48517f4775",
+          "parent": "Parent(0)",
+          "file": null,
+          "presentation": null,
+          "left": null,
+          "right": null,
+          "left_present": null,
+          "right_present": null,
+          "left_mode": null,
+          "right_mode": null
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 18,
+      "history_frames": 15,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-root",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "offset": 0,
+          "commit": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "base_id": null,
+          "parent": "EmptyTree",
+          "file": "file",
+          "presentation": "Text",
+          "left": "",
+          "right": "linked root\n",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        },
+        {
+          "tip": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "offset": 0,
+          "commit": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "base_id": null,
+          "parent": "EmptyTree",
+          "file": "file",
+          "presentation": "Text",
+          "left": "",
+          "right": "linked root\n",
+          "left_present": false,
+          "right_present": true,
+          "left_mode": null,
+          "right_mode": 33188
+        }
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 18,
+      "history_frames": 10,
+      "locales": [
+        "History",
+        "История",
+        "История"
+      ],
+      "scenario": "history-draft",
+      "backend": "gix",
+      "read_only": true,
+      "draft_retained": true,
+      "message_retained": true,
+      "reviews": [
+        {
+          "tip": "ed82c4bbb6e821927a8d309e842f3fc4d9bdc8dd",
+          "offset": 0,
+          "commit": "ed82c4bbb6e821927a8d309e842f3fc4d9bdc8dd",
+          "base_id": "8848fb311bf5a59fdce8ca182603fe3355f7246d",
+          "parent": "Parent(0)",
+          "file": "f",
+          "presentation": "Text",
+          "left": "base\n",
+          "right": "current\n",
+          "left_present": true,
+          "right_present": true,
+          "left_mode": 33188,
+          "right_mode": 33188
+        }
+      ]
+    }
+  ]
+}

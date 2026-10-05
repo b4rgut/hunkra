@@ -3,6 +3,9 @@
 pub mod conflict_view;
 #[cfg(feature = "gui")]
 pub mod editor;
+pub mod history_state;
+#[cfg(feature = "gui")]
+pub mod history_view;
 pub mod i18n;
 pub mod result_draft;
 pub mod settings;

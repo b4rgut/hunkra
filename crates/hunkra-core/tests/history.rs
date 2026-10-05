@@ -411,6 +411,49 @@ fn message_encoding_and_object_limits_are_bounded() {
     let detail = read_commit(repo.path(), &oid(&repo, "HEAD"), CommitBase::Parent(0)).unwrap();
     assert!(detail.message.is_none() && detail.summary.subject.is_none());
     assert_eq!(detail.encoding.as_deref(), Some("ISO-8859-1"));
+    repo.write(
+        "message",
+        "bytes are valid UTF-8 but the declaration is not\n",
+    );
+    repo.git(&[
+        "-c",
+        "i18n.commitEncoding=ISO-8859-1",
+        "commit",
+        "--allow-empty",
+        "-F",
+        "message",
+    ]);
+    let detail = read_commit(repo.path(), &oid(&repo, "HEAD"), CommitBase::Parent(0)).unwrap();
+    assert!(detail.message.is_none() && detail.summary.subject.is_none());
+    repo.git(&[
+        "-c",
+        "i18n.commitEncoding=UTF-8",
+        "commit",
+        "--allow-empty",
+        "-m",
+        "valid UTF-8",
+    ]);
+    let raw = repo.git(&["cat-file", "commit", "HEAD"]);
+    let header_end = raw.windows(2).position(|bytes| bytes == b"\n\n").unwrap();
+    repo.write(
+        "raw-commit",
+        [&raw[..header_end], b"\n\ntext\0with NUL\n"].concat(),
+    );
+    let null_commit = String::from_utf8(repo.git(&[
+        "hash-object",
+        "--literally",
+        "-w",
+        "-t",
+        "commit",
+        "raw-commit",
+    ]))
+    .unwrap();
+    assert!(
+        read_commit(repo.path(), null_commit.trim(), CommitBase::Parent(0))
+            .unwrap()
+            .message
+            .is_none()
+    );
     repo.write("message", vec![b'x'; 1024 * 1024 + 1]);
     repo.git(&["commit", "--allow-empty", "-F", "message"]);
     let huge = oid(&repo, "HEAD");

@@ -3532,6 +3532,7 @@ dependencies = [
  "hunkra-core",
  "serde",
  "serde_json",
+ "tempfile",
  "unic-langid",
  "unicode-segmentation",
 ]

@@ -1,39 +1,78 @@
 # Hunkra: запуск и фактическое состояние
 
-Ветка `codex/bootstrap-mvp`. Первый GUI checkpoint `b0c3699`, release config tests `35f0524`; проверенный stage implementation checkpoint `78e0081` (`feat(staging): update selected index lines through gix`). Полный MVP ещё не готов.
-
-Доступно нативное GPUI-окно: открыть repo через диалог/путь, недавние проекты, branch/unborn/detached, независимые staged/unstaged/conflict flags, side-by-side HEAD→index / index→worktree с номерами, знаками, общим vertical scroll и переходами по hunks. Три Fluent-профиля меняются без Git-запроса/потери выбранного файла и +/- строк. Refresh каждые 2 секунды, F5, Up/Down, F7/Shift-F7, Ctrl+O. Stage/unstage настоящего индекса: файл, текущий hunk и независимые +/- строки; Shift+click выбирает диапазон изменённых строк на своей стороне. Во время записи действия сериализованы, обычное закрытие окна ждёт окончания. Есть нативное многострочное сообщение и Commit только из индекса (Ctrl+Enter); кириллица/emoji, выделение, clipboard и undo/redo. Во время записи поле блокируется, после ошибки текст остаётся, после подтверждённого Commit очищается. Ошибка записи отменяет ожидающее закрытие окна.
-
-Запуск из корня `/home/akalsin/Documents/Projects/hunkra`:
+Ветка `codex/bootstrap-mvp`. Проверены staging, index-only Commit, локальные ветки,
+switch/merge/rebase, независимый Result и порционная история. Полный MVP ещё не готов:
+network, watcher/cache/load UX, RPM и общая приёмка остаются в TASKS.md.
 
 ```sh
+scripts/dev build-ui
+scripts/dev demo
 scripts/dev run "$PWD/demo-repositories/preview/changes"
 ```
 
-Готовый артефакт `/home/akalsin/Documents/Projects/hunkra/target/debug/hunkra` запускается из любого каталога с абсолютным путём repo. На этом host native dependencies/bootstrap/build выполнены. На новом Fedora host: scripts/dev bootstrap, затем build-ui. Bootstrap ставит pinned Rust/local tools и извлекает проверенные devel RPMs локально без sudo. Ресурсы встроены; standalone не зависит от соседнего Zed.
+Готовый `/home/akalsin/Documents/Projects/hunkra/target/debug/hunkra` принимает
+абсолютный путь repo из любого cwd. На новом Fedora host сначала scripts/dev
+bootstrap: pinned Rust/local tools и verified devel RPMs извлекаются локально без
+sudo. Ресурсы встроены, соседний Zed не нужен. Тёмные компактные панели, вкладки
+и status bar следуют запросу владельца; GPL editor/workspace не копировались.
 
-Демо `/home/akalsin/Documents/Projects/hunkra/demo-repositories/preview/changes`: выбрать `Изменения с пробелом.bsl`. A=10 уже в индексе, B=20/C=30 только в worktree. В unstaged сравниваются index и worktree: нажать старую и новую строки B, затем «Подготовить выбранное». Staged покажет A+B; unstaged оставит C. В staged выбрать обе строки B и отменить подготовку: индекс снова содержит A, рабочий файл остаётся A+B+C. «Подготовить участок» использует текущий hunk (F7 для перехода); отдельная кнопка обрабатывает весь файл. Также доступны new/delete/binary/BOM+CRLF/no-final-newline. Это реальные записи в выбранном demo, не симуляция.
+В Changes доступны staged/unstaged/conflict flags, HEAD→index / index→worktree
+с выровненными строками, +/- и EOF, общим vertical scroll и hunk navigation.
+Файл/hunk/независимые +/- строки записывают настоящий index; worktree не меняется.
+Shift+click выбирает диапазон на своей стороне. В demo `Изменения с пробелом.bsl`
+имеет A в index, B/C только в worktree: подготовьте обе стороны B, введите любое
+сообщение и Commit содержит A+B, оставляя C. Unstage B возвращает index к A.
+Commit hooks/signing работают; ошибка сохраняет текст без unsigned retry.
 
-`demo-repositories/preview/merge-conflict` и `rebase-conflict` показывают незавершённые внешние операции и conflict. Rebase fixture подготовлена для двух остановок. Continue/abort/skip работают по фактическому состоянию; до HNK-010 разрешите и подготовьте конфликт во внешнем Git перед Continue. Editable Result/save/mark-resolved пока отсутствуют. Новый набор: scripts/dev demo либо demo /NEW/PATH, существующий путь отвергается.
+В Branches отдельные create/switch/merge/rebase действия; выбор строки не делает
+checkout. Continue/Abort/Skip (rebase) идут по фактической незавершённой операции.
+В demo merge-conflict/rebase-conflict откройте конфликт: A / Result / B, Base
+toggle и участки A/B/A→B/B→A. Result принимает собственный текст и undo/redo.
+Save меняет только рабочий файл; затем Mark resolved отдельно пишет index;
+Continue выполняется отдельно. После новой правки resolved Result требуется
+новый Mark resolved. Несохранённый draft переживает refresh/locale/History,
+изменившийся внешний файл запрещает stale write. Dirty navigation/close и
+Abort/Skip имеют подтверждения. Binary/UTF-16 сохраняются и разрешаются внешним
+редактором, с явным ограничением native text writes.
 
-Проверено 2026-10-05: bootstrap, fmt, strict Clippy всех headless/UI targets, 69 headless tests (28 repository + 12 commit + 8 branch/state + 11 transitions + 10 app) и 2 GPUI platform tests ввода/clipboard/undo, check-i18n, native build, check-release. scripts/dev smoke /ABS/REPORT.json запускает настоящие Wayland/GPUI scenarios в disposable repos: диапазоны +/- и 3 локали, stage B, unstage hunk B, обе версии index и сохранность worktree через независимый Git; второй запуск — закрытие во время принятой записи, exit после writer без оставшегося lock; третий — отказ на чужом lock с сохранением выбора и ошибки после refresh. Доказательства: validation/first-slice.json и validation/index-selection.json. Это scripted native render/handlers, а не физическая проверка мышью. Дополнительные native scenarios: кириллица/IME/выделение и три локали, Commit A+B/C worktree, отказ commit-msg сохраняет сообщение и отменяет pending close, закрытие во время успешного Commit ждёт writer. Clipboard/registered keyboard dispatch проверены на isolated GPUI test platform; системный clipboard владельца не менялся. Directory picker, физический ввод/настроенный аппаратный IME, большие нагрузки/RAM и Fedora RPM не проверены.
+History показывает 100-row pages (cache восемь порций), сообщение и изменённые
+файлы выбранного commit. Root сравнивается с empty tree; у merge выбирается
+настоящий parent с полным OID. Raw Git blobs/modes не используют нынешние attrs.
+Rename показан как delete/add. Просмотр read-only; staging/Commit выключены.
+F5 начинает новую историю от текущего HEAD; фоновый refresh не сдвигает её tip.
+Legacy/invalid metadata объясняются явно, без старого сообщения под новым commit.
 
-Чтение, diff, attribute conversion и все реализованные index writes используют gix 0.88.0 (official gix-index/gix-lock); Для этих операций Git CLI fallback отсутствует. Commit tree/objects/ref transactions и signing также используют gix; обычные configured hooks/signers запускаются его command primitives. Для полного switch/merge/rebase coordinator Git CLI выбирается заранее по фиксированному audited gap; это не повтор после неудачной gix записи. Он также служит независимым fixture oracle/generator. Проверены SHA-1/SHA-256, unborn, linked worktree, часть replacement, new/delete/binary, CRLF/EOF, UTF-16LE attributes, clean filter и required failure, modes/permissions/symlinks, stale sources/held lock/TREE cache. Capability details и границы — gix-capabilities.md.
+Ctrl+1/2/3 переключают Changes/Branches/History; F5 refresh, Up/Down selection,
+F7/Shift+F7 hunk, Ctrl+O open, Ctrl+Enter Commit, Ctrl+Shift+Enter Continue.
+Три Fluent-профиля сохраняют message/Result/selection/undo без Git-запросов.
+Все accepted writes сериализованы; обычное закрытие ждёт writer. Ошибка отменяет
+pending close и сохраняет пользовательский ввод.
 
-Отказы до записи: split/sparse/shared/SKIP_WORKTREE, D/F collision, case/precompose variants, index symlink и executable post-index-change hook. Отдельная EOF половина, которая склеила бы две строки без newline, отвергается; полная пара работает. Неподдержанные варианты не обходятся вторым исполнителем. Index.lock защищает от кооперативных writers; raw worktree/HEAD/index повторно проверяются перед atomic replacement, без обещания универсального lock внешнего редактора.
+Проверено 2026-10-06: fmt/i18n/plan, strict headless/UI Clippy, 100 headless tests
+(83 core + 17 app), 2 isolated GPUI input/clipboard/undo tests, native build.
+12 real Wayland history windows, 17 conflict windows, 15 branch/operation и
+6 staging/Commit windows прошли с независимым Git-оракулом в disposable repos.
+Reports: docs/validation/history.json, conflicts.json, operations.json,
+index-selection.json. scripts/dev smoke|smoke-operations|smoke-conflicts|
+smoke-history принимают абсолютный report path после build-ui. Native smoke
+проверяет render/handlers/input callbacks, не физическую мышь/аппаратный IME.
+Owner clipboard не менялся. Directory picker, physical input, X11, нагрузочные
+метрики и установленный RPM ещё не сертифицированы. Nested X11 capture был пустым,
+временные процессы/failed artifacts удалены.
 
-Ограничения: история/network и редактируемый conflict Result пока отсутствуют. Для Commit явно ограничены sparse index, non-UTF-8 message encoding и некоторые cleanup settings; обычный Commit при активной операции отказывается, не подменяет continue. Длинные строки обрезаются горизонтально; diff до 2 MiB / 40k total lines / 16k byte line, status до 100k изменённых файлов. Binary/invalid encoding/large/gitlink/conflict имеют явное ограничение. Polling функционален, watcher/cache/сравнимые нагрузки ещё нужны. Никакого превосходства по скорости не заявлено.
+gix 0.88.0 читает status/diff/filters/history, пишет index/objects/refs/commit и
+resolve. Git CLI заранее выбран только для audited complete switch/merge/rebase
+coordinator gaps; failed gix write никогда не повторяется через CLI. Git также
+независимый test oracle. Exact guards/locks сохраняют данные; универсальный lock
+внешнего редактора не обещается. Split/sparse/shared/SKIP_WORKTREE и прочие
+сложные index variants имеют объяснимый отказ; см. docs/gix-capabilities.md.
+Diff ограничен 2MiB / 40k total lines / 16k byte line, status 100k changed files,
+commit metadata 1MiB, commit changed files 50k. Длинные строки пока обрезаются
+горизонтально. Никакого превосходства по скорости не заявлено.
 
-Версии verified latest stable: Rust 1.99.0, official GPUI 0.2.2, gix 0.88.0, Fluent 0.16.0; инструменты и источники — dependencies.md. Единственное compatibility exception: libc 0.2.189 в Cargo.lock из-за воспроизведённой GPUI→old xattr регрессии на 0.2.190. Lower real MSRV не установлен; поддерживаемый floor 1.99. Future-incompatibility notice proc-macro-error2 2.0.1 не скрыт.
-
-Следующая HNK-010 — редактируемый Result; HNK-009 операции проверены, Commit HNK-008 проверен. HNK-006 — reconciliation/cache/performance. HNK-014: parser/update проверяет core-only/locales-only release в temporary workspace; RPM/удалённая release chain ещё отсутствуют. Для настоящего выпуска нужны owner-configured token/environment/ruleset; они не блокируют GUI/Git. Push, публичные PR/tags/releases не выполнялись, соседний Zed чист и не изменён. Лицензию продукта владелец ещё не выбрал, GPL-код не копировался.
-
-Staging дополнен: данные REUC для восстановления разрешённого конфликта сохраняются при записи своего/другого пути, проверены SHA-1/SHA-256 и index v2–v4. Неподдержанные варианты объясняются отдельными локализованными причинами. При отказе из-за lock/EOF boundary выбор сохраняется; изменившиеся исходные версии его сбрасывают. EOF половина, которой нужен невыбранный перевод строки, требует выбрать обе стороны. HNK-017/HNK-007 проверены.
-
-Ядро Commit проверено отдельно (HNK-018): настоящий gix commit только из индекса, обычные hooks и reference-transaction, подпись SSH с независимой проверкой Git, structured failures/guards. Ядро checkpoint fbc502f. HNK-019 подключает проверенный Commit к нативному полю и общей очереди writer; проверка native input/Commit описана выше.
-
-Перед фиксацией в demo: подготовьте обе стороны B, введите произвольное сообщение в поле под diff и нажмите «Коммит»/Ctrl+Enter. Commit содержит только индекс A+B; C остаётся в worktree. Ошибки hook/signing объясняются на выбранном языке, unsigned retry отсутствует. Команда scripts/dev check-editor запускает изолированную platform-проверку редактора; check/check-ui/build-ui/smoke остаются отдельными проверками.
-
-Вкладка «Ветки» показывает локальные loose/packed/symbolic refs и короткие oid. Однострочное нативное имя + «Создать ветку» создаёт только ссылку на просмотренный HEAD, сохраняя индекс/рабочие файлы. Выбор строки не переключает репозиторий: отдельные действия Switch/Merge/Rebase используют тот же сериализованный writer. При активной операции верхняя панель показывает исходную ветку/шаг и отдельные Continue/Abort/Skip (только rebase); unresolved stages блокируют Continue. Ctrl+1/2 переключают панели, Up/Down и Enter работают в списке веток, Ctrl+Shift+Enter продолжает операцию. UI/UX следует запросу Zed: свой компактный тёмный GPUI layout, вкладки, спокойные границы и нижняя строка состояния.
-
-Дополнительные проверки: scripts/dev smoke-operations /ABS/REPORT.json — 15 настоящих Wayland окон с fixture-only mutations. Branch create SHA-1/SHA-256, input/locale/error retention, close wait, switch, merge parents/conflicts/abort, hook rejection без retry и две native rebase остановки + external recovery/continue/skip/abort. Core также проверяет внешний apply backend и interactive edit review stops; completed не показывается, пока операция активна. Вывод дочернего Git не сохраняется и не показывается произвольно; оба потока дренируются с постоянным расходом памяти, процесс ожидается. Nested X11 pixel capture дала пустой кадр и не подтверждена; временные процессы/изображение удалены. Native Wayland render/handlers проходят, physical hardware QA и X11 certification не заявляются.
+Rust 1.99.0, GPUI 0.2.2, gix 0.88.0 и Fluent 0.16.0 проверены по exact locked
+sources (docs/dependencies.md). libc 0.2.189 сохраняется из-за воспроизведённой
+GPUI→old xattr регрессии на 0.2.190. proc-macro-error2 future notice не скрыт;
+lower MSRV не проверен. release-plz core-only/locales-only fixtures проходят,
+remote release chain не выполнялась. Push/PR/product tags/releases отсутствуют,
+Zed read-only. Лицензию продукта выбирает владелец.

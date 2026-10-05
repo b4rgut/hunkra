@@ -21,6 +21,9 @@ serde_json.workspace = true
 unicode-segmentation.workspace = true
 gpui = { workspace = true, optional = true }
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [[bin]]
 name = "hunkra"
 path = "src/main.rs"

@@ -187,6 +187,9 @@ impl HistoryReader {
 /// Limits display strings at scalar boundaries, leaving unsupported non-UTF-8 metadata explicit.
 fn display(bytes: &[u8], size: usize) -> Option<String> {
     let text = std::str::from_utf8(bytes).ok()?;
+    if text.contains('\0') {
+        return None;
+    }
     let mut clipped: String = text.chars().take(size).collect();
     if text.chars().count() > size {
         clipped.push('…');
@@ -203,19 +206,33 @@ fn summary(
     }
     let author = decoded.author().map_err(git_error)?;
     let committer = decoded.committer().map_err(git_error)?;
+    let supported_text = utf8_encoding(decoded);
     Ok(CommitSummary {
         id: id.to_string(),
         parents: decoded.parents.iter().map(|id| id.to_string()).collect(),
-        subject: display(
-            decoded
-                .message
-                .split(|byte| *byte == b'\n')
-                .next()
-                .unwrap_or_default(),
-            256,
-        ),
-        author: display(author.name.as_bytes(), 256),
+        subject: supported_text
+            .then(|| {
+                display(
+                    decoded
+                        .message
+                        .split(|byte| *byte == b'\n')
+                        .next()
+                        .unwrap_or_default(),
+                    256,
+                )
+            })
+            .flatten(),
+        author: supported_text
+            .then(|| display(author.name.as_bytes(), 256))
+            .flatten(),
         commit_seconds: committer.seconds(),
+    })
+}
+/// Respects the declared commit encoding instead of guessing UTF-8 from coincidentally valid bytes.
+fn utf8_encoding(decoded: &gix::objs::CommitRef<'_>) -> bool {
+    decoded.encoding.is_none_or(|name| {
+        name.as_bytes().eq_ignore_ascii_case(b"UTF-8")
+            || name.as_bytes().eq_ignore_ascii_case(b"UTF8")
     })
 }
 /// Accepts full object ids only, preventing moving revspecs and accidental option/ref interpretation.
@@ -328,7 +345,14 @@ pub fn read_commit(root: &Path, id: &str, base: CommitBase) -> Result<CommitDeta
     Ok(CommitDetails {
         root,
         summary,
-        message: std::str::from_utf8(decoded.message).ok().map(str::to_owned),
+        message: utf8_encoding(&decoded)
+            .then(|| {
+                std::str::from_utf8(decoded.message)
+                    .ok()
+                    .filter(|text| !text.contains('\0'))
+                    .map(str::to_owned)
+            })
+            .flatten(),
         encoding: decoded
             .encoding
             .map(|name| name.to_str_lossy().into_owned()),

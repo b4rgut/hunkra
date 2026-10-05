@@ -8,6 +8,7 @@ use gpui::{
 use hunkra::{
     conflict_view::{ConflictEvent, ConflictView},
     editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
+    history_view::HistoryView,
     i18n::{Locale, Translator},
     settings::{self, Settings},
     state::ViewState,
@@ -22,6 +23,7 @@ use hunkra_core::{
 };
 use std::{
     path::PathBuf,
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -134,6 +136,10 @@ struct Smoke {
     result_text: Option<String>,
     conflict_guard: Option<OperationSnapshot>,
     conflict_path: Option<PathBuf>,
+    history_input: bool,
+    history_selection: Option<hunkra::text::Selection>,
+    history_text: Option<String>,
+    history_reviews: Vec<serde_json::Value>,
 }
 struct Hunkra {
     view: ViewState,
@@ -147,6 +153,8 @@ struct Hunkra {
     branch_input: Entity<NativeEditor>,
     conflict: Option<Entity<ConflictView>>,
     conflict_subscription: Option<Subscription>,
+    history: Option<Entity<HistoryView>>,
+    history_tab: bool,
     confirmation: Option<Confirmation>,
     after_save: Option<Intent>,
     applying_intent: bool,
@@ -306,6 +314,8 @@ impl Hunkra {
             branch_input,
             conflict: None,
             conflict_subscription: None,
+            history: None,
+            history_tab: false,
             confirmation: None,
             after_save: None,
             applying_intent: false,
@@ -394,6 +404,10 @@ impl Hunkra {
                 result_text: None,
                 conflict_guard: None,
                 conflict_path: None,
+                history_input: false,
+                history_selection: None,
+                history_text: None,
+                history_reviews: Vec::new(),
             }),
         };
         if let Some(root) = root {
@@ -664,6 +678,9 @@ impl Hunkra {
         if let Some(conflict) = &self.conflict {
             conflict.update(cx, |view, cx| view.set_locale(locale, cx));
         }
+        if let Some(history) = &self.history {
+            history.update(cx, |view, cx| view.set_locale(locale, cx));
+        }
         let placeholder = self.t("commit-placeholder");
         self.message.update(cx, |editor, cx| {
             editor.placeholder = placeholder.into();
@@ -692,6 +709,8 @@ impl Hunkra {
         self.conflict = None;
         self.conflict_subscription = None;
         self.reviewed_commit = None;
+        self.history = None;
+        self.history_tab = false;
         self.branches = None;
         self.operation = None;
         self.reviewed_operation = None;
@@ -737,6 +756,43 @@ impl Hunkra {
         self.last_scan = Instant::now();
         self.status_worker.submit(self.scan_generation, root);
         cx.notify();
+    }
+    /// Lazily opens immutable history while preserving the host's unsaved Result/message/selection.
+    fn select_tab(&mut self, index: usize, cx: &mut Context<Self>) {
+        if self.writing || self.confirmation.is_some() {
+            return;
+        }
+        self.history_tab = index == 2;
+        self.branch_tab = index == 1;
+        if self.history_tab
+            && self.history.is_none()
+            && let Some(root) = self.root.clone()
+        {
+            self.history = Some(cx.new(|cx| HistoryView::new(root, self.view.locale, cx)));
+        }
+        cx.notify();
+    }
+    /// Gives keyboard navigation to the displayed native tab rather than a hidden message editor.
+    fn focus_tab(&self, window: &mut Window, cx: &Context<Self>) {
+        if self.history_tab
+            && let Some(history) = &self.history
+        {
+            window.focus(&history.read(cx).focus_handle(cx));
+        } else {
+            window.focus(&self.focus);
+        }
+    }
+    /// Manual refresh restarts history at current HEAD; background status polls keep its immutable tip.
+    fn refresh_visible(&mut self, cx: &mut Context<Self>) {
+        if self.history_tab
+            && let Some(history) = &self.history
+        {
+            history.update(cx, |view, cx| view.reload(cx));
+        } else if self.scanning {
+            self.refresh_queued = true;
+        } else {
+            self.refresh(cx);
+        }
     }
     /// Uses GPUI's asynchronous native directory picker.
     fn choose_repository(&mut self, cx: &mut Context<Self>) {
@@ -878,7 +934,7 @@ impl Hunkra {
     }
     /// Serializes index writes; active reads are invalidated and fresh status follows completion.
     fn write_index(&mut self, selection: Selection, cx: &mut Context<Self>) {
-        if self.writing || self.confirmation.is_some() {
+        if self.writing || self.confirmation.is_some() || self.history_tab {
             return;
         }
         let (Some(root), Some(diff)) = (self.root.clone(), self.view.diff.clone()) else {
@@ -891,7 +947,12 @@ impl Hunkra {
     }
     /// Captures the reviewed repository and user text before entering the shared writer.
     fn commit(&mut self, cx: &mut Context<Self>) {
-        if self.writing || self.scanning || self.diff_loading || self.confirmation.is_some() {
+        if self.writing
+            || self.scanning
+            || self.diff_loading
+            || self.confirmation.is_some()
+            || self.history_tab
+        {
             return;
         }
         let Some(snapshot) = self.reviewed_commit.clone() else {
@@ -1002,6 +1063,9 @@ impl Hunkra {
     /// Reads completed mailboxes, rejecting obsolete generations before touching UI state.
     fn poll(&mut self, cx: &mut Context<Self>) {
         let mut changed = false;
+        if let Some(history) = &self.history {
+            history.update(cx, |view, cx| view.poll(cx));
+        }
         if let Some((generation, result)) = self.status_worker.take()
             && generation == self.scan_generation
         {
@@ -1235,7 +1299,7 @@ impl Hunkra {
         cx.notify();
     }
     /// Provides file/hunk navigation and open/refresh keyboard shortcuts.
-    fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
         if self.confirmation.is_some() {
             if key == "escape" {
@@ -1252,24 +1316,35 @@ impl Hunkra {
             return;
         }
         if key == "f5" {
-            if self.scanning {
-                self.refresh_queued = true;
-            } else {
-                self.refresh(cx);
-            }
+            self.refresh_visible(cx);
             return;
         }
         if key == "f7" {
+            if self.history_tab {
+                return;
+            }
             self.move_hunk(!event.keystroke.modifiers.shift, cx);
             return;
         }
-        if event.keystroke.modifiers.control && matches!(key, "1" | "2") {
-            self.branch_tab = key == "2";
-            cx.notify();
+        if event.keystroke.modifiers.control && matches!(key, "1" | "2" | "3") {
+            self.select_tab(
+                if key == "1" {
+                    0
+                } else if key == "2" {
+                    1
+                } else {
+                    2
+                },
+                cx,
+            );
+            self.focus_tab(window, cx);
             return;
         }
         if event.keystroke.modifiers.control && event.keystroke.modifiers.shift && key == "enter" {
             self.perform_operation(OperationAction::Continue, cx);
+            return;
+        }
+        if self.history_tab {
             return;
         }
         if self.branch_tab && key == "enter" {
@@ -1333,6 +1408,14 @@ impl Hunkra {
             let report = serde_json::json!({"ok":false,"reason":"timeout","frames":self.frames,"error":self.error_key});
             let _ = std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap());
             cx.quit();
+            return;
+        }
+        if smoke
+            .operation
+            .as_deref()
+            .is_some_and(|action| action.starts_with("history"))
+        {
+            self.smoke_history_tick(cx);
             return;
         }
         if smoke
@@ -1681,13 +1764,190 @@ impl Hunkra {
         smoke.last_frame = self.frames;
         cx.notify();
     }
+    /// Captures fixture-only historical sources after their matching native read has completed.
+    fn history_review(&self, cx: &Context<Self>) -> serde_json::Value {
+        let view = self.history.as_ref().unwrap().read(cx);
+        serde_json::json!({"tip":view.cache.current().and_then(|page| page.tip.clone()), "offset":view.cache.current().map(|page| page.offset),
+            "commit":view.details.as_ref().map(|detail| &detail.summary.id), "base_id":view.details.as_ref().and_then(|detail| detail.base_id.clone()),
+            "parent":view.details.as_ref().map(|detail| format!("{:?}",detail.base)), "file":view.selected_file,
+            "presentation":view.diff.as_ref().map(|diff| format!("{:?}",diff.presentation)),
+            "left":view.diff.as_ref().and_then(|diff| String::from_utf8(diff.left.bytes.clone()).ok()),
+            "right":view.diff.as_ref().and_then(|diff| String::from_utf8(diff.right.bytes.clone()).ok()),
+            "left_present":view.diff.as_ref().map(|diff| diff.left.present), "right_present":view.diff.as_ref().map(|diff| diff.right.present),
+            "left_mode":view.diff.as_ref().and_then(|diff| diff.left.mode), "right_mode":view.diff.as_ref().and_then(|diff| diff.right.mode)} )
+    }
+    /// Drives actual history handlers in finite Wayland fixtures, including host draft retention.
+    fn smoke_history_tick(&mut self, cx: &mut Context<Self>) {
+        let smoke = self.smoke.as_ref().unwrap();
+        if self.writing
+            || self.scanning
+            || self.diff_loading
+            || self.view.repository.is_none()
+            || !smoke.input_prepared
+            || self.frames <= smoke.last_frame
+        {
+            return;
+        }
+        let phase = smoke.phase;
+        let action = smoke.operation.clone().unwrap();
+        if phase == 0 {
+            if action == "history-draft" && !smoke.result_ready {
+                return;
+            }
+            self.select_tab(2, cx);
+        } else {
+            let Some(history) = self.history.clone() else {
+                return;
+            };
+            let view = history.read(cx);
+            if view.loading
+                || view.frames == 0
+                || view.cache.current().is_none()
+                || (view.details.is_some() && !smoke.history_input)
+            {
+                return;
+            }
+            assert!(view.error.is_none());
+            if phase <= 3 {
+                let preserved = (
+                    view.generation,
+                    view.cache.current().unwrap().offset,
+                    view.selected.clone(),
+                    view.details.as_ref().map(|detail| detail.base),
+                    view.selected_file.clone(),
+                    view.diff.as_ref().map(Arc::as_ptr),
+                );
+                let selection = view.message.read(cx).buffer.selection;
+                let text = view.message.read(cx).buffer.text().to_owned();
+                let revision = view.message.read(cx).buffer.revision;
+                let generation = self.scan_generation;
+                self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 1], cx);
+                let view = history.read(cx);
+                assert_eq!(
+                    preserved,
+                    (
+                        view.generation,
+                        view.cache.current().unwrap().offset,
+                        view.selected.clone(),
+                        view.details.as_ref().map(|detail| detail.base),
+                        view.selected_file.clone(),
+                        view.diff.as_ref().map(Arc::as_ptr)
+                    )
+                );
+                let message = &view.message.read(cx).buffer;
+                assert_eq!(
+                    (message.selection, message.text(), message.revision),
+                    (selection, text.as_str(), revision)
+                );
+                assert_eq!(self.scan_generation, generation);
+                self.commit(cx);
+                self.write_index(Selection::File, cx);
+                assert!(!self.writing && self.last_write_backend.is_none());
+                let label = self.t("history");
+                self.smoke.as_mut().unwrap().locales.push(label);
+            } else if phase == 4 {
+                if action == "history-pages" {
+                    history.update(cx, |view, cx| view.next_page(cx));
+                } else if action == "history-merge" {
+                    history.update(cx, |view, cx| view.select_parent(1, cx));
+                } else if action == "history-root" {
+                    let count = view.cache.current().unwrap().commits.len();
+                    history.update(cx, |view, cx| view.select_commit(count - 1, cx));
+                } else if let Some(file) = action.strip_prefix("history-file:") {
+                    let index = view
+                        .details
+                        .as_ref()
+                        .unwrap()
+                        .files
+                        .iter()
+                        .position(|entry| entry.path == std::path::Path::new(file))
+                        .unwrap();
+                    history.update(cx, |view, cx| view.select_file(index, cx));
+                } else if action == "history-draft" {
+                    self.select_tab(0, cx);
+                }
+            } else if phase == 5 {
+                if action == "history-pages" {
+                    assert_eq!(view.cache.current().unwrap().offset, 100);
+                    history.update(cx, |view, cx| view.previous_page(cx));
+                } else if action == "history-merge" {
+                    assert_eq!(
+                        view.details.as_ref().unwrap().base,
+                        hunkra_core::CommitBase::Parent(1)
+                    );
+                    let review = self.history_review(cx);
+                    self.smoke.as_mut().unwrap().history_reviews.push(review);
+                } else if action == "history-root" {
+                    assert_eq!(
+                        view.details.as_ref().unwrap().base,
+                        hunkra_core::CommitBase::EmptyTree
+                    );
+                    let review = self.history_review(cx);
+                    self.smoke.as_mut().unwrap().history_reviews.push(review);
+                } else if action == "history-draft" {
+                    self.select_tab(2, cx);
+                }
+            } else if phase == 6 {
+                if action == "history-pages" {
+                    assert_eq!(view.cache.current().unwrap().offset, 0);
+                    history.update(cx, |view, cx| view.next_page(cx));
+                } else if action == "history-merge" {
+                    history.update(cx, |view, cx| view.select_parent(0, cx));
+                } else if action == "history-root" {
+                    self.refresh_visible(cx);
+                }
+            } else if phase == 7 {
+                if action == "history-pages" {
+                    assert_eq!(view.cache.current().unwrap().offset, 100);
+                }
+                if action == "history-merge" {
+                    assert_eq!(
+                        view.details.as_ref().unwrap().base,
+                        hunkra_core::CommitBase::Parent(0)
+                    );
+                }
+                if action == "history-root" {
+                    assert_eq!(
+                        view.selected.as_ref().unwrap().id,
+                        view.cache.current().unwrap().tip.clone().unwrap()
+                    );
+                }
+            } else {
+                let review = self.history_review(cx);
+                let smoke = self.smoke.as_mut().unwrap();
+                smoke.history_reviews.push(review);
+                let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"history_frames":history.read(cx).frames,
+                    "locales":smoke.locales,"scenario":action,"backend":"gix","read_only":self.last_write_backend.is_none(),
+                    "draft_retained":true,"message_retained":self.message.read(cx).buffer.text()==SMOKE_MESSAGE,"reviews":smoke.history_reviews});
+                std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
+                cx.quit();
+                return;
+            }
+        }
+        if action == "history-draft" && phase > 0 {
+            let conflict = self.conflict.as_ref().unwrap().read(cx);
+            assert!(conflict.dirty(cx));
+            assert_eq!(
+                conflict.result.read(cx).buffer.text(),
+                self.smoke.as_ref().unwrap().result_text.as_deref().unwrap()
+            );
+            assert_eq!(
+                Some(conflict.result.read(cx).buffer.selection),
+                self.smoke.as_ref().unwrap().result_selection
+            );
+        }
+        let smoke = self.smoke.as_mut().unwrap();
+        smoke.phase += 1;
+        smoke.last_frame = self.frames;
+        cx.notify();
+    }
     /// Exercises chunk choices, real Result input and keyboard undo/redo in a finite fixture window.
     fn smoke_conflict_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.smoke.as_ref().is_some_and(|smoke| {
             smoke
                 .operation
                 .as_deref()
-                .is_some_and(|action| action.starts_with("conflict"))
+                .is_some_and(|action| action.starts_with("conflict") || action == "history-draft")
                 && !smoke.result_ready
         }) {
             return;
@@ -2015,6 +2275,30 @@ impl Hunkra {
     /// Exercises real native input callbacks, Cyrillic composition and editing keys in the smoke window.
     fn smoke_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.smoke_conflict_input(window, cx);
+        if self.smoke.as_ref().is_some_and(|smoke| {
+            !smoke.history_input
+                && smoke
+                    .operation
+                    .as_deref()
+                    .is_some_and(|action| action.starts_with("history"))
+        }) && let Some(history) = &self.history
+            && history.read(cx).details.is_some()
+            && !history.read(cx).loading
+        {
+            let editor = history.read(cx).message.clone();
+            editor.update(cx, |editor, cx| {
+                let original = editor.buffer.text().to_owned();
+                editor.replace_text_in_range(None, "readonly refusal", window, cx);
+                assert_eq!(editor.buffer.text(), original);
+                editor.buffer.select(0, false);
+                editor.buffer.select(6, true);
+                cx.notify();
+            });
+            let smoke = self.smoke.as_mut().unwrap();
+            smoke.history_input = true;
+            smoke.history_selection = Some(editor.read(cx).buffer.selection);
+            smoke.history_text = Some(editor.read(cx).buffer.text().to_owned());
+        }
         if self
             .smoke
             .as_ref()
@@ -2247,32 +2531,6 @@ impl Hunkra {
             .bg(rgb(PANEL))
             .border_r_1()
             .border_color(rgb(LINE));
-        sidebar = sidebar.child(
-            div()
-                .h(px(36.))
-                .flex()
-                .items_center()
-                .gap_1()
-                .px_2()
-                .border_b_1()
-                .border_color(rgb(LINE))
-                .child(
-                    button("changes-tab", self.t("changes"), !self.branch_tab).on_click(
-                        cx.listener(|app, _, _, cx| {
-                            app.branch_tab = false;
-                            cx.notify();
-                        }),
-                    ),
-                )
-                .child(
-                    button("branches-tab", self.t("branches"), self.branch_tab).on_click(
-                        cx.listener(|app, _, _, cx| {
-                            app.branch_tab = true;
-                            cx.notify();
-                        }),
-                    ),
-                ),
-        );
         if self.branch_tab {
             return sidebar.child(self.branch_panel(cx));
         }
@@ -2846,13 +3104,7 @@ impl Render for Hunkra {
                     self.t(if self.scanning { "loading" } else { "refresh" }),
                     false,
                 )
-                .on_click(cx.listener(|app, _, _, cx| {
-                    if app.scanning {
-                        app.refresh_queued = true;
-                    } else {
-                        app.refresh(cx);
-                    }
-                })),
+                .on_click(cx.listener(|app, _, _, cx| app.refresh_visible(cx))),
             )
             .child(
                 button(
@@ -2865,6 +3117,8 @@ impl Render for Hunkra {
                         || self.scanning
                         || self.diff_loading
                         || self.reviewed_commit.is_none()
+                        || self.history_tab
+                        || self.confirmation.is_some()
                     {
                         0.5
                     } else {
@@ -2904,40 +3158,74 @@ impl Render for Hunkra {
             content = content.child(bar);
         }
         if self.root.is_some() {
-            content = content.child(
-                div()
-                    .flex()
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_hidden()
-                    .child(self.sidebar(cx))
-                    .child(
-                        div()
-                            .flex_1()
-                            .min_w_0()
-                            .flex()
-                            .flex_col()
-                            .child(self.diff_panel(cx))
-                            .child(
-                                div()
-                                    .h(px(138.))
-                                    .flex_none()
-                                    .p_3()
-                                    .flex()
-                                    .flex_col()
-                                    .gap_2()
-                                    .border_t_1()
-                                    .border_color(rgb(LINE))
-                                    .child(
-                                        div()
-                                            .text_sm()
-                                            .text_color(rgb(MUTED))
-                                            .child(self.t("commit-hint")),
-                                    )
-                                    .child(div().flex_1().min_h_0().child(self.message.clone())),
-                            ),
-                    ),
-            );
+            let mut tabs = div()
+                .h(px(36.))
+                .flex_none()
+                .px_2()
+                .flex()
+                .items_center()
+                .gap_1()
+                .bg(rgb(PANEL))
+                .border_b_1()
+                .border_color(rgb(LINE));
+            for (index, key) in ["changes", "branches", "history"].into_iter().enumerate() {
+                let active = match index {
+                    0 => !self.history_tab && !self.branch_tab,
+                    1 => !self.history_tab && self.branch_tab,
+                    _ => self.history_tab,
+                };
+                tabs = tabs.child(
+                    button(("workspace-tab", index), self.t(key), active).on_click(cx.listener(
+                        move |app, _, window, cx| {
+                            app.select_tab(index, cx);
+                            app.focus_tab(window, cx);
+                        },
+                    )),
+                );
+            }
+            content = content.child(tabs);
+            if self.history_tab
+                && let Some(history) = &self.history
+            {
+                content = content.child(div().flex_1().min_h_0().child(history.clone()));
+            } else {
+                content = content.child(
+                    div()
+                        .flex()
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_hidden()
+                        .child(self.sidebar(cx))
+                        .child(
+                            div()
+                                .flex_1()
+                                .min_w_0()
+                                .flex()
+                                .flex_col()
+                                .child(self.diff_panel(cx))
+                                .child(
+                                    div()
+                                        .h(px(138.))
+                                        .flex_none()
+                                        .p_3()
+                                        .flex()
+                                        .flex_col()
+                                        .gap_2()
+                                        .border_t_1()
+                                        .border_color(rgb(LINE))
+                                        .child(
+                                            div()
+                                                .text_sm()
+                                                .text_color(rgb(MUTED))
+                                                .child(self.t("commit-hint")),
+                                        )
+                                        .child(
+                                            div().flex_1().min_h_0().child(self.message.clone()),
+                                        ),
+                                ),
+                        ),
+                );
+            }
         } else {
             let mut welcome = div()
                 .flex_1()
