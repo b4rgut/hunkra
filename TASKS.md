@@ -17,7 +17,7 @@
 | HNK-011 | P1 / 4 | todo | HNK-008 | Init/clone/fetch/push/upstream/ff-only pull | Локальные remotes, credentials, capability routing, сохранность | core, UI, tests |
 | HNK-012 | P1 / 4 | todo | HNK-005 | Порционная история и diff коммита | done | core, UI, tests |
 | HNK-013 | P1 / 5 | todo | HNK-010, HNK-011, HNK-012 | Нагрузки и UX, недавние проекты, фильтр, клавиатура | Тысячи файлов, большой файл, массовая перезапись, метрики backend/UI/RAM | benchmarks, UI |
-| HNK-014 | P1 / 0,5 | todo | HNK-002 | Release-plz git-only, Fedora-артефакт | done | release-plz.toml, workflows, packaging |
+| HNK-014 | P1 / 0,5 | in_progress | HNK-002 | Release-plz git-only, Fedora-артефакт | Реальный parser/update в temporary workspace; RPM и цепочка выпуска ещё не проверены | release-plz.toml, scripts/release-check.py, workflows, packaging |
 | HNK-015 | P1 / 5 | todo | HNK-013, HNK-014 | Проверка всего MVP и адаптеров Zed | Все MVP-A..F; handoff различает выполненное/частичное | docs/handoff.md, architecture |
 | HNK-101 | P2 / post-MVP | deferred | HNK-015 | Встраивание Panel/Item и host GitStore/buffers/remote | Отдельный план; исходный Zed не менять | docs/architecture.md |
 | HNK-102 | P2 / post-MVP | deferred | HNK-015 | OAuth/PR/CI, граф, интерактивная история, stash | Отдельные сценарии после MVP | backlog |
@@ -26,3 +26,5 @@
 Критический путь первого GUI: 001 → 002/003 → 004 → 005 → 006. Полный MVP: 007 → 008 → 009 → 010, параллельно независимые 011/012; далее 013/014 → 015. Циклов и отсутствующих ID нет. Ближайшая очередь: 002, 003, 004, 005. Дальние задачи уточняются перед реализацией, исходный объём MVP сохраняется.
 
 Первый slice проверен 2026-10-05: scripts/dev bootstrap, check (15 tests), check-ui, build-ui; native smoke в реальной Wayland-сессии — 11 render passes, файл с staged+unstaged, 3 локали, HEAD→index и index→worktree. Доказательство: docs/validation/first-slice.json. Проверяющий коммит будет указан следующим checkpoint. HNK-006 частична: очереди/поколения/refresh есть; watcher/cache/load metrics не закрыты.
+
+HNK-014: scripts/dev check-release прошёл 2026-10-05. Official release-plz 0.3.169 проверил core-only и locales-only изменения: product 0.1.0 → 0.1.1, обновлён внутренний dependency pin, один changelog. Все fixture commits/tags только TemporaryDirectory; release/push отсутствуют.

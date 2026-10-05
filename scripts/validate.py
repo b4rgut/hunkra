@@ -47,8 +47,8 @@ def release():
     assert "hunkra-core" in packages["hunkra"]["changelog_include"]
     assert not config["workspace"]["release_always"]
     subprocess.run([str(ROOT / ".tools/bin/release-plz"), "--version"], check=True)
-    # Actual parser/update behavior is tested in a disposable copy at a checkpoint.
-    print("Release policy valid: one product tag, git-only, internal changes included; no release executed")
+    subprocess.run([sys.executable, str(ROOT / "scripts/release-check.py")], check=True)
+    print("Release policy and disposable update tests passed; no real tag, push or release executed")
 
 
 if __name__ == "__main__":
