@@ -6,7 +6,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 19,
+      "frames": 20,
       "history_frames": 15,
       "locales": [
         "History",
@@ -20,10 +20,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "941900dfd28acd94096f800f54f130f8a62621a3",
+          "tip": "a33b9e72e7dfb17761ec672f9e1644e210f6430e",
           "offset": 100,
-          "commit": "60b34dac9f16f50dbe25d2811564f88991daa649",
-          "base_id": "7b23ca24b7d009d90573a36db673ea9314bfb622",
+          "commit": "b539f7781eac55f4eaeb8acfec256c6f8e4e8618",
+          "base_id": "fc781ce590a3bcb047e7042778fe29d3e1ab2147",
           "parent": "Parent(0)",
           "file": "файл.txt",
           "presentation": "Text",
@@ -53,10 +53,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
+          "tip": "e2ac78c95ea54562c916c9584127b7838a9b6bcd",
           "offset": 0,
-          "commit": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
-          "base_id": "ba7fba68144681f4ff34eee5b58c8715081893b8",
+          "commit": "e2ac78c95ea54562c916c9584127b7838a9b6bcd",
+          "base_id": "64b4d787b18ae755096f4131303eba0f54f420b6",
           "parent": "Parent(1)",
           "file": "a",
           "presentation": "Text",
@@ -68,10 +68,10 @@
           "right_mode": 33188
         },
         {
-          "tip": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
+          "tip": "e2ac78c95ea54562c916c9584127b7838a9b6bcd",
           "offset": 0,
-          "commit": "cb11e0ca5176f3edfd10b4aac3903197024b99f4",
-          "base_id": "7b6be5430d663efcc35f2407fb814668412b1abb",
+          "commit": "e2ac78c95ea54562c916c9584127b7838a9b6bcd",
+          "base_id": "5eb8b0932e9eeefc084380eb032c6aa1671fdcd1",
           "parent": "Parent(0)",
           "file": "b",
           "presentation": "Text",
@@ -87,7 +87,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 20,
+      "frames": 19,
       "history_frames": 15,
       "locales": [
         "History",
@@ -101,10 +101,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "1ff13eda8d155615e663e33df88a8a0189112c335e6e51e7d7b610fac00c0d2e",
+          "tip": "7685864dd4c8f1392030698f7eead1fe8325a4b6fd0aa319392c4fe613d2bc07",
           "offset": 100,
-          "commit": "46f7d9b0bd70bc1bb2653f5e5cc1770f101253f4c5e1f97d5d9b3ca65706783f",
-          "base_id": "19931c32ddf3460ef77e276acccb1ba619e8b1f5fa2ba61fee914c66e4ada83c",
+          "commit": "75597734c93193b3c66b554bca92f580517d793c7231931de5554cc9c16b1d1d",
+          "base_id": "3b4c5babfbc5cc4c935cc7496f584230115d3534aac571f32bf3cc48b9565de6",
           "parent": "Parent(0)",
           "file": "файл.txt",
           "presentation": "Text",
@@ -134,10 +134,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
+          "tip": "f01e964085d882f1202e13e56bd5364c7a78da8f18c32988251e043657f5ad4f",
           "offset": 0,
-          "commit": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
-          "base_id": "2cf3071c708e2efbd0c846426436c861896a28b989d63d5f268922dcac7bcac6",
+          "commit": "f01e964085d882f1202e13e56bd5364c7a78da8f18c32988251e043657f5ad4f",
+          "base_id": "694741235e17b2927fca0fda0d5f6b36abc5c652313387f24620c8991053e80d",
           "parent": "Parent(1)",
           "file": "a",
           "presentation": "Text",
@@ -149,10 +149,10 @@
           "right_mode": 33188
         },
         {
-          "tip": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
+          "tip": "f01e964085d882f1202e13e56bd5364c7a78da8f18c32988251e043657f5ad4f",
           "offset": 0,
-          "commit": "bfaa6a1a647b41e2bc048adce5df68d25faaebd44d125455a91324d5cd9e15ad",
-          "base_id": "3be93cffc727766416f86081c12521b63a56ec69ed834aa210361926ebe1cd41",
+          "commit": "f01e964085d882f1202e13e56bd5364c7a78da8f18c32988251e043657f5ad4f",
+          "base_id": "a666479e099aab8f9fd1f07571df3a9452616bb728ad80b9b806e87dae7d5f9f",
           "parent": "Parent(0)",
           "file": "b",
           "presentation": "Text",
@@ -168,7 +168,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 17,
+      "frames": 18,
       "history_frames": 14,
       "locales": [
         "History",
@@ -182,9 +182,9 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "53047e8bb724f4e47afbb92e229e98f5bd7f5d49",
+          "tip": "558d774c863b8330a08dca46bf1a9fce7d2a280b",
           "offset": 0,
-          "commit": "184edae48109143e82abd7e932a84e967f8e13cb",
+          "commit": "a6726717d4d225553adb6aa4417e1d1bf18d6765",
           "base_id": null,
           "parent": "EmptyTree",
           "file": "file",
@@ -197,10 +197,10 @@
           "right_mode": 33188
         },
         {
-          "tip": "53047e8bb724f4e47afbb92e229e98f5bd7f5d49",
+          "tip": "558d774c863b8330a08dca46bf1a9fce7d2a280b",
           "offset": 0,
-          "commit": "53047e8bb724f4e47afbb92e229e98f5bd7f5d49",
-          "base_id": "184edae48109143e82abd7e932a84e967f8e13cb",
+          "commit": "558d774c863b8330a08dca46bf1a9fce7d2a280b",
+          "base_id": "a6726717d4d225553adb6aa4417e1d1bf18d6765",
           "parent": "Parent(0)",
           "file": "file",
           "presentation": "Text",
@@ -217,7 +217,7 @@
       "ok": true,
       "native_display": true,
       "frames": 15,
-      "history_frames": 11,
+      "history_frames": 12,
       "locales": [
         "History",
         "История",
@@ -230,10 +230,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "tip": "e5e50f632758aa791cbcd9135823628b2f87fa7e8563a01da7ba8baaeb77fe11",
           "offset": 0,
-          "commit": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
-          "base_id": "a6dd4df3a21d160145c7861cb7f63088c9c93dd8811356717200a75a9ccb07a5",
+          "commit": "e5e50f632758aa791cbcd9135823628b2f87fa7e8563a01da7ba8baaeb77fe11",
+          "base_id": "84ed96578178183bbd9df5e030dcc96f32af2cfd8d6ff8bf4f1759004e29bc06",
           "parent": "Parent(0)",
           "file": "binary",
           "presentation": "Binary",
@@ -250,7 +250,7 @@
       "ok": true,
       "native_display": true,
       "frames": 15,
-      "history_frames": 12,
+      "history_frames": 11,
       "locales": [
         "History",
         "История",
@@ -263,10 +263,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "tip": "e5e50f632758aa791cbcd9135823628b2f87fa7e8563a01da7ba8baaeb77fe11",
           "offset": 0,
-          "commit": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
-          "base_id": "a6dd4df3a21d160145c7861cb7f63088c9c93dd8811356717200a75a9ccb07a5",
+          "commit": "e5e50f632758aa791cbcd9135823628b2f87fa7e8563a01da7ba8baaeb77fe11",
+          "base_id": "84ed96578178183bbd9df5e030dcc96f32af2cfd8d6ff8bf4f1759004e29bc06",
           "parent": "Parent(0)",
           "file": "large",
           "presentation": "TooLarge",
@@ -296,10 +296,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
+          "tip": "e5e50f632758aa791cbcd9135823628b2f87fa7e8563a01da7ba8baaeb77fe11",
           "offset": 0,
-          "commit": "001cb86b25751c179193a97bc95ec84c815867f4401416a08d52876db9886c11",
-          "base_id": "a6dd4df3a21d160145c7861cb7f63088c9c93dd8811356717200a75a9ccb07a5",
+          "commit": "e5e50f632758aa791cbcd9135823628b2f87fa7e8563a01da7ba8baaeb77fe11",
+          "base_id": "84ed96578178183bbd9df5e030dcc96f32af2cfd8d6ff8bf4f1759004e29bc06",
           "parent": "Parent(0)",
           "file": "link",
           "presentation": "Text",
@@ -315,8 +315,8 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
-      "history_frames": 8,
+      "frames": 12,
+      "history_frames": 9,
       "locales": [
         "History",
         "История",
@@ -348,7 +348,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 14,
+      "frames": 15,
       "history_frames": 10,
       "locales": [
         "History",
@@ -362,10 +362,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "bc50d03235efd19500fd075096d10c4cf527d646",
+          "tip": "5cdd8f79e4896271f15ebcd5522fe52fd75a2e6d",
           "offset": 0,
-          "commit": "bc50d03235efd19500fd075096d10c4cf527d646",
-          "base_id": "e2a4f378f3f819b1dfd6b6cd04387c48517f4775",
+          "commit": "5cdd8f79e4896271f15ebcd5522fe52fd75a2e6d",
+          "base_id": "2c8fb1fff29ecc62d9f1c98c408fd116287ae9a0",
           "parent": "Parent(0)",
           "file": null,
           "presentation": null,
@@ -382,7 +382,7 @@
       "ok": true,
       "native_display": true,
       "frames": 18,
-      "history_frames": 15,
+      "history_frames": 14,
       "locales": [
         "History",
         "История",
@@ -395,9 +395,9 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "tip": "dc4f9827426f1a6f34210b5c9d0ebb3ec244e41f",
           "offset": 0,
-          "commit": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "commit": "dc4f9827426f1a6f34210b5c9d0ebb3ec244e41f",
           "base_id": null,
           "parent": "EmptyTree",
           "file": "file",
@@ -410,9 +410,9 @@
           "right_mode": 33188
         },
         {
-          "tip": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "tip": "dc4f9827426f1a6f34210b5c9d0ebb3ec244e41f",
           "offset": 0,
-          "commit": "16649cb57a210d9d33963cab6250ced31e60d43a",
+          "commit": "dc4f9827426f1a6f34210b5c9d0ebb3ec244e41f",
           "base_id": null,
           "parent": "EmptyTree",
           "file": "file",
@@ -443,10 +443,10 @@
       "message_retained": true,
       "reviews": [
         {
-          "tip": "ed82c4bbb6e821927a8d309e842f3fc4d9bdc8dd",
+          "tip": "ffa400b88dbc1eb3dd0f1175b4ef9bd6dbce1473",
           "offset": 0,
-          "commit": "ed82c4bbb6e821927a8d309e842f3fc4d9bdc8dd",
-          "base_id": "8848fb311bf5a59fdce8ca182603fe3355f7246d",
+          "commit": "ffa400b88dbc1eb3dd0f1175b4ef9bd6dbce1473",
+          "base_id": "5dae5585e134cb3bf745ce6bda97a24654eb7877",
           "parent": "Parent(0)",
           "file": "f",
           "presentation": "Text",

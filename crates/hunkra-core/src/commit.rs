@@ -84,6 +84,11 @@ fn executable(path: &Path) -> Result<bool, CoreError> {
     }
 }
 
+/// Reports a configured executable hook without running it or retaining its arbitrary contents.
+pub(crate) fn hook_exists(repo: &gix::Repository, name: &str) -> Result<bool, CoreError> {
+    executable(&hooks_directory(repo)?.join(name))
+}
+
 /// Runs a configured Git hook through gix command/context; owned errors never expose its output.
 pub(crate) fn hook(
     repo: &gix::Repository,

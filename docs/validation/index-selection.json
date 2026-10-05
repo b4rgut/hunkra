@@ -20,7 +20,7 @@
     "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
   ],
   "files": 5,
-  "elapsed_ms": 1696,
+  "elapsed_ms": 1702,
   "close_during_write": {
     "ok": true,
     "close_deferred": true,
@@ -33,11 +33,11 @@
     "ok": true,
     "selection_preserved": true,
     "write_error": "error-index-lock",
-    "frames": 14
+    "frames": 13
   },
   "commit_hook_refusal": {
     "ok": true,
-    "frames": 14,
+    "frames": 13,
     "native_display": true,
     "commit_id": null,
     "write_backend": null,
@@ -55,7 +55,7 @@
     "ok": true,
     "frames": 14,
     "native_display": true,
-    "commit_id": "04b649410b74754742a40422ec4cb64cfc094e55",
+    "commit_id": "29fd6357948cb4aaa301d97229b687206f8e9ceb",
     "write_backend": "gix",
     "write_error": null,
     "message_cleared": true,
@@ -72,7 +72,7 @@
     "close_deferred": true,
     "writer_finished": true,
     "write_backend": "gix",
-    "commit_id": "d881e841f13b66bf912048a149a13593418cb14b",
+    "commit_id": "9840a0a71802099d72006f48688e11e6cd1e112a",
     "message_cleared": true
   },
   "oracle": "git version 2.55.0",

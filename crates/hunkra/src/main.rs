@@ -256,6 +256,15 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::HistoryLimit => "error-history-limit",
         CoreError::HistoryRequest => "error-history-request",
         CoreError::HistoryBase => "error-history-base",
+        CoreError::RepositoryDestination => "error-repository-destination",
+        CoreError::NetworkConfig => "error-network-config",
+        CoreError::NetworkTarget => "error-network-target",
+        CoreError::NetworkExecution => "error-network-execution",
+        CoreError::FetchRejected => "error-fetch-rejected",
+        CoreError::CloneCheckout => "error-clone-checkout",
+        CoreError::NetworkCanceled => "error-network-canceled",
+        CoreError::Upstream => "error-upstream",
+        CoreError::ConfigLock => "error-config-lock",
     }
 }
 

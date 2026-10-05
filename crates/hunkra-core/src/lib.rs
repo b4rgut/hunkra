@@ -6,6 +6,7 @@ pub mod conflicts;
 pub mod diff;
 pub mod history;
 mod index_format;
+pub mod network;
 pub mod operations;
 pub mod repository;
 pub mod staging;

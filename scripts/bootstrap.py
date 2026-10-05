@@ -43,11 +43,20 @@ def native_fedora():
     """Extract Fedora development RPMs into a local sysroot without privilege changes."""
     if not Path("/etc/os-release").exists() or 'ID=fedora\n' not in Path("/etc/os-release").read_text():
         return
-    if Path("/usr/lib64/libfontconfig.so").exists() and Path("/usr/lib64/libxkbcommon-x11.so").exists():
+    required = {
+        "fontconfig-devel": "libfontconfig.so",
+        "freetype-devel": "libfreetype.so",
+        "libxcb-devel": "libxcb.so",
+        "libxkbcommon-x11-devel": "libxkbcommon-x11.so",
+        "openssl-devel": "libssl.so",
+        "libcurl-devel": "libcurl.so",
+    }
+    missing = [name for name, library in required.items() if not Path("/usr/lib64", library).exists() and not (ROOT / ".local-sysroot/usr/lib64" / library).exists()]
+    if not missing:
         return
     packages = ROOT / ".tools/rpms"
     packages.mkdir(parents=True, exist_ok=True)
-    subprocess.run(["dnf5", "download", "--arch=x86_64", f"--destdir={packages}", "fontconfig-devel", "freetype-devel", "libxcb-devel", "libxkbcommon-x11-devel"], check=True)
+    subprocess.run(["dnf5", "download", "--arch=x86_64", f"--destdir={packages}", *missing], check=True)
     sysroot = ROOT / ".local-sysroot"
     sysroot.mkdir(exist_ok=True)
     for package in packages.glob("*.x86_64.rpm"):

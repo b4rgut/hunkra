@@ -22,8 +22,9 @@ def run():
             "GIT_ATTR_NOSYSTEM": "1",
             "LC_ALL": "C.UTF-8",
         }
-        if "LIBRARY_PATH" in os.environ:
-            environment["LIBRARY_PATH"] = os.environ["LIBRARY_PATH"]
+        for name in ("LIBRARY_PATH", "OPENSSL_INCLUDE_DIR", "OPENSSL_LIB_DIR"):
+            if name in os.environ:
+                environment[name] = os.environ[name]
         result = subprocess.run(["cargo", "test", *sys.argv[1:]], env=environment)
         return result.returncode
 

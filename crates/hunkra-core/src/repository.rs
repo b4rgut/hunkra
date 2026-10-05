@@ -87,6 +87,24 @@ pub enum CoreError {
     HistoryRequest,
     #[error("select an actual parent of this commit, or the empty tree for a root commit")]
     HistoryBase,
+    #[error("the destination already exists or its repository metadata is unsafe")]
+    RepositoryDestination,
+    #[error("remote configuration is invalid, unsupported or exceeds its limits")]
+    NetworkConfig,
+    #[error("select a configured remote and a valid branch")]
+    NetworkTarget,
+    #[error("the network operation failed; inspect actual state before retrying")]
+    NetworkExecution,
+    #[error("some remote references were rejected; inspect the fetched state")]
+    FetchRejected,
+    #[error("the clone checkout is incomplete; inspect its preserved repository")]
+    CloneCheckout,
+    #[error("the operation was canceled; inspect any partial changes")]
+    NetworkCanceled,
+    #[error("this action requires a current local branch and one configured upstream")]
+    Upstream,
+    #[error("could not acquire the local repository configuration lock")]
+    ConfigLock,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

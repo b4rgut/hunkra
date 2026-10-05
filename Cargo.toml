@@ -10,7 +10,7 @@ repository = "https://github.com/b4rgut/hunkra"
 publish = false
 
 [workspace.dependencies]
-gix = { version = "=0.88.0", default-features = false, features = ["basic", "status", "sha1", "sha256"] }
+gix = { version = "=0.88.0", default-features = false, features = ["basic", "status", "sha1", "sha256", "blocking-http-transport-curl-openssl", "worktree-mutation"] }
 thiserror = "=2.0.21"
 tempfile = "=3.27.0"
 fluent-bundle = "=0.16.0"

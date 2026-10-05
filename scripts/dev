@@ -5,6 +5,10 @@ project_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_root"
 export PATH="$project_root/.tools/bin:$PATH"
 export LIBRARY_PATH="$project_root/.local-sysroot/usr/lib64${LIBRARY_PATH:+:$LIBRARY_PATH}"
+if [[ -f "$project_root/.local-sysroot/usr/include/openssl/ssl.h" ]]; then
+  export OPENSSL_INCLUDE_DIR="$project_root/.local-sysroot/usr/include"
+  export OPENSSL_LIB_DIR="$project_root/.local-sysroot/usr/lib64"
+fi
 command="${1:-check}"
 shift || true
 case "$command" in
