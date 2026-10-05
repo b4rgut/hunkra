@@ -1,6 +1,6 @@
 # Hunkra: запуск и фактическое состояние
 
-Ветка `codex/bootstrap-mvp`. Первый GUI checkpoint `b0c3699`, release config tests `35f0524`; текущие stage/unstage проверены, их commit будет записан следующим docs checkpoint. Полный MVP ещё не готов.
+Ветка `codex/bootstrap-mvp`. Первый GUI checkpoint `b0c3699`, release config tests `35f0524`; проверенный stage implementation checkpoint `78e0081` (`feat(staging): update selected index lines through gix`). Полный MVP ещё не готов.
 
 Доступно нативное GPUI-окно: открыть repo через диалог/путь, недавние проекты, branch/unborn/detached, независимые staged/unstaged/conflict flags, side-by-side HEAD→index / index→worktree с номерами, знаками, общим vertical scroll и переходами по hunks. Три Fluent-профиля меняются без Git-запроса/потери выбранного файла и +/- строк. Refresh каждые 2 секунды, F5, Up/Down, F7/Shift-F7, Ctrl+O. Stage/unstage настоящего индекса: файл, текущий hunk и независимые +/- строки; Shift+click выбирает диапазон изменённых строк на своей стороне. Во время записи действия сериализованы, обычное закрытие окна ждёт окончания.
 

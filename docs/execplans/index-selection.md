@@ -14,3 +14,5 @@ Checkpoint первого GUI: b0c3699. Дальнейшая задача сох
 Результат HNK-016: scripts/dev check (32 tests), check-ui, build-ui и два настоящих native Wayland сценария прошли. Первый — диапазоны +/- → три локали → stage B → staged view → unstage hunk B; независимый Git проверяет обе версии index и неизменный worktree. Второй — закрытие окна сразу после принятия write; выход после завершения, A+B в index, worktree цел и index.lock отсутствует. Воспроизведение: scripts/dev smoke /ABS/REPORT.json; отчет docs/validation/index-selection.json.
 
 Поддержанные варианты и отказы — gix-capabilities.md. HNK-007 остаётся частичной: HNK-017 уточнит семантику независимой половины EOF replacement и расширение hook/advanced-index вариантов. Текущая половина без newline, которая склеила бы две строки, отвергается до lock; полная пара сохраняет EOF. GUI не создаёт Commit — HNK-008.
+
+Проверяющий implementation checkpoint: 78e0081 — feat(staging): update selected index lines through gix.

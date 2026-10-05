@@ -1,6 +1,6 @@
 # Продолжение
 
-Ветка codex/bootstrap-mvp; origin https://github.com/b4rgut/hunkra.git. Исходный a2b566c, plan 61a0166, первый GUI b0c3699, release tests 35f0524. Stage implementation checkpoint будет указан после commit; сверять git log/status и TASKS.md. Все текущие изменения принадлежат этой задаче; identity сохранена. Push/PR/tag/release запрещены. Zed read-only /home/akalsin/Documents/Projects/zed @ 0c70487f830b10abde93ef75a0772a4552744f15, чист.
+Ветка codex/bootstrap-mvp; origin https://github.com/b4rgut/hunkra.git. Исходный a2b566c, plan 61a0166, первый GUI b0c3699, release tests 35f0524. Проверенный stage implementation checkpoint 78e0081; сверять git log/status и TASKS.md. Все текущие изменения принадлежат этой задаче; identity сохранена. Push/PR/tag/release запрещены. Zed read-only /home/akalsin/Documents/Projects/zed @ 0c70487f830b10abde93ef75a0772a4552744f15, чист.
 
 HNK-016: настоящий gix index writer + GUI file/hunk/independent +/- ranges. Guard index digest/HEAD/raw worktree/mode; gix lock, fresh read, final recheck, TREE invalidation. Native stage B + hunk unstage + locale/range and close-during-write passed; tests Git oracle prove A+B index/C worktree and safe refusals. No production CLI fallback. Detailed constraints gix-capabilities.md; EOF half without line boundary refused; paired EOF works. HNK-007 остаётся частичной, full MVP не готов.
 
