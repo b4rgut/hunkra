@@ -1,6 +1,10 @@
 //! gix network reads, fresh repository creation and guarded remote-tracking mutations.
+mod coordinator;
 use crate::{
     CoreError, OperationSnapshot, branches::branch_name, prepare_operation, repository::open,
+};
+pub use coordinator::{
+    NetworkCapability, NetworkRoute, NetworkWrite, PushRequest, pull_ff_only, push_branch,
 };
 use gix::{bstr::ByteSlice, error::ResultExt};
 use std::{
@@ -266,6 +270,7 @@ fn options(branch: Option<&str>) -> gix::open::Options {
         "checkout.workers=2".to_owned(),
         "pack.threads=2".to_owned(),
         "core.configLockTimeout=0".to_owned(),
+        "gitoxide.core.externalCommandStderr=false".to_owned(),
     ];
     if let Some(branch) = branch {
         overrides.push(format!("init.defaultBranch={branch}"));
@@ -338,6 +343,53 @@ fn authentication(
             None => Ok(None),
         }
     })
+}
+
+/// Replaces only the not-yet-started SSH transport, preserving its configured command/variant while suppressing arbitrary stderr.
+fn quiet_ssh(
+    connection: &mut gix::remote::Connection<
+        '_,
+        '_,
+        '_,
+        Box<dyn gix::protocol::transport::client::blocking_io::Transport + Send>,
+    >,
+) -> Result<(), CoreError> {
+    use gix::protocol::transport::client::blocking_io::ssh;
+    let remote = connection.remote();
+    let (url, version) = remote
+        .sanitized_url_and_version(gix::remote::Direction::Fetch)
+        .map_err(|_| CoreError::NetworkConfig)?;
+    if url.scheme != gix::url::Scheme::Ssh {
+        return Ok(());
+    }
+    let mut options = remote
+        .repo()
+        .ssh_connect_options()
+        .map_err(|_| CoreError::NetworkConfig)?;
+    let program = options
+        .ssh_command()
+        .to_str()
+        .ok_or(CoreError::NetworkConfig)?;
+    let guessed = ssh::ProgramKind::from(options.ssh_command());
+    let mut command = if options.disallow_shell {
+        String::from_utf8(gix::quote::single(program.as_bytes().as_bstr()).to_vec())
+            .map_err(|_| CoreError::NetworkConfig)?
+    } else {
+        program.to_owned()
+    };
+    // This is the already configured trusted command; URL/host/path arguments remain separate quoted positional parameters.
+    if !command.contains("$@") {
+        command.push_str(" \"$@\"");
+    }
+    options.command = Some(format!("{{ {command}; }} 2>/dev/null").into());
+    options.disallow_shell = false;
+    if options.kind.is_none() && guessed != ssh::ProgramKind::Simple {
+        options.kind = Some(guessed);
+    }
+    let transport =
+        ssh::connect(url, version, options, false).map_err(|_| CoreError::NetworkExecution)?;
+    *connection.transport_mut() = Box::new(transport);
+    Ok(())
 }
 
 /// Checks actual fetched-tree attributes before using the known UTF-16-limited checkout encoder.
@@ -431,6 +483,7 @@ pub fn clone_repository(
         Ok(remote)
     })
     .configure_connection(|connection| {
+        quiet_ssh(connection).or_erased()?;
         connection.set_credentials(authentication(connection.remote().repo().clone()));
         Ok(())
     });
@@ -527,10 +580,11 @@ pub fn fetch_remote(
     {
         return Err(CoreError::NetworkConfig);
     }
-    let connection = remote
+    let mut connection = remote
         .connect(gix::remote::Direction::Fetch)
         .map_err(|_| CoreError::NetworkExecution)?
         .with_credentials(authentication(repo.clone()));
+    quiet_ssh(&mut connection)?;
     let prepared = connection
         .prepare_fetch(gix::progress::Discard, Default::default())
         .map_err(|_| CoreError::NetworkExecution)?;
@@ -573,6 +627,30 @@ pub fn fetch_remote(
     })
 }
 
+/// Refuses upstream values supplied by includes/global config, which a local-only edit cannot safely replace.
+fn upstream_write_supported(
+    snapshot: &NetworkSnapshot,
+    repo: &gix::Repository,
+    current: &str,
+) -> Result<(), CoreError> {
+    let physical = gix::config::File::try_from(snapshot.config.physical.as_bstr())
+        .map_err(|_| CoreError::NetworkConfig)?;
+    let effective = repo.config_snapshot();
+    for key in ["remote", "merge"] {
+        let local = physical
+            .raw_values_by("branch", Some(current.as_bytes().as_bstr()), key)
+            .unwrap_or_default();
+        let all = effective
+            .raw_values_by("branch", Some(current.as_bytes().as_bstr()), key)
+            .unwrap_or_default();
+        // merge is multivalued, and a later include can override a scalar remote.
+        if all != local || (key == "merge" && all.len() > 1) {
+            return Err(CoreError::NetworkConfig);
+        }
+    }
+    Ok(())
+}
+
 /// Writes only the current branch's explicit local upstream, under a physical config transaction.
 pub fn set_upstream(
     snapshot: &NetworkSnapshot,
@@ -592,14 +670,7 @@ pub fn set_upstream(
     }
     let repo = open(&snapshot.repository.repository.root)?;
     named_remote(&repo, snapshot, remote)?;
-    if repo
-        .config_snapshot()
-        .raw_values_by("branch", Some(current.as_bytes().as_bstr()), "merge")
-        .ok()
-        .is_some_and(|values| values.len() > 1)
-    {
-        return Err(CoreError::NetworkConfig);
-    }
+    upstream_write_supported(snapshot, &repo, current)?;
     let mut config = repo
         .config_file_mut(&snapshot.config.path)
         .map_err(|_| CoreError::ConfigLock)?;

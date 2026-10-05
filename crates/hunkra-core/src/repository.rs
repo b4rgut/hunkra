@@ -105,6 +105,11 @@ pub enum CoreError {
     Upstream,
     #[error("could not acquire the local repository configuration lock")]
     ConfigLock,
+    #[error("the selected network coordinator failed; inspect actual state before retrying")]
+    NetworkCoordinator {
+        capability: crate::network::NetworkCapability,
+        exit_code: Option<i32>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

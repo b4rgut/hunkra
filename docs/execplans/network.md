@@ -51,5 +51,42 @@ Implemented: init/clone/remote models/fetch/set-upstream through gix. Fetch disa
 tags and refuses non-remote-tracking destinations; no prune/FETCH_HEAD behavior is
 claimed. Configured reference-transaction hooks are refused before connection;
 post-checkout is honored. Effective insteadOf transport rewrites are rechecked
-before connection. Push/pull and native controls remain required; HNK-011 stays
+before connection. At the first checkpoint push/pull and native controls remained required; HNK-011 stays
 in_progress. Partial data survives cancellation/failure without automatic retry.
+
+Push/pull core acceptance (2026-10-06): 119 headless tests, strict headless/UI
+Clippy and build-ui. Push routes once to `PushCoordinator`, explicit full local and
+remote branches, no force/mirror/follow-tags/prune/submodule expansion. Actual Git
+2.55 requires `-c remote.NAME.mirror=false`; `--no-mirror` alone does not override
+that configured default. Override is command-local. Groups/multiple endpoints and
+ambiguous override keys are refused. Helpers, configured signatures and pre-push
+remain Git-owned; real hook/server/non-fast-forward refusals do not write upstream.
+Both pipes drain with fixed memory (8MiB hook fixture). Optional upstream uses the
+separate guarded gix config transaction only after confirmed success; an already
+pushed remote is not rolled back after a later config failure. Include/global
+branch upstream values are explicitly refused rather than duplicated/ineffectively
+overridden by local edits; unrelated includes/comments/mode are preserved.
+
+Pull routes gix fetch first, then `FastForwardWorktreeCoordinator` for immutable
+actual upstream commit. Fixed ff-only/no-autostash/no-squash/no-overwrite-ignore
+protects dirty/untracked/ignored collisions; divergence leaves fetched tracking refs
+for inspection but never starts merge/rebase/stash. Linked SHA-256 index/HEAD/common
+config tested without changing primary worktree. Pre-cancel/stale/detached/missing
+upstream refuse before transport. An accepted CLI child is waited, not killed;
+force termination is not a cancellation promise. Cooperative ref/index/config
+locks do not constitute a universal lock against external editing.
+
+Real OpenSSH 10.2p1 + a private ssh-agent/loopback sshd verify clone/fetch/push/pull
+in both object formats and strict known-host refusal. Fixture generates keys and
+uses its own socket/trust/config; all server/agent children are reaped. Production
+uses the existing configured agent. gix-transport 0.60.0 forwards unknown SSH
+stderr directly; before handshake Hunkra replaces the not-yet-started SSH transport
+using the same configured trusted command/variant with stderr suppression and
+separate positional URL arguments. A 4MiB/sentinel subprocess assertion and the
+real-agent fixture validate this gix route. No process-wide fd/environment mutation.
+Primary manuals: [Git push](https://git-scm.com/docs/git-push),
+[Git merge](https://git-scm.com/docs/git-merge),
+[ssh-agent](https://man.openbsd.org/ssh-agent), [sshd](https://man.openbsd.org/sshd).
+Native network UI remains required. Removal condition for CLI coordinators is
+HNK-104: upstream gix must expose complete coordinators that pass the same hook,
+locking, worktree, credential/signing and native acceptance matrices.

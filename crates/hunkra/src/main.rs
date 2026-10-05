@@ -260,6 +260,7 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::NetworkConfig => "error-network-config",
         CoreError::NetworkTarget => "error-network-target",
         CoreError::NetworkExecution => "error-network-execution",
+        CoreError::NetworkCoordinator { .. } => "error-network-execution",
         CoreError::FetchRejected => "error-fetch-rejected",
         CoreError::CloneCheckout => "error-clone-checkout",
         CoreError::NetworkCanceled => "error-network-canceled",
