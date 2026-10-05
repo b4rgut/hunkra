@@ -17,7 +17,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "816b8685d8a3c061ba581e131e52b6aa906ad4c8",
+      "head": "54c4f1545545c1f086aac7a8614383c1653eddd3",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -39,7 +39,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "6c690065ca9951731bbaa9d157d554177f503d72bd1c95d508049bf73ab7fbc4",
+      "head": "819b5892d73429a0c0d2ec0b2e2234a9577d91954539fa7346c77f84e4f86f19",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -61,7 +61,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "5a49b5b9838a199ad8dd76058cfcd1c6d5552afe",
+      "head": "44c214337c4dff269bb3a15a1e7af2621a23f316",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -83,7 +83,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "77e3ff9c62790e748e2cf8786f96a786f69217ac",
+      "head": "96e2a3e78eaa280b8f34a9ccd25db8cd47bbe938",
       "branch": "other",
       "operation": null,
       "progress": null,
@@ -113,7 +113,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "21d7abbfd85d13dfa642f837d1f597010768d068",
+      "head": "0847c2cc436aae66882b6213144466cc5528a52a",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -135,7 +135,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "e644282d8f38cf998d5fb5bc99dce1af0fabc2e0",
+      "head": "80b3aa801a2ad37e98f09f4305d54666f83abf71",
       "branch": "main",
       "operation": "Merge",
       "progress": null,
@@ -157,7 +157,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "e1caec041b928b2dada2cdc29ead84b6d9863fcc",
+      "head": "d5635188def0a4cd9275296abf1c9f5f319e8b87",
       "branch": "main",
       "operation": "Merge",
       "progress": null,
@@ -167,7 +167,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "action": "abort",
       "write_backend": "git-cli",
       "write_error": null,
@@ -179,7 +179,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "e1caec041b928b2dada2cdc29ead84b6d9863fcc",
+      "head": "d5635188def0a4cd9275296abf1c9f5f319e8b87",
       "branch": "main",
       "operation": null,
       "progress": null,
@@ -201,7 +201,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "52a959c5e22f7ede536ee6e327d47ba247b34e30",
+      "head": "b1a6ea865fb78a74effad8f9394a755a1b8e8085",
       "branch": null,
       "operation": "Rebase",
       "progress": [
@@ -214,7 +214,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 12,
+      "frames": 11,
       "action": "continue",
       "write_backend": "git-cli",
       "write_error": null,
@@ -226,7 +226,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "857894e9f4f9bd3472303519b11b7d2039cf8af8",
+      "head": "572c498e7b82d3c673acfa63152e9006d22d6dfb",
       "branch": null,
       "operation": "Rebase",
       "progress": [
@@ -251,7 +251,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "2257c96766b379dee4cf242da20871b998d30bbb",
+      "head": "c7834e92bf38e087c808a36390a195d357218fa9",
       "branch": "topic",
       "operation": null,
       "progress": null,
@@ -273,7 +273,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "9f956e293e7982617e77ce813a438a7a71461173",
+      "head": "96965427f07afbe68936d0d35e9449ed52fb67a9",
       "branch": null,
       "operation": "Rebase",
       "progress": [
@@ -286,7 +286,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 10,
       "action": "skip",
       "write_backend": "git-cli",
       "write_error": null,
@@ -298,7 +298,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "9f956e293e7982617e77ce813a438a7a71461173",
+      "head": "96965427f07afbe68936d0d35e9449ed52fb67a9",
       "branch": "topic",
       "operation": null,
       "progress": null,
@@ -320,7 +320,7 @@
         "Ветки",
         "Ветки"
       ],
-      "head": "3eb6c6a102e013c34593f2e2b0eeeb22a2c0c282",
+      "head": "46195440859b6c595da6f0ed7278e14de934e7d7",
       "branch": "topic",
       "operation": null,
       "progress": null,

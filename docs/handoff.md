@@ -1,8 +1,8 @@
 # Hunkra: запуск и фактическое состояние
 
 Ветка `codex/bootstrap-mvp`. Проверены staging, index-only Commit, локальные ветки,
-switch/merge/rebase, независимый Result и порционная история. Полный MVP ещё не готов:
-network, watcher/cache/load UX, RPM и общая приёмка остаются в TASKS.md.
+switch/merge/rebase, независимый Result, порционная история и native Init/Clone/Remotes. Полный MVP ещё не готов:
+watcher/cache/load UX, RPM и общая приёмка остаются в TASKS.md.
 
 ```sh
 scripts/dev build-ui
@@ -42,19 +42,19 @@ Rename показан как delete/add. Просмотр read-only; staging/Com
 F5 начинает новую историю от текущего HEAD; фоновый refresh не сдвигает её tip.
 Legacy/invalid metadata объясняются явно, без старого сообщения под новым commit.
 
-Ctrl+1/2/3 переключают Changes/Branches/History; F5 refresh, Up/Down selection,
+Ctrl+1/2/3/4 переключают Changes/Branches/History/Remotes; F5 refresh, Up/Down selection,
 F7/Shift+F7 hunk, Ctrl+O open, Ctrl+Enter Commit, Ctrl+Shift+Enter Continue.
 Три Fluent-профиля сохраняют message/Result/selection/undo без Git-запросов.
 Все accepted writes сериализованы; обычное закрытие ждёт writer. Ошибка отменяет
 pending close и сохраняет пользовательский ввод.
 
-Проверено 2026-10-06: fmt/i18n/plan, strict headless/UI Clippy, 100 headless tests
-(83 core + 17 app), 2 isolated GPUI input/clipboard/undo tests, native build.
+Проверено 2026-10-06: fmt/i18n/plan, strict headless/UI Clippy, 119 headless tests
+(102 core + 17 app), 2 isolated GPUI input/clipboard/undo tests, native build.
 12 real Wayland history windows, 17 conflict windows, 15 branch/operation и
-6 staging/Commit windows прошли с независимым Git-оракулом в disposable repos.
+6 staging/Commit и 19 network/creation windows прошли с независимым Git-оракулом в disposable repos.
 Reports: docs/validation/history.json, conflicts.json, operations.json,
-index-selection.json. scripts/dev smoke|smoke-operations|smoke-conflicts|
-smoke-history принимают абсолютный report path после build-ui. Native smoke
+index-selection.json, network.json. scripts/dev smoke|smoke-operations|smoke-conflicts|
+smoke-history|smoke-network принимают абсолютный report path после build-ui. Native smoke
 проверяет render/handlers/input callbacks, не физическую мышь/аппаратный IME.
 Owner clipboard не менялся. Directory picker, physical input, X11, нагрузочные
 метрики и установленный RPM ещё не сертифицированы. Nested X11 capture был пустым,
@@ -62,7 +62,7 @@ Owner clipboard не менялся. Directory picker, physical input, X11, на
 
 gix 0.88.0 читает status/diff/filters/history, пишет index/objects/refs/commit и
 resolve. Git CLI заранее выбран только для audited complete switch/merge/rebase
-coordinator gaps; failed gix write никогда не повторяется через CLI. Git также
+coordinator gaps и explicit push/ff-only integration; failed gix write никогда не повторяется через CLI. Git также
 независимый test oracle. Exact guards/locks сохраняют данные; универсальный lock
 внешнего редактора не обещается. Split/sparse/shared/SKIP_WORKTREE и прочие
 сложные index variants имеют объяснимый отказ; см. docs/gix-capabilities.md.
@@ -76,3 +76,5 @@ GPUI→old xattr регрессии на 0.2.190. proc-macro-error2 future notic
 lower MSRV не проверен. release-plz core-only/locales-only fixtures проходят,
 remote release chain не выполнялась. Push/PR/product tags/releases отсутствуют,
 Zed read-only. Лицензию продукта выбирает владелец.
+
+Init/Clone открываются верхними кнопками, destination вводится полным путём. Init сохраняет existing project files, Clone требует новой папки и сохраняет partial data после ошибки. В Remotes выбираются remote/целевая ветка, отдельно Fetch, Set upstream, Push и ff-only Pull. SSH agent/helpers существующие, OAuth не требуется. Push одной explicit ветки без force/mirror/tags; отслеживание записывается после подтверждённого успеха. Pull сначала gix fetch, затем только fast-forward; dirty/diverged/untracked/ignored/locks дают явный отказ без stash/rebase. Ctrl+Shift+F/P/L — Fetch/Push/Pull, Ctrl+Enter в creation — создать и открыть. Все четыре inputs/selection/undo сохраняются при смене языка и отказе. Dirty Result не теряется; Fetch его сохраняет, смена проекта требует Save/Discard/Cancel. Unsupported remote helpers/ref-transaction fetch hooks/UTF-16 clone checkout/included upstream values — explicit limits; production trace/transport output/URL в reports не сохраняются.

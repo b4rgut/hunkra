@@ -26,6 +26,7 @@ case "$command" in
   smoke-operations) python3 scripts/operations-smoke.py "$@" ;;
   smoke-conflicts) python3 scripts/conflicts-smoke.py "$@" ;;
   smoke-history) python3 scripts/history-smoke.py "$@" ;;
+  smoke-network) python3 scripts/network-smoke.py "$@" ;;
   check-release) python3 scripts/validate.py release ;;
   *) printf 'Unknown command: %s\n' "$command" >&2; exit 2 ;;
 esac

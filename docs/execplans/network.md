@@ -87,6 +87,8 @@ real-agent fixture validate this gix route. No process-wide fd/environment mutat
 Primary manuals: [Git push](https://git-scm.com/docs/git-push),
 [Git merge](https://git-scm.com/docs/git-merge),
 [ssh-agent](https://man.openbsd.org/ssh-agent), [sshd](https://man.openbsd.org/sshd).
-Native network UI remains required. Removal condition for CLI coordinators is
+Native network UI acceptance is recorded below. Removal condition for CLI coordinators is
 HNK-104: upstream gix must expose complete coordinators that pass the same hook,
 locking, worktree, credential/signing and native acceptance matrices.
+
+Native acceptance 2026-10-06: 19 real Wayland windows plus 50 prior regression windows, 119 headless tests, strict headless/UI Clippy, two isolated GPUI input tests and native build. Remotes/tracking branches, explicit branch/upstream toggle and fetch/push/ff-only pull actions use four bounded owned NativeEditors and the common serialized writer. Init/Clone have separate native pages, explicit destination/hash/initial branch, and open only a successful created repository. Ctrl+4 opens Remotes; Ctrl+Shift+F/P/L fetch/push/pull; Ctrl+Enter submits creation. Locale swaps preserve all text/selection/revision without reads. Accepted writes/dirty prompts freeze controls and duplicate actions; close waits for the actual worker and refusal cancels close. Fetch/config-only/push outcomes retain diff coordinates until refreshed sources change. Dirty Result survives Fetch, cancel Clone/Pull; save-before-clone first saves only Result then opens the clone. Independent Git proves exact index/worktree/refs and existing-destination/config-lock/hook/integration refusals. Reports contain owned result categories/refs, not URLs/credentials/config/output. UI remains compact dark native GPUI as requested, not copied Zed GPL code. Physical input/X11/remote CI are not inferred.

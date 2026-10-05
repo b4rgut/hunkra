@@ -1,4 +1,5 @@
 //! Native GPUI shell. Blocking repository reads run in separate bounded workers.
+mod network_smoke;
 use gpui::{
     App, Application, Bounds, Context, Entity, EntityInputHandler, FocusHandle, Focusable,
     KeyDownEvent, Keystroke, PathPromptOptions, ScrollStrategy, SharedString, Subscription, Task,
@@ -10,6 +11,8 @@ use hunkra::{
     editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
     history_view::HistoryView,
     i18n::{Locale, Translator},
+    network_action::{self, NetworkCommand, NetworkOutcome},
+    network_view::{NetworkEvent, NetworkPage, NetworkView},
     settings::{self, Settings},
     state::ViewState,
     theme::{ACCENT, BACKGROUND as BG, BORDER as LINE, HOVER, MUTED, PANEL, SELECTED, TEXT},
@@ -75,6 +78,7 @@ enum WriteQuery {
     Operation(std::sync::Arc<OperationSnapshot>, OperationAction),
     SaveResult(std::sync::Arc<ConflictSnapshot>, Document),
     Resolve(std::sync::Arc<ConflictSnapshot>),
+    Network(NetworkCommand),
 }
 enum WriteResult {
     Index(IndexWrite),
@@ -83,6 +87,7 @@ enum WriteResult {
     Operation(OperationWrite),
     SaveResult(ConflictWrite, Document),
     Resolve(ConflictWrite),
+    Network(NetworkOutcome),
 }
 
 #[derive(Clone)]
@@ -93,6 +98,7 @@ enum Intent {
     Reload,
     Operation(OperationAction),
     SaveDeletion(std::sync::Arc<ConflictSnapshot>, Document),
+    Network(NetworkCommand),
 }
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum ConfirmationKind {
@@ -140,6 +146,9 @@ struct Smoke {
     history_selection: Option<hunkra::text::Selection>,
     history_text: Option<String>,
     history_reviews: Vec<serde_json::Value>,
+    network_input: bool,
+    network_preserved: Vec<(String, hunkra::text::Selection, u64)>,
+    network_selection: Option<(Arc<DiffSnapshot>, hunkra_core::LineSelection)>,
 }
 struct Hunkra {
     view: ViewState,
@@ -155,6 +164,9 @@ struct Hunkra {
     conflict_subscription: Option<Subscription>,
     history: Option<Entity<HistoryView>>,
     history_tab: bool,
+    network: Option<Entity<NetworkView>>,
+    network_subscription: Option<Subscription>,
+    network_tab: bool,
     confirmation: Option<Confirmation>,
     after_save: Option<Intent>,
     applying_intent: bool,
@@ -326,6 +338,9 @@ impl Hunkra {
             conflict_subscription: None,
             history: None,
             history_tab: false,
+            network: None,
+            network_subscription: None,
+            network_tab: false,
             confirmation: None,
             after_save: None,
             applying_intent: false,
@@ -369,6 +384,9 @@ impl Hunkra {
                 }
                 WriteQuery::Resolve(snapshot) => {
                     hunkra_core::mark_resolved(&snapshot).map(WriteResult::Resolve)
+                }
+                WriteQuery::Network(command) => {
+                    network_action::run(command).map(WriteResult::Network)
                 }
             }),
             writing: false,
@@ -418,6 +436,9 @@ impl Hunkra {
                 history_selection: None,
                 history_text: None,
                 history_reviews: Vec::new(),
+                network_input: false,
+                network_preserved: Vec::new(),
+                network_selection: None,
             }),
         };
         if let Some(root) = root {
@@ -471,6 +492,9 @@ impl Hunkra {
         cx: &mut Context<Self>,
     ) {
         self.confirmation = Some(Confirmation { intent, kind });
+        if let Some(network) = &self.network {
+            network.update(cx, |view, cx| view.set_busy(true, cx));
+        }
         if let Some(view) = &self.conflict {
             view.update(cx, |view, cx| view.set_busy(true, cx));
         }
@@ -480,6 +504,9 @@ impl Hunkra {
     fn cancel_confirmation(&mut self, cx: &mut Context<Self>) {
         self.confirmation = None;
         self.after_save = None;
+        if let Some(network) = &self.network {
+            network.update(cx, |view, cx| view.set_busy(self.writing, cx));
+        }
         if let Some(view) = &self.conflict {
             view.update(cx, |view, cx| view.set_busy(self.writing, cx));
         }
@@ -547,6 +574,7 @@ impl Hunkra {
                 }
             }
             Intent::Operation(action) => self.perform_operation(action, cx),
+            Intent::Network(command) => self.perform_network(command, cx),
             Intent::SaveDeletion(snapshot, document) => {
                 self.begin_write(cx);
                 self.write_worker
@@ -691,6 +719,9 @@ impl Hunkra {
         if let Some(history) = &self.history {
             history.update(cx, |view, cx| view.set_locale(locale, cx));
         }
+        if let Some(network) = &self.network {
+            network.update(cx, |view, cx| view.set_locale(locale, cx));
+        }
         let placeholder = self.t("commit-placeholder");
         self.message.update(cx, |editor, cx| {
             editor.placeholder = placeholder.into();
@@ -721,6 +752,9 @@ impl Hunkra {
         self.reviewed_commit = None;
         self.history = None;
         self.history_tab = false;
+        self.network = None;
+        self.network_subscription = None;
+        self.network_tab = false;
         self.branches = None;
         self.operation = None;
         self.reviewed_operation = None;
@@ -774,6 +808,16 @@ impl Hunkra {
         }
         self.history_tab = index == 2;
         self.branch_tab = index == 1;
+        self.network_tab = index == 3;
+        if self.network_tab && self.network.is_none() {
+            let root = self.root.clone();
+            let network = cx.new(|cx| NetworkView::new(root, self.view.locale, cx));
+            self.network_subscription =
+                Some(cx.subscribe(&network, |app, _, event: &NetworkEvent, cx| {
+                    app.perform_network(event.0.clone(), cx);
+                }));
+            self.network = Some(network);
+        }
         if self.history_tab
             && self.history.is_none()
             && let Some(root) = self.root.clone()
@@ -784,7 +828,11 @@ impl Hunkra {
     }
     /// Gives keyboard navigation to the displayed native tab rather than a hidden message editor.
     fn focus_tab(&self, window: &mut Window, cx: &Context<Self>) {
-        if self.history_tab
+        if self.network_tab
+            && let Some(network) = &self.network
+        {
+            window.focus(&network.read(cx).focus_handle(cx));
+        } else if self.history_tab
             && let Some(history) = &self.history
         {
             window.focus(&history.read(cx).focus_handle(cx));
@@ -794,7 +842,11 @@ impl Hunkra {
     }
     /// Manual refresh restarts history at current HEAD; background status polls keep its immutable tip.
     fn refresh_visible(&mut self, cx: &mut Context<Self>) {
-        if self.history_tab
+        if self.network_tab
+            && let Some(network) = &self.network
+        {
+            network.update(cx, |view, cx| view.reload(cx));
+        } else if self.history_tab
             && let Some(history) = &self.history
         {
             history.update(cx, |view, cx| view.reload(cx));
@@ -802,6 +854,15 @@ impl Hunkra {
             self.refresh_queued = true;
         } else {
             self.refresh(cx);
+        }
+    }
+    /// Opens native creation controls without losing the current project's message/Result or entered destination.
+    fn show_creation(&mut self, page: NetworkPage, cx: &mut Context<Self>) {
+        self.select_tab(3, cx);
+        if self.network_tab
+            && let Some(network) = &self.network
+        {
+            network.update(cx, |view, cx| view.select_page(page, cx));
         }
     }
     /// Uses GPUI's asynchronous native directory picker.
@@ -962,6 +1023,7 @@ impl Hunkra {
             || self.diff_loading
             || self.confirmation.is_some()
             || self.history_tab
+            || self.network_tab
         {
             return;
         }
@@ -1044,12 +1106,27 @@ impl Hunkra {
             .submit(0, WriteQuery::Operation(snapshot, action));
         cx.notify();
     }
+    /// Sends one captured network action through the same writer and existing Result/navigation guard.
+    fn perform_network(&mut self, command: NetworkCommand, cx: &mut Context<Self>) {
+        if self.writing || (self.confirmation.is_some() && !self.applying_intent) {
+            return;
+        }
+        if command.changes_workspace() && self.guard_intent(Intent::Network(command.clone()), cx) {
+            return;
+        }
+        self.begin_write(cx);
+        self.write_worker.submit(0, WriteQuery::Network(command));
+        cx.notify();
+    }
     /// Invalidates pending reads and freezes message edits for either kind of accepted write.
     fn begin_write(&mut self, cx: &mut Context<Self>) {
         self.writing = true;
         self.committed = None;
         self.branch_created = None;
         self.operation_written = None;
+        if let Some(network) = &self.network {
+            network.update(cx, |view, cx| view.set_busy(true, cx));
+        }
         if let Some(conflict) = &self.conflict {
             conflict.update(cx, |view, cx| view.set_busy(true, cx));
         }
@@ -1075,6 +1152,9 @@ impl Hunkra {
         let mut changed = false;
         if let Some(history) = &self.history {
             history.update(cx, |view, cx| view.poll(cx));
+        }
+        if let Some(network) = &self.network {
+            network.update(cx, |view, cx| view.poll(cx));
         }
         if let Some((generation, result)) = self.status_worker.take()
             && generation == self.scan_generation
@@ -1191,6 +1271,9 @@ impl Hunkra {
         }
         if let Some((_, result)) = self.write_worker.take() {
             self.writing = false;
+            if let Some(network) = &self.network {
+                network.update(cx, |view, cx| view.set_busy(false, cx));
+            }
             if let Some(conflict) = &self.conflict {
                 conflict.update(cx, |view, cx| view.set_busy(false, cx));
             }
@@ -1202,7 +1285,8 @@ impl Hunkra {
                 editor.enabled = true;
                 cx.notify();
             });
-            if self.view.finish_write(&result) {
+            let preserves_documents = matches!(&result, Ok(WriteResult::Network(outcome)) if !outcome.changes_documents());
+            if !preserves_documents && self.view.finish_write(&result) {
                 self.anchor_removed = None;
                 self.anchor_added = None;
             }
@@ -1249,6 +1333,43 @@ impl Hunkra {
                     self.write_error_key = None;
                     self.last_write_backend = Some(result.backend);
                 }
+                Ok(WriteResult::Network(result)) => {
+                    self.write_error_key = None;
+                    match result {
+                        NetworkOutcome::Created(created) => {
+                            let backend = created.backend;
+                            self.open(created.root, cx);
+                            self.last_write_backend = Some(backend);
+                        }
+                        NetworkOutcome::Fetch(fetched) => {
+                            self.last_write_backend = Some(fetched.backend);
+                            if let Some(network) = &self.network {
+                                network.update(cx, |view, cx| {
+                                    view.status = Some("network-fetched");
+                                    cx.notify();
+                                });
+                            }
+                        }
+                        NetworkOutcome::Upstream => {
+                            self.last_write_backend = Some("gix");
+                            if let Some(network) = &self.network {
+                                network.update(cx, |view, cx| {
+                                    view.status = Some("network-upstream-set");
+                                    cx.notify();
+                                });
+                            }
+                        }
+                        NetworkOutcome::Coordinator(write) => {
+                            self.last_write_backend = Some(write.route.backend);
+                            if let Some(network) = &self.network {
+                                network.update(cx, |view, cx| {
+                                    view.status = Some(if write.route.capability == hunkra_core::network::NetworkCapability::PushCoordinator { "network-pushed" } else { "network-pulled" });
+                                    cx.notify();
+                                });
+                            }
+                        }
+                    }
+                }
                 Err(error) => {
                     self.after_save = None;
                     self.write_error_key = Some(error_key(&error));
@@ -1259,7 +1380,7 @@ impl Hunkra {
             }
             if self.close_requested && self.last_write_backend.is_some() {
                 if let Some(smoke) = &self.smoke {
-                    let report = serde_json::json!({"ok":self.last_write_backend==Some(if smoke.operation.as_deref().is_some_and(|action| action.starts_with("conflict")) {"filesystem"} else if smoke.operation.as_deref().is_some_and(|action| !action.starts_with("branch")) {"git-cli"} else {"gix"}), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
+                    let report = serde_json::json!({"ok":self.last_write_backend==Some(if smoke.operation.as_deref().is_some_and(|action| action.starts_with("conflict")) {"filesystem"} else if smoke.operation.as_deref().is_some_and(|action| action.starts_with("network") && !matches!(action, "network-push" | "network-pull")) {"gix"} else if smoke.operation.as_deref().is_some_and(|action| !action.starts_with("branch")) {"git-cli"} else {"gix"}), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
                     std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap())
                         .expect("close smoke report");
                 }
@@ -1269,6 +1390,9 @@ impl Hunkra {
             self.close_requested = false;
             self.refresh_queued = false;
             self.refresh(cx);
+            if let Some(network) = &self.network {
+                network.update(cx, |view, cx| view.reload(cx));
+            }
             changed = true;
         }
         if self.smoke.is_some() {
@@ -1330,20 +1454,22 @@ impl Hunkra {
             return;
         }
         if key == "f7" {
-            if self.history_tab {
+            if self.history_tab || self.network_tab {
                 return;
             }
             self.move_hunk(!event.keystroke.modifiers.shift, cx);
             return;
         }
-        if event.keystroke.modifiers.control && matches!(key, "1" | "2" | "3") {
+        if event.keystroke.modifiers.control && matches!(key, "1" | "2" | "3" | "4") {
             self.select_tab(
                 if key == "1" {
                     0
                 } else if key == "2" {
                     1
-                } else {
+                } else if key == "3" {
                     2
+                } else {
+                    3
                 },
                 cx,
             );
@@ -1354,7 +1480,7 @@ impl Hunkra {
             self.perform_operation(OperationAction::Continue, cx);
             return;
         }
-        if self.history_tab {
+        if self.history_tab || self.network_tab {
             return;
         }
         if self.branch_tab && key == "enter" {
@@ -1413,6 +1539,15 @@ impl Hunkra {
     }
     /// Runs a native scripted render scenario, with a finite timeout and isolated settings.
     fn smoke_tick(&mut self, cx: &mut Context<Self>) {
+        if self.smoke.as_ref().is_some_and(|smoke| {
+            smoke
+                .operation
+                .as_deref()
+                .is_some_and(|action| action.starts_with("network"))
+        }) {
+            self.smoke_network_tick(cx);
+            return;
+        }
         let smoke = self.smoke.as_ref().expect("smoke state");
         if smoke.started.elapsed() > Duration::from_secs(30) {
             let report = serde_json::json!({"ok":false,"reason":"timeout","frames":self.frames,"error":self.error_key});
@@ -1954,11 +2089,11 @@ impl Hunkra {
     /// Exercises chunk choices, real Result input and keyboard undo/redo in a finite fixture window.
     fn smoke_conflict_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.smoke.as_ref().is_some_and(|smoke| {
-            smoke
-                .operation
-                .as_deref()
-                .is_some_and(|action| action.starts_with("conflict") || action == "history-draft")
-                && !smoke.result_ready
+            smoke.operation.as_deref().is_some_and(|action| {
+                action.starts_with("conflict")
+                    || action == "history-draft"
+                    || action.starts_with("network-draft")
+            }) && !smoke.result_ready
         }) {
             return;
         }
@@ -2284,6 +2419,7 @@ impl Hunkra {
     }
     /// Exercises real native input callbacks, Cyrillic composition and editing keys in the smoke window.
     fn smoke_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.smoke_network_input(window, cx);
         self.smoke_conflict_input(window, cx);
         if self.smoke.as_ref().is_some_and(|smoke| {
             !smoke.history_input
@@ -3109,6 +3245,22 @@ impl Render for Hunkra {
                     .on_click(cx.listener(|app, _, _, cx| app.choose_repository(cx))),
             )
             .child(
+                button("new-repository", self.t("network-init"), false).on_click(cx.listener(
+                    |app, _, window, cx| {
+                        app.show_creation(NetworkPage::Init, cx);
+                        app.focus_tab(window, cx);
+                    },
+                )),
+            )
+            .child(
+                button("clone-repository", self.t("network-clone"), false).on_click(cx.listener(
+                    |app, _, window, cx| {
+                        app.show_creation(NetworkPage::Clone, cx);
+                        app.focus_tab(window, cx);
+                    },
+                )),
+            )
+            .child(
                 button(
                     "refresh",
                     self.t(if self.scanning { "loading" } else { "refresh" }),
@@ -3128,6 +3280,7 @@ impl Render for Hunkra {
                         || self.diff_loading
                         || self.reviewed_commit.is_none()
                         || self.history_tab
+                        || self.network_tab
                         || self.confirmation.is_some()
                     {
                         0.5
@@ -3178,11 +3331,15 @@ impl Render for Hunkra {
                 .bg(rgb(PANEL))
                 .border_b_1()
                 .border_color(rgb(LINE));
-            for (index, key) in ["changes", "branches", "history"].into_iter().enumerate() {
+            for (index, key) in ["changes", "branches", "history", "network"]
+                .into_iter()
+                .enumerate()
+            {
                 let active = match index {
-                    0 => !self.history_tab && !self.branch_tab,
+                    0 => !self.history_tab && !self.branch_tab && !self.network_tab,
                     1 => !self.history_tab && self.branch_tab,
-                    _ => self.history_tab,
+                    2 => self.history_tab,
+                    _ => self.network_tab,
                 };
                 tabs = tabs.child(
                     button(("workspace-tab", index), self.t(key), active).on_click(cx.listener(
@@ -3194,7 +3351,11 @@ impl Render for Hunkra {
                 );
             }
             content = content.child(tabs);
-            if self.history_tab
+            if self.network_tab
+                && let Some(network) = &self.network
+            {
+                content = content.child(div().flex_1().min_h_0().child(network.clone()));
+            } else if self.history_tab
                 && let Some(history) = &self.history
             {
                 content = content.child(div().flex_1().min_h_0().child(history.clone()));
@@ -3237,26 +3398,32 @@ impl Render for Hunkra {
                 );
             }
         } else {
-            let mut welcome = div()
-                .flex_1()
-                .p_8()
-                .flex()
-                .flex_col()
-                .gap_4()
-                .justify_center()
-                .child(div().text_3xl().child(self.t("welcome")))
-                .child(div().text_color(rgb(MUTED)).child(self.t("welcome-detail")));
-            for (index, path) in self.settings.recent.iter().cloned().enumerate() {
-                welcome = welcome.child(
-                    button(
-                        ("recent", index),
-                        path.to_string_lossy().into_owned(),
-                        false,
-                    )
-                    .on_click(cx.listener(move |app, _, _, cx| app.open(path.clone(), cx))),
-                );
+            if self.network_tab
+                && let Some(network) = &self.network
+            {
+                content = content.child(div().flex_1().min_h_0().child(network.clone()));
+            } else {
+                let mut welcome = div()
+                    .flex_1()
+                    .p_8()
+                    .flex()
+                    .flex_col()
+                    .gap_4()
+                    .justify_center()
+                    .child(div().text_3xl().child(self.t("welcome")))
+                    .child(div().text_color(rgb(MUTED)).child(self.t("welcome-detail")));
+                for (index, path) in self.settings.recent.iter().cloned().enumerate() {
+                    welcome = welcome.child(
+                        button(
+                            ("recent", index),
+                            path.to_string_lossy().into_owned(),
+                            false,
+                        )
+                        .on_click(cx.listener(move |app, _, _, cx| app.open(path.clone(), cx))),
+                    );
+                }
+                content = content.child(welcome);
             }
-            content = content.child(welcome);
         }
         if let Some(commit) = &self.committed {
             content = content.child(

@@ -1,0 +1,335 @@
+{
+  "ok": true,
+  "runs": [
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 10,
+      "network_frames": null,
+      "scenario": "network-init",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "network_frames": null,
+      "scenario": "network-clone",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "network_frames": null,
+      "scenario": "network-init",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "network_frames": null,
+      "scenario": "network-clone",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "network_frames": 9,
+      "scenario": "network-fetch",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/main"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "network_frames": 9,
+      "scenario": "network-pull",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "git-cli",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/main"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "network_frames": 9,
+      "scenario": "network-upstream",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/feature/ветка"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "network_frames": 9,
+      "scenario": "network-push",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "git-cli",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/review/ветка"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "network_frames": 9,
+      "scenario": "network-push-refusal",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": "error-network-execution",
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "network_frames": 9,
+      "scenario": "network-pull-refusal",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": "error-network-execution",
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/main"
+      ]
+    },
+    {
+      "ok": true,
+      "close_deferred": true,
+      "writer_finished": true,
+      "write_backend": "git-cli",
+      "commit_id": null,
+      "message_cleared": false
+    },
+    {
+      "ok": true,
+      "close_deferred": true,
+      "writer_finished": true,
+      "write_backend": "gix",
+      "commit_id": null,
+      "message_cleared": true
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "network_frames": 9,
+      "scenario": "network-draft-fetch",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/main"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 13,
+      "network_frames": 7,
+      "scenario": "network-draft-clone-cancel",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/main"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "network_frames": 7,
+      "scenario": "network-draft-pull-cancel",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": null,
+      "close_cancelled": true,
+      "upstream": [
+        "origin",
+        "refs/heads/main"
+      ]
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "network_frames": null,
+      "scenario": "network-draft-clone-save",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 10,
+      "network_frames": 6,
+      "scenario": "network-init-refusal",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": "error-repository-destination",
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 10,
+      "network_frames": 7,
+      "scenario": "network-clone-refusal",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": "error-repository-destination",
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "network_frames": 8,
+      "scenario": "network-upstream-refusal",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": null,
+      "error": "error-config-lock",
+      "close_cancelled": true,
+      "upstream": null
+    }
+  ],
+  "scope": "isolated native Wayland controls; independent Git oracle; no owner remotes/keys/settings"
+}

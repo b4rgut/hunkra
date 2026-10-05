@@ -60,7 +60,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 19,
+      "frames": 18,
       "locales": [
         "Result",
         "Результат",
@@ -104,7 +104,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 10,
       "locales": [
         "Result",
         "Результат",
@@ -140,7 +140,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 10,
       "locales": [
         "Result",
         "Результат",
@@ -212,7 +212,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 13,
+      "frames": 12,
       "locales": [
         "Result",
         "Результат",
@@ -230,7 +230,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 19,
+      "frames": 20,
       "locales": [
         "Result",
         "Результат",
