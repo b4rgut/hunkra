@@ -20,6 +20,16 @@ pub enum CoreError {
     InvalidPath,
     #[error("the repository exceeds the supported file limit")]
     TooManyFiles,
+    #[error("the diff sources have changed; refresh before writing")]
+    Stale,
+    #[error("this repository or file variant is not supported for index writes")]
+    UnsupportedWrite,
+    #[error("select both sides of this EOF replacement to preserve line boundaries")]
+    SelectionBoundary,
+    #[error("no changed lines selected")]
+    EmptySelection,
+    #[error("could not acquire the index lock")]
+    IndexLock,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -60,12 +70,12 @@ pub struct RepositorySnapshot {
 }
 
 /// Keeps library diagnostics out of the translatable domain error categories.
-fn git_error(error: impl std::fmt::Display) -> CoreError {
+pub(crate) fn git_error(error: impl std::fmt::Display) -> CoreError {
     CoreError::Git(error.to_string())
 }
 
 /// Discovers a repository using gix and returns its canonical worktree root.
-fn open(path: &Path) -> Result<gix::Repository, CoreError> {
+pub(crate) fn open(path: &Path) -> Result<gix::Repository, CoreError> {
     let repo = gix::discover(path).map_err(git_error)?;
     if repo.workdir().is_none() {
         return Err(CoreError::Bare);
@@ -173,7 +183,7 @@ pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
 }
 
 /// Refuses traversal and intermediate symlinks outside the worktree.
-fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
+pub(crate) fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
     if path.as_os_str().is_empty() || !path.components().all(|p| matches!(p, Component::Normal(_)))
     {
         return Err(CoreError::InvalidPath);
@@ -261,21 +271,39 @@ fn at_worktree(
     if !metadata.is_file() {
         return Ok(Document::unsupported(Some(0o160000)));
     }
+    let options = repo.filesystem_options().map_err(git_error)?;
+    let path_bytes = gix::path::into_bstr(path);
+    let indexed_mode = index
+        .entry_by_path_and_stage(path_bytes.as_ref(), gix::index::entry::Stage::Unconflicted)
+        .map_or(gix::index::entry::Mode::FILE, |entry| entry.mode);
     #[cfg(unix)]
-    let mode = {
+    let executable = {
         use std::os::unix::fs::PermissionsExt;
-        if metadata.permissions().mode() & 0o111 != 0 {
-            0o100755
-        } else {
-            0o100644
-        }
+        metadata.permissions().mode() & 0o111 != 0
     };
     #[cfg(not(unix))]
-    let mode = 0o100644;
+    let executable = false;
+    let mode = indexed_mode
+        .change_to_match_fs_with_values(
+            true,
+            false,
+            false,
+            executable,
+            options.symlink,
+            options.executable_bit,
+        )
+        .map_or(indexed_mode, |change| change.apply(indexed_mode))
+        .bits();
     if metadata.len() > MAX_BYTES as u64 {
         return Ok(Document::oversized(metadata.len(), Some(mode)));
     }
     let raw = fs::File::open(full_path)?.take(MAX_BYTES as u64 + 1);
+    // core.symlinks=false checks a tracked link out as a regular file of target bytes.
+    if mode == 0o120000 {
+        let mut bytes = Vec::new();
+        raw.take(MAX_BYTES as u64 + 1).read_to_end(&mut bytes)?;
+        return Ok(Document::present(bytes, Some(mode)));
+    }
     let (mut pipeline, _) = repo.filter_pipeline(None).map_err(git_error)?;
     let outcome = pipeline
         .convert_to_git(raw, path, index)
@@ -293,6 +321,7 @@ pub fn read_diff(root: &Path, path: &Path, kind: DiffKind) -> Result<DiffSnapsho
     let repo = open(root)?;
     let root = repo.workdir().ok_or(CoreError::Bare)?.canonicalize()?;
     check_path(&root, path)?;
+    let guard = capture_guard(&repo, &root, path)?;
     let index = repo.index_or_empty().map_err(git_error)?;
     let bytes = gix::path::into_bstr(path);
     let conflict = index.entries().iter().any(|entry| {
@@ -310,5 +339,89 @@ pub fn read_diff(root: &Path, path: &Path, kind: DiffKind) -> Result<DiffSnapsho
         DiffKind::Staged => at_index(&repo, &index, path)?,
         DiffKind::Unstaged => at_worktree(&repo, &index, &root, path)?,
     };
-    Ok(DiffSnapshot::new(path.to_path_buf(), kind, left, right))
+    if capture_guard(&repo, &root, path)? != guard {
+        return Err(CoreError::Stale);
+    }
+    let mut snapshot = DiffSnapshot::new(path.to_path_buf(), kind, left, right);
+    snapshot.guard = Some(guard);
+    Ok(snapshot)
+}
+
+/// Opaque source precondition; domain/UI snapshots expose no gix IDs or index handles.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct RepositoryGuard {
+    pub root: PathBuf,
+    pub index: Option<Vec<u8>>,
+    pub head: Option<String>,
+    pub raw_worktree: Option<Vec<u8>>,
+    pub mode: Option<u32>,
+}
+
+/// Hashes exact index contents, including extensions, using a fixed independent digest.
+fn index_digest(path: &Path) -> Result<Option<Vec<u8>>, CoreError> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let hash = gix::hash::bytes_of_file(
+        path,
+        metadata.len(),
+        gix::hash::Kind::Sha256,
+        &mut gix::progress::Discard,
+        &std::sync::atomic::AtomicBool::new(false),
+    )
+    .map_err(git_error)?;
+    Ok(Some(hash.as_slice().to_vec()))
+}
+
+/// Captures raw file bytes separately from normalized Git bytes for stale-diff checks.
+pub(crate) fn capture_guard(
+    repo: &gix::Repository,
+    root: &Path,
+    path: &Path,
+) -> Result<RepositoryGuard, CoreError> {
+    check_path(root, path)?;
+    let full_path = root.join(path);
+    let (raw_worktree, mode) = match fs::symlink_metadata(&full_path) {
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => (None, None),
+        Err(error) => return Err(error.into()),
+        Ok(metadata) if metadata.is_symlink() => {
+            let target = fs::read_link(&full_path)?;
+            (
+                Some(target.as_os_str().as_encoded_bytes().to_vec()),
+                Some(0o120000),
+            )
+        }
+        Ok(metadata) if metadata.is_file() => {
+            let mut bytes = Vec::new();
+            fs::File::open(full_path)?
+                .take(MAX_BYTES as u64 + 1)
+                .read_to_end(&mut bytes)?;
+            #[cfg(unix)]
+            let mode = {
+                use std::os::unix::fs::PermissionsExt;
+                if metadata.permissions().mode() & 0o111 != 0 {
+                    0o100755
+                } else {
+                    0o100644
+                }
+            };
+            #[cfg(not(unix))]
+            let mode = 0o100644;
+            (Some(bytes), Some(mode))
+        }
+        Ok(_) => (None, Some(0o160000)),
+    };
+    Ok(RepositoryGuard {
+        root: root.to_path_buf(),
+        index: index_digest(&repo.index_path())?,
+        head: repo
+            .head()
+            .map_err(git_error)?
+            .id()
+            .map(|id| id.to_string()),
+        raw_worktree,
+        mode,
+    })
 }

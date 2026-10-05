@@ -1,0 +1,39 @@
+{
+  "ok": true,
+  "frames": 19,
+  "file": "Изменения с пробелом.bsl",
+  "locales": [
+    "Commit",
+    "Фиксация",
+    "Коммит"
+  ],
+  "rows": 7,
+  "hunks": 2,
+  "mode": "index-to-worktree",
+  "backend": "gix",
+  "native_display": true,
+  "index_written": true,
+  "write_backend": "gix",
+  "write_error": null,
+  "index_versions": [
+    "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 20;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n",
+    "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
+  ],
+  "files": 5,
+  "elapsed_ms": 1669,
+  "close_during_write": {
+    "ok": true,
+    "close_deferred": true,
+    "writer_finished": true,
+    "write_backend": "gix"
+  },
+  "oracle": "git version 2.55.0",
+  "verified": [
+    "stage B preserves A",
+    "unstage hunk B preserves A",
+    "worktree A+B+C unchanged",
+    "shift range selects changed +/- lines only",
+    "locale selection preserved",
+    "close waits for index transaction"
+  ]
+}

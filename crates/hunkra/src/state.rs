@@ -10,10 +10,17 @@ pub struct ViewState {
     pub selected: Option<PathBuf>,
     pub diff: Option<Arc<DiffSnapshot>>,
     pub selected_rows: BTreeSet<usize>,
+    pub line_selection: hunkra_core::LineSelection,
     pub message: String,
     pub diff_generation: u64,
 }
 impl ViewState {
+    /// Gates callbacks from a rendered frame so old coordinates cannot target a newer document.
+    pub fn is_current_diff(&self, rendered: &Arc<DiffSnapshot>) -> bool {
+        self.diff
+            .as_ref()
+            .is_some_and(|current| Arc::ptr_eq(current, rendered))
+    }
     /// Changes only the label profile; requests and all document/selection state stay intact.
     pub fn switch_locale(&mut self, locale: Locale) {
         self.locale = locale;
@@ -26,7 +33,8 @@ impl ViewState {
         if let Some(previous) = &self.diff {
             if previous.left != diff.left || previous.right != diff.right {
                 self.selected_rows.clear();
-            } else if previous.kind == diff.kind && previous.presentation == diff.presentation {
+                self.line_selection = Default::default();
+            } else if previous.same_version(&diff) {
                 return true;
             }
         }
@@ -40,6 +48,7 @@ impl ViewState {
         {
             self.diff = None;
             self.selected_rows.clear();
+            self.line_selection = Default::default();
         }
         self.selected = Some(path);
         self.diff_generation += 1;
@@ -67,12 +76,15 @@ mod tests {
         );
         state.message = "User commit message".into();
         state.selected_rows.insert(0);
+        state.line_selection.added.insert(0);
         let diff = state.diff.clone().unwrap();
         for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
             state.switch_locale(locale);
             assert!(Arc::ptr_eq(&diff, state.diff.as_ref().unwrap()));
+            assert!(state.is_current_diff(&diff));
             assert_eq!(state.message, "User commit message");
             assert!(state.selected_rows.contains(&0));
+            assert!(state.line_selection.added.contains(&0));
             assert_eq!(state.diff_generation, generation);
         }
     }
@@ -81,7 +93,18 @@ mod tests {
     fn stale_reply_is_ignored() {
         let mut state = ViewState::default();
         let old = state.select("old".into(), DiffKind::Unstaged);
+        state.apply_diff(
+            old,
+            DiffSnapshot::new(
+                "old".into(),
+                DiffKind::Unstaged,
+                Document::absent(),
+                Document::present(b"old\n".to_vec(), None),
+            ),
+        );
+        let rendered = state.diff.clone().unwrap();
         let current = state.select("new".into(), DiffKind::Unstaged);
+        assert!(!state.is_current_diff(&rendered));
         let diff = DiffSnapshot::new(
             "old".into(),
             DiffKind::Unstaged,

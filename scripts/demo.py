@@ -24,6 +24,10 @@ def repository(parent, name):
     root = parent / name
     root.mkdir()
     git(root, "init", "--initial-branch=main")
+    (root / ".git/empty-hooks").mkdir()
+    for key, value in (("user.name", "Hunkra Demo"), ("user.email", "demo@example.invalid"),
+                       ("core.hooksPath", str(root / ".git/empty-hooks")), ("core.autocrlf", "false")):
+        git(root, "config", "--local", key, value)
     return root
 
 

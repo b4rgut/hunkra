@@ -10,13 +10,14 @@ shift || true
 case "$command" in
   bootstrap) python3 scripts/bootstrap.py "$@" ;;
   check-plan) python3 scripts/validate.py plan ;;
-  check-i18n) cargo run --quiet --locked -p hunkra --bin check-i18n; cargo test --locked -p hunkra i18n:: ;;
+  check-i18n) cargo run --quiet --locked -p hunkra --bin check-i18n; python3 scripts/test.py --locked -p hunkra i18n:: ;;
   check-fast) cargo fmt --all -- --check; python3 scripts/validate.py plan; cargo run --quiet --locked -p hunkra --bin check-i18n ;;
-  check) scripts/dev check-fast; cargo clippy --workspace --all-targets --locked -- -D warnings; cargo test --workspace --locked; cog check 61a0166..HEAD ;;
+  check) scripts/dev check-fast; cargo clippy --workspace --all-targets --locked -- -D warnings; python3 scripts/test.py --workspace --locked; cog check 61a0166..HEAD ;;
   check-ui) cargo clippy -p hunkra --features gui --all-targets --locked -- -D warnings ;;
   build-ui) cargo build -p hunkra --features gui --locked "$@" ;;
   run) cargo run -p hunkra --features gui --locked --bin hunkra -- "$@" ;;
   demo) python3 scripts/demo.py "$@" ;;
+  smoke) python3 scripts/smoke.py "$@" ;;
   check-release) python3 scripts/validate.py release ;;
   *) printf 'Unknown command: %s\n' "$command" >&2; exit 2 ;;
 esac

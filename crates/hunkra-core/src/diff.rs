@@ -99,6 +99,7 @@ pub struct DiffSnapshot {
     pub rows: Vec<DiffRow>,
     pub hunks: Vec<Range<usize>>,
     pub backend: &'static str,
+    pub(crate) guard: Option<crate::repository::RepositoryGuard>,
 }
 
 /// Separates display text from its exact newline representation.
@@ -118,6 +119,16 @@ fn line(text: &str, index: usize) -> Line {
 }
 
 impl DiffSnapshot {
+    /// Compares exact source versions as well as bytes; a new index needs a new write guard.
+    pub fn same_version(&self, other: &Self) -> bool {
+        self.path == other.path
+            && self.kind == other.kind
+            && self.left == other.left
+            && self.right == other.right
+            && self.presentation == other.presentation
+            && self.guard == other.guard
+    }
+
     /// Constructs a safe explanation for an index with nonzero conflict stages.
     pub fn conflict(path: PathBuf, kind: DiffKind) -> Self {
         let mut snapshot = Self::new(path, kind, Document::absent(), Document::absent());
@@ -136,6 +147,7 @@ impl DiffSnapshot {
             rows: Vec::new(),
             hunks: Vec::new(),
             backend: "gix",
+            guard: None,
         };
         if snapshot.left.unsupported || snapshot.right.unsupported {
             snapshot.presentation = Presentation::Unsupported;
