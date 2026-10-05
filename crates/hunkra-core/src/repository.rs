@@ -32,6 +32,24 @@ pub enum CoreError {
     EmptySelection,
     #[error("could not acquire the index lock")]
     IndexLock,
+    #[error("commit message is empty, invalid or exceeds the supported limit")]
+    CommitMessage,
+    #[error("there are no staged changes to commit")]
+    NothingStaged,
+    #[error("commit identity is missing or invalid")]
+    Identity,
+    #[error("unresolved index stages must be resolved before committing")]
+    Unresolved,
+    #[error("complete the current Git operation before creating an ordinary commit")]
+    ActiveOperation,
+    #[error("commit hook failed: {0}")]
+    Hook(&'static str),
+    #[error("commit signing failed")]
+    Signing,
+    #[error("reference update failed; inspect current HEAD before retrying")]
+    ReferenceUpdate,
+    #[error("this commit configuration is not supported: {0}")]
+    CommitUnsupported(&'static str),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -83,6 +101,7 @@ pub struct RepositorySnapshot {
     pub operation: Option<Operation>,
     pub files: Vec<FileStatus>,
     pub backend: &'static str,
+    pub commit: crate::CommitSnapshot,
 }
 
 /// Keeps library diagnostics out of the translatable domain error categories.
@@ -102,6 +121,7 @@ pub(crate) fn open(path: &Path) -> Result<gix::Repository, CoreError> {
 /// Scans both comparisons without persisting gix's optional index stat updates.
 pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
     let repo = open(path)?;
+    let commit = crate::prepare_commit(repo.workdir().ok_or(CoreError::Bare)?)?;
     let root = repo.workdir().ok_or(CoreError::Bare)?.canonicalize()?;
     let head = repo.head().map_err(git_error)?;
     let branch = head.referent_name().map(|name| name.shorten().to_string());
@@ -187,6 +207,9 @@ pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
         | gix::state::InProgress::ApplyMailboxRebase => Operation::Rebase,
         _ => Operation::Other,
     });
+    if crate::prepare_commit(&root)? != commit {
+        return Err(CoreError::Stale);
+    }
     Ok(RepositorySnapshot {
         root,
         branch,
@@ -195,6 +218,7 @@ pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
         operation,
         files: files.into_values().collect(),
         backend: "gix",
+        commit,
     })
 }
 
@@ -374,7 +398,7 @@ pub(crate) struct RepositoryGuard {
 }
 
 /// Hashes exact index contents, including extensions, using a fixed independent digest.
-fn index_digest(path: &Path) -> Result<Option<Vec<u8>>, CoreError> {
+pub(crate) fn index_digest(path: &Path) -> Result<Option<Vec<u8>>, CoreError> {
     let metadata = match fs::metadata(path) {
         Ok(metadata) => metadata,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),

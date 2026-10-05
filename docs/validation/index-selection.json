@@ -20,7 +20,7 @@
     "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
   ],
   "files": 5,
-  "elapsed_ms": 1670,
+  "elapsed_ms": 1669,
   "close_during_write": {
     "ok": true,
     "close_deferred": true,

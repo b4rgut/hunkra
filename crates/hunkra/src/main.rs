@@ -97,6 +97,26 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::SelectionBoundary => "error-boundary",
         CoreError::EmptySelection => "error-selection",
         CoreError::IndexLock => "error-index-lock",
+        CoreError::CommitMessage => "error-commit-message",
+        CoreError::NothingStaged => "error-commit-empty",
+        CoreError::Identity => "error-commit-identity",
+        CoreError::Unresolved => "error-commit-conflict",
+        CoreError::ActiveOperation => "error-commit-operation",
+        CoreError::Hook(name) => match *name {
+            "pre-commit" => "error-hook-pre-commit",
+            "prepare-commit-msg" => "error-hook-prepare",
+            "commit-msg" => "error-hook-message",
+            "reference-transaction" => "error-hook-reference",
+            _ => "error-commit-hook",
+        },
+        CoreError::Signing => "error-commit-signing",
+        CoreError::ReferenceUpdate => "error-commit-reference",
+        CoreError::CommitUnsupported(reason) => match *reason {
+            "encoding" => "error-commit-encoding",
+            "sparse" => "error-commit-sparse",
+            "cleanup" | "comment-auto" => "error-commit-cleanup",
+            _ => "error-commit-unsupported",
+        },
     }
 }
 
