@@ -14,6 +14,7 @@ case "$command" in
   check-fast) cargo fmt --all -- --check; python3 scripts/validate.py plan; cargo run --quiet --locked -p hunkra --bin check-i18n ;;
   check) scripts/dev check-fast; cargo clippy --workspace --all-targets --locked -- -D warnings; python3 scripts/test.py --workspace --locked; cog check 61a0166..HEAD ;;
   check-ui) cargo clippy -p hunkra --features gui --all-targets --locked -- -D warnings ;;
+  check-editor) cargo clippy -p hunkra --features gui-tests --all-targets --locked -- -D warnings; python3 scripts/test.py -p hunkra --lib --features gui-tests --locked editor:: ;;
   build-ui) cargo build -p hunkra --features gui --locked "$@" ;;
   run) cargo run -p hunkra --features gui --locked --bin hunkra -- "$@" ;;
   demo) python3 scripts/demo.py "$@" ;;

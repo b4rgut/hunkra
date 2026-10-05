@@ -19,6 +19,7 @@ jobs:
       - run: scripts/dev bootstrap --no-native
       - run: scripts/dev check
       - run: scripts/dev check-ui
+      - run: scripts/dev check-editor
       - run: scripts/dev build-ui
       - run: scripts/dev check-release
       - name: Conventional PR title

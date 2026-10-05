@@ -1,18 +1,21 @@
 //! Native GPUI shell. Blocking repository reads run in separate bounded workers.
 use gpui::{
-    App, Application, Bounds, Context, FocusHandle, KeyDownEvent, PathPromptOptions,
-    ScrollStrategy, SharedString, Task, TitlebarOptions, UniformListScrollHandle, Window,
-    WindowBounds, WindowOptions, div, prelude::*, px, rgb, size, uniform_list,
+    App, Application, Bounds, Context, Entity, EntityInputHandler, FocusHandle, Focusable,
+    KeyDownEvent, Keystroke, PathPromptOptions, ScrollStrategy, SharedString, Subscription, Task,
+    TitlebarOptions, UniformListScrollHandle, Window, WindowBounds, WindowOptions, div, prelude::*,
+    px, rgb, size, uniform_list,
 };
 use hunkra::{
+    editor::{NativeEditor, TextChanged, TextRejected},
     i18n::{Locale, Translator},
     settings::{self, Settings},
     state::ViewState,
     worker::LatestWorker,
 };
 use hunkra_core::{
-    ChangeKind, CoreError, DiffKind, DiffRow, DiffSnapshot, IndexLimitation, IndexWrite, Line,
-    LineSelection, Operation, Presentation, RepositorySnapshot, Selection,
+    ChangeKind, CommitSnapshot, CommitWrite, CoreError, DiffKind, DiffRow, DiffSnapshot,
+    IndexLimitation, IndexWrite, Line, LineSelection, Operation, Presentation, RepositorySnapshot,
+    Selection,
 };
 use std::{
     path::PathBuf,
@@ -25,10 +28,26 @@ const LINE: u32 = 0x2b3541;
 const TEXT: u32 = 0xdce3ed;
 const MUTED: u32 = 0x99a8b9;
 const ACCENT: u32 = 0x93c9bd;
+const SMOKE_MESSAGE: &str = "Подготовить A+B 🦀\n\nСообщение из поля";
 
 type DiffQuery = (PathBuf, PathBuf, DiffKind);
-type WriteQuery = (PathBuf, std::sync::Arc<DiffSnapshot>, Selection);
+enum WriteQuery {
+    Index(PathBuf, std::sync::Arc<DiffSnapshot>, Selection),
+    Commit(CommitSnapshot, String),
+}
+enum WriteResult {
+    Index(IndexWrite),
+    Commit(CommitWrite),
+}
 
+#[derive(Default)]
+struct SmokeOptions {
+    stage: bool,
+    close: bool,
+    refusal: bool,
+    commit: bool,
+    hook: bool,
+}
 struct Smoke {
     report: PathBuf,
     phase: usize,
@@ -40,6 +59,11 @@ struct Smoke {
     index_versions: Vec<String>,
     close_on_write: bool,
     refusal: bool,
+    commit: bool,
+    hook_refusal: bool,
+    message_ready: bool,
+    input_prepared: bool,
+    message_selection: Option<hunkra::text::Selection>,
 }
 struct Hunkra {
     view: ViewState,
@@ -48,7 +72,11 @@ struct Hunkra {
     status_worker: LatestWorker<PathBuf, Result<RepositorySnapshot, CoreError>>,
     diff_worker: LatestWorker<DiffQuery, Result<DiffSnapshot, CoreError>>,
     settings_worker: LatestWorker<Settings, std::io::Result<()>>,
-    write_worker: LatestWorker<WriteQuery, Result<IndexWrite, CoreError>>,
+    write_worker: LatestWorker<WriteQuery, Result<WriteResult, CoreError>>,
+    message: Entity<NativeEditor>,
+    _message_subscriptions: Vec<Subscription>,
+    committed: Option<CommitWrite>,
+    reviewed_commit: Option<CommitSnapshot>,
     writing: bool,
     close_requested: bool,
     write_error_key: Option<&'static str>,
@@ -140,19 +168,30 @@ impl Hunkra {
     fn new(
         root: Option<PathBuf>,
         smoke: Option<PathBuf>,
-        stage_smoke: bool,
-        close_smoke: bool,
-        refusal_smoke: bool,
+        smoke_options: SmokeOptions,
         cx: &mut Context<Self>,
     ) -> Self {
         let settings = settings::load();
         let locale = settings.locale;
+        let translator = Translator::new(locale);
+        let message = cx.new(|cx| {
+            NativeEditor::new(64 * 1024, translator.text("commit-placeholder", None), cx)
+        });
+        let message_subscription = cx.subscribe(&message, |_, _, _: &TextChanged, cx| cx.notify());
+        let rejected_subscription = cx.subscribe(&message, |app, _, _: &TextRejected, cx| {
+            app.write_error_key = Some("error-commit-message");
+            cx.notify();
+        });
         let mut app = Self {
             view: ViewState {
                 locale,
                 ..Default::default()
             },
-            translator: Translator::new(locale),
+            translator,
+            message,
+            _message_subscriptions: vec![message_subscription, rejected_subscription],
+            committed: None,
+            reviewed_commit: None,
             settings,
             status_worker: LatestWorker::new("hunkra-status", |root: PathBuf| {
                 hunkra_core::scan(&root)
@@ -161,12 +200,14 @@ impl Hunkra {
                 hunkra_core::read_diff(&root, &path, kind)
             }),
             settings_worker: LatestWorker::new("hunkra-settings", settings::save),
-            write_worker: LatestWorker::new(
-                "hunkra-index",
-                |(root, diff, selection): WriteQuery| {
-                    hunkra_core::update_index(&root, &diff, &selection)
-                },
-            ),
+            write_worker: LatestWorker::new("hunkra-write", |query: WriteQuery| match query {
+                WriteQuery::Index(root, diff, selection) => {
+                    hunkra_core::update_index(&root, &diff, &selection).map(WriteResult::Index)
+                }
+                WriteQuery::Commit(snapshot, message) => {
+                    hunkra_core::create_commit(&snapshot, &message).map(WriteResult::Commit)
+                }
+            }),
             writing: false,
             close_requested: false,
             write_error_key: None,
@@ -193,11 +234,16 @@ impl Hunkra {
                 started: Instant::now(),
                 last_frame: 0,
                 locales: Vec::new(),
-                stage: stage_smoke,
+                stage: smoke_options.stage,
                 worktree: None,
                 index_versions: Vec::new(),
-                close_on_write: close_smoke,
-                refusal: refusal_smoke,
+                close_on_write: smoke_options.close,
+                refusal: smoke_options.refusal,
+                commit: smoke_options.commit,
+                hook_refusal: smoke_options.hook,
+                message_ready: false,
+                input_prepared: false,
+                message_selection: None,
             }),
         };
         if let Some(root) = root {
@@ -232,6 +278,11 @@ impl Hunkra {
     fn set_locale(&mut self, locale: Locale, cx: &mut Context<Self>) {
         self.view.switch_locale(locale);
         self.translator = Translator::new(locale);
+        let placeholder = self.t("commit-placeholder");
+        self.message.update(cx, |editor, cx| {
+            editor.placeholder = placeholder.into();
+            cx.notify();
+        });
         self.settings.locale = locale;
         if self.smoke.is_none() {
             self.settings_worker.submit(0, self.settings.clone());
@@ -243,6 +294,12 @@ impl Hunkra {
         if self.writing {
             return;
         }
+        self.committed = None;
+        self.reviewed_commit = None;
+        self.message.update(cx, |editor, cx| {
+            editor.buffer.reset(String::new());
+            cx.notify();
+        });
         self.root = Some(root);
         self.view.repository = None;
         self.view.selected = None;
@@ -410,7 +467,38 @@ impl Hunkra {
         let (Some(root), Some(diff)) = (self.root.clone(), self.view.diff.clone()) else {
             return;
         };
+        self.begin_write(cx);
+        self.write_worker
+            .submit(0, WriteQuery::Index(root, diff, selection));
+        cx.notify();
+    }
+    /// Captures the reviewed repository and user text before entering the shared writer.
+    fn commit(&mut self, cx: &mut Context<Self>) {
+        if self.writing || self.scanning || self.diff_loading {
+            return;
+        }
+        let Some(snapshot) = self.reviewed_commit.clone() else {
+            return;
+        };
+        let message = self.message.read(cx).buffer.text().to_owned();
+        if message.trim().is_empty() {
+            self.write_error_key = Some("error-commit-message");
+            cx.notify();
+            return;
+        }
+        self.begin_write(cx);
+        self.write_worker
+            .submit(0, WriteQuery::Commit(snapshot, message));
+        cx.notify();
+    }
+    /// Invalidates pending reads and freezes message edits for either kind of accepted write.
+    fn begin_write(&mut self, cx: &mut Context<Self>) {
         self.writing = true;
+        self.committed = None;
+        self.message.update(cx, |editor, cx| {
+            editor.enabled = false;
+            cx.notify();
+        });
         self.error_key = None;
         self.write_error_key = None;
         self.last_write_backend = None;
@@ -418,8 +506,6 @@ impl Hunkra {
         self.scanning = false;
         self.view.diff_generation += 1;
         self.diff_loading = false;
-        self.write_worker.submit(0, (root, diff, selection));
-        cx.notify();
     }
     /// Reads completed mailboxes, rejecting obsolete generations before touching UI state.
     fn poll(&mut self, cx: &mut Context<Self>) {
@@ -498,27 +584,41 @@ impl Hunkra {
         }
         if let Some((_, result)) = self.write_worker.take() {
             self.writing = false;
-            if self.view.finish_index_write(&result) {
+            self.message.update(cx, |editor, cx| {
+                editor.enabled = true;
+                cx.notify();
+            });
+            if self.view.finish_write(&result) {
                 self.anchor_removed = None;
                 self.anchor_added = None;
             }
             self.diff_loading = false;
             match result {
-                Ok(result) => {
+                Ok(WriteResult::Index(result)) => {
                     self.write_error_key = None;
                     self.last_write_backend = Some(result.backend);
                 }
+                Ok(WriteResult::Commit(result)) => {
+                    self.write_error_key = None;
+                    self.last_write_backend = Some(result.backend);
+                    self.message.update(cx, |editor, cx| {
+                        editor.buffer.reset(String::new());
+                        cx.notify();
+                    });
+                    self.committed = Some(result);
+                }
                 Err(error) => self.write_error_key = Some(error_key(&error)),
             }
-            if self.close_requested {
+            if self.close_requested && self.last_write_backend.is_some() {
                 if let Some(smoke) = &self.smoke {
-                    let report = serde_json::json!({"ok":self.last_write_backend==Some("gix"), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend});
+                    let report = serde_json::json!({"ok":self.last_write_backend==Some("gix"), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
                     std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap())
                         .expect("close smoke report");
                 }
                 cx.quit();
                 return;
             }
+            self.close_requested = false;
             self.refresh_queued = false;
             self.refresh(cx);
             changed = true;
@@ -563,6 +663,10 @@ impl Hunkra {
     /// Provides file/hunk navigation and open/refresh keyboard shortcuts.
     fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
+        if event.keystroke.modifiers.control && key == "enter" {
+            self.commit(cx);
+            return;
+        }
         if event.keystroke.modifiers.control && key == "o" {
             self.choose_repository(cx);
             return;
@@ -608,6 +712,10 @@ impl Hunkra {
             let report = serde_json::json!({"ok":false,"reason":"timeout","frames":self.frames,"error":self.error_key});
             let _ = std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap());
             cx.quit();
+            return;
+        }
+        if smoke.commit && !smoke.message_ready {
+            cx.notify();
             return;
         }
         if self.writing
@@ -660,7 +768,13 @@ impl Hunkra {
             let generation = self.view.diff_generation;
             let selected = self.view.selected.clone();
             let diff = self.view.diff.clone();
+            let message = self.message.read(cx).buffer.text().to_owned();
+            let message_selection = self.message.read(cx).buffer.selection;
+            let message_revision = self.message.read(cx).buffer.revision;
             self.set_locale(locale, cx);
+            assert_eq!(self.message.read(cx).buffer.text(), message);
+            assert_eq!(self.message.read(cx).buffer.selection, message_selection);
+            assert_eq!(self.message.read(cx).buffer.revision, message_revision);
             assert_eq!(self.view.diff_generation, generation);
             assert_eq!(self.view.line_selection.removed, line_selection.removed);
             assert_eq!(self.view.line_selection.added, line_selection.added);
@@ -675,6 +789,32 @@ impl Hunkra {
             self.set_mode(DiffKind::Staged, cx);
         } else if phase == 5 {
             self.set_mode(DiffKind::Unstaged, cx);
+        } else if phase == 6 && self.smoke.as_ref().unwrap().commit {
+            self.commit(cx);
+            assert!(self.writing);
+            assert!(!self.message.read(cx).enabled);
+            if self.smoke.as_ref().unwrap().close_on_write {
+                assert!(!self.request_close(cx));
+            }
+        } else if phase == 7 && self.smoke.as_ref().unwrap().commit {
+            let smoke = self.smoke.as_ref().unwrap();
+            let message = &self.message.read(cx).buffer;
+            let retained = message.text() == SMOKE_MESSAGE
+                && Some(message.selection) == smoke.message_selection;
+            let ok = if smoke.hook_refusal {
+                self.write_error_key == Some("error-hook-message")
+                    && self.committed.is_none()
+                    && retained
+            } else {
+                self.write_error_key.is_none()
+                    && self.committed.is_some()
+                    && message.text().is_empty()
+            };
+            let report = serde_json::json!({"ok":ok,"frames":self.frames,"native_display":true,"commit_id":self.committed.as_ref().map(|commit| &commit.id),"write_backend":self.last_write_backend,"write_error":self.write_error_key,"message_cleared":message.text().is_empty(),"message_retained":retained,"input_checked":smoke.message_ready,"locales":smoke.locales});
+            std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap())
+                .expect("commit smoke report");
+            cx.quit();
+            return;
         } else if phase == 6 && self.smoke.as_ref().unwrap().stage {
             let path = self
                 .root
@@ -770,6 +910,61 @@ impl Hunkra {
         smoke.phase += 1;
         smoke.last_frame = self.frames;
         cx.notify();
+    }
+    /// Exercises real native input callbacks, Cyrillic composition and editing keys in the smoke window.
+    fn smoke_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(smoke) = self
+            .smoke
+            .as_ref()
+            .filter(|smoke| smoke.commit && !smoke.message_ready)
+        else {
+            return;
+        };
+        if !smoke.input_prepared {
+            self.message.update(cx, |editor, cx| {
+                window.focus(&editor.focus_handle(cx));
+                editor.replace_text_in_range(None, "Подготовить A+B 🦀\n\n", window, cx);
+                editor.replace_and_mark_text_in_range(None, "Соо", Some(1..2), window, cx);
+                editor.replace_and_mark_text_in_range(None, "Сообщение", Some(2..4), window, cx);
+                assert_eq!(&editor.buffer.text()[editor.buffer.selection.range()], "об");
+                editor.replace_text_in_range(None, "Сообщение из поля", window, cx);
+                let key = |stroke| KeyDownEvent {
+                    keystroke: Keystroke::parse(stroke).unwrap(),
+                    is_held: false,
+                };
+                editor.key_down(&key("ctrl-z"), window, cx);
+                assert_eq!(editor.buffer.text(), "Подготовить A+B 🦀\n\n");
+                editor.key_down(&key("ctrl-shift-z"), window, cx);
+                assert_eq!(editor.buffer.text(), SMOKE_MESSAGE);
+                editor.buffer.select("Подготовить".len(), false);
+                editor.buffer.select(0, true);
+                assert!(
+                    editor
+                        .selected_text_range(false, window, cx)
+                        .unwrap()
+                        .reversed
+                );
+                cx.notify();
+            });
+            let smoke = self.smoke.as_mut().unwrap();
+            smoke.input_prepared = true;
+            smoke.message_selection = Some(self.message.read(cx).buffer.selection);
+            cx.notify();
+        } else {
+            let checked = self.message.update(cx, |editor, cx| {
+                let selected = editor.selected_text_range(false, window, cx).unwrap();
+                let Some(bounds) =
+                    editor.bounds_for_range(selected.range, Bounds::default(), window, cx)
+                else {
+                    return false;
+                };
+                let index = editor.character_index_for_point(bounds.origin, window, cx);
+                assert_eq!(index, Some(0));
+                assert!(bounds.size.width > px(0.));
+                true
+            });
+            self.smoke.as_mut().unwrap().message_ready = checked;
+        }
     }
     /// Builds one virtualized file row with independent staged and unstaged indicators.
     fn file_row(&self, index: usize, cx: &Context<Self>) -> gpui::Stateful<gpui::Div> {
@@ -1071,7 +1266,7 @@ impl Hunkra {
                     button(
                         "write-selected",
                         self.t(if self.writing {
-                            "index-writing"
+                            "write-busy"
                         } else if self.mode == DiffKind::Unstaged {
                             "stage-selection"
                         } else {
@@ -1231,8 +1426,14 @@ impl Hunkra {
 
 impl Render for Hunkra {
     /// Renders native elements from existing snapshots; no blocking Git work occurs here.
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.frames += 1;
+        self.smoke_input(window, cx);
+        self.reviewed_commit = self
+            .view
+            .repository
+            .as_ref()
+            .map(|repo| repo.commit.clone());
         let mut content = div()
             .size_full()
             .flex()
@@ -1277,14 +1478,23 @@ impl Render for Hunkra {
                 })),
             )
             .child(
-                div()
-                    .bg(rgb(PANEL))
-                    .text_color(rgb(MUTED))
-                    .rounded_md()
-                    .px_3()
-                    .py_2()
-                    .text_sm()
-                    .child(self.t("commit")),
+                button(
+                    "commit",
+                    self.t(if self.writing { "write-busy" } else { "commit" }),
+                    false,
+                )
+                .opacity(
+                    if self.writing
+                        || self.scanning
+                        || self.diff_loading
+                        || self.reviewed_commit.is_none()
+                    {
+                        0.5
+                    } else {
+                        1.
+                    },
+                )
+                .on_click(cx.listener(|app, _, _, cx| app.commit(cx))),
             )
             .child(div().flex_1());
         for (index, locale) in [Locale::En, Locale::Ru, Locale::RuDev]
@@ -1318,7 +1528,32 @@ impl Render for Hunkra {
                     .min_h_0()
                     .overflow_hidden()
                     .child(self.sidebar(cx))
-                    .child(self.diff_panel(cx)),
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w_0()
+                            .flex()
+                            .flex_col()
+                            .child(self.diff_panel(cx))
+                            .child(
+                                div()
+                                    .h(px(138.))
+                                    .flex_none()
+                                    .p_3()
+                                    .flex()
+                                    .flex_col()
+                                    .gap_2()
+                                    .border_t_1()
+                                    .border_color(rgb(LINE))
+                                    .child(
+                                        div()
+                                            .text_sm()
+                                            .text_color(rgb(MUTED))
+                                            .child(self.t("commit-hint")),
+                                    )
+                                    .child(div().flex_1().min_h_0().child(self.message.clone())),
+                            ),
+                    ),
             );
         } else {
             let mut welcome = div()
@@ -1342,6 +1577,36 @@ impl Render for Hunkra {
             }
             content = content.child(welcome);
         }
+        if let Some(commit) = &self.committed {
+            content = content.child(
+                div()
+                    .px_4()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(ACCENT))
+                    .child(format!("{}: {}", self.t("commit-created"), commit.id)),
+            );
+            if commit.post_hook_failed {
+                content = content.child(
+                    div()
+                        .px_4()
+                        .py_2()
+                        .text_sm()
+                        .text_color(rgb(0xe1be86))
+                        .child(self.t("commit-post-warning")),
+                );
+            }
+            if commit.reference_warning {
+                content = content.child(
+                    div()
+                        .px_4()
+                        .py_2()
+                        .text_sm()
+                        .text_color(rgb(0xe1be86))
+                        .child(self.t("commit-reference-warning")),
+                );
+            }
+        }
         content.child(
             div()
                 .h(px(30.))
@@ -1353,11 +1618,7 @@ impl Render for Hunkra {
                 .border_color(rgb(LINE))
                 .text_sm()
                 .text_color(rgb(MUTED))
-                .child(format!(
-                    "{}  ·  {}",
-                    self.t("view-only"),
-                    self.t("write-unavailable")
-                )),
+                .child(self.t("view-only")),
         )
     }
 }
@@ -1367,18 +1628,20 @@ fn main() {
     let mut args = std::env::args_os().skip(1);
     let mut root = None;
     let mut smoke = None;
-    let mut stage_smoke = false;
-    let mut close_smoke = false;
-    let mut refusal_smoke = false;
+    let mut smoke_options = SmokeOptions::default();
     while let Some(arg) = args.next() {
         if arg == "--smoke-test" {
             smoke = args.next().map(PathBuf::from);
         } else if arg == "--smoke-stage" {
-            stage_smoke = true;
+            smoke_options.stage = true;
         } else if arg == "--smoke-close" {
-            close_smoke = true;
+            smoke_options.close = true;
         } else if arg == "--smoke-refusal" {
-            refusal_smoke = true;
+            smoke_options.refusal = true;
+        } else if arg == "--smoke-commit" {
+            smoke_options.commit = true;
+        } else if arg == "--smoke-hook" {
+            smoke_options.hook = true;
         } else {
             root = Some(PathBuf::from(arg));
         }
@@ -1396,7 +1659,7 @@ fn main() {
             },
             move |window, cx| {
                 cx.new(|cx| {
-                    let app = Hunkra::new(root, smoke, stage_smoke, close_smoke, refusal_smoke, cx);
+                    let app = Hunkra::new(root, smoke, smoke_options, cx);
                     let entity = cx.entity().downgrade();
                     window.on_window_should_close(cx, move |_, cx| {
                         entity

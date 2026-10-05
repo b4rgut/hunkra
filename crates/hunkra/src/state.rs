@@ -11,7 +11,6 @@ pub struct ViewState {
     pub diff: Option<Arc<DiffSnapshot>>,
     pub selected_rows: BTreeSet<usize>,
     pub line_selection: hunkra_core::LineSelection,
-    pub message: String,
     pub diff_generation: u64,
 }
 impl ViewState {
@@ -22,10 +21,7 @@ impl ViewState {
             .is_some_and(|current| Arc::ptr_eq(current, rendered))
     }
     /// Keeps retryable choices after a refusal; successful or stale writes invalidate coordinates.
-    pub fn finish_index_write(
-        &mut self,
-        result: &Result<hunkra_core::IndexWrite, hunkra_core::CoreError>,
-    ) -> bool {
+    pub fn finish_write<T>(&mut self, result: &Result<T, hunkra_core::CoreError>) -> bool {
         let invalidated = result.is_ok() || matches!(result, Err(hunkra_core::CoreError::Stale));
         if invalidated {
             self.line_selection = Default::default();
@@ -95,7 +91,7 @@ mod tests {
             CoreError::SelectionBoundary,
             CoreError::UnsupportedWrite,
         ] {
-            assert!(!state.finish_index_write(&Err(error)));
+            assert!(!state.finish_write::<IndexWrite>(&Err(error)));
             assert!(state.is_current_diff(&rendered));
             assert!(state.line_selection.added.contains(&0));
         }
@@ -104,14 +100,14 @@ mod tests {
         assert!(state.apply_diff(generation, unchanged));
         assert!(state.is_current_diff(&rendered));
         assert!(state.line_selection.added.contains(&0));
-        assert!(state.finish_index_write(&Err(CoreError::Stale)));
+        assert!(state.finish_write::<IndexWrite>(&Err(CoreError::Stale)));
         assert!(state.diff.is_none() && state.line_selection.added.is_empty());
         state.line_selection.added.insert(0);
-        assert!(state.finish_index_write(&Ok(IndexWrite { backend: "gix" })));
+        assert!(state.finish_write(&Ok(IndexWrite { backend: "gix" })));
         assert!(state.line_selection.added.is_empty());
     }
     #[test]
-    /// Runtime locale changes preserve file, selection, diff identity and message with no new job.
+    /// Runtime locale changes preserve file, selection, diff identity with no new job.
     fn locale_preserves_state() {
         let mut state = ViewState::default();
         let path = PathBuf::from("f");
@@ -125,7 +121,6 @@ mod tests {
                 Document::present(b"a\n".to_vec(), None),
             ),
         );
-        state.message = "User commit message".into();
         state.selected_rows.insert(0);
         state.line_selection.added.insert(0);
         let diff = state.diff.clone().unwrap();
@@ -133,7 +128,6 @@ mod tests {
             state.switch_locale(locale);
             assert!(Arc::ptr_eq(&diff, state.diff.as_ref().unwrap()));
             assert!(state.is_current_diff(&diff));
-            assert_eq!(state.message, "User commit message");
             assert!(state.selected_rows.contains(&0));
             assert!(state.line_selection.added.contains(&0));
             assert_eq!(state.diff_generation, generation);

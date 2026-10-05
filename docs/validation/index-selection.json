@@ -20,18 +20,60 @@
     "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
   ],
   "files": 5,
-  "elapsed_ms": 1669,
+  "elapsed_ms": 1690,
   "close_during_write": {
     "ok": true,
     "close_deferred": true,
     "writer_finished": true,
-    "write_backend": "gix"
+    "write_backend": "gix",
+    "commit_id": null,
+    "message_cleared": true
   },
   "lock_refusal": {
     "ok": true,
     "selection_preserved": true,
     "write_error": "error-index-lock",
     "frames": 14
+  },
+  "commit_hook_refusal": {
+    "ok": true,
+    "frames": 14,
+    "native_display": true,
+    "commit_id": null,
+    "write_backend": null,
+    "write_error": "error-hook-message",
+    "message_cleared": false,
+    "message_retained": true,
+    "input_checked": true,
+    "locales": [
+      "Commit",
+      "Фиксация",
+      "Коммит"
+    ]
+  },
+  "native_commit": {
+    "ok": true,
+    "frames": 13,
+    "native_display": true,
+    "commit_id": "77bd6483d75895e08824851c58231a6a6ebfab1d",
+    "write_backend": "gix",
+    "write_error": null,
+    "message_cleared": true,
+    "message_retained": false,
+    "input_checked": true,
+    "locales": [
+      "Commit",
+      "Фиксация",
+      "Коммит"
+    ]
+  },
+  "close_during_commit": {
+    "ok": true,
+    "close_deferred": true,
+    "writer_finished": true,
+    "write_backend": "gix",
+    "commit_id": "d36b01ddf4a9c59a57e907b0a2f7d893ac2c2397",
+    "message_cleared": true
   },
   "oracle": "git version 2.55.0",
   "verified": [
@@ -41,6 +83,13 @@
     "shift range selects changed +/- lines only",
     "locale selection preserved",
     "close waits for index transaction",
-    "lock refusal preserves selection and index bytes"
+    "lock refusal preserves selection and index bytes",
+    "native Unicode/IME and undo/redo callbacks",
+    "native shaped selection/hit-testing",
+    "native message and selection retained across three locales",
+    "commit-msg refusal cancels pending close and preserves message/selection/index/HEAD",
+    "gix commit contains A+B only; C remains in worktree",
+    "successful commit clears message",
+    "close waits for commit transaction"
   ]
 }

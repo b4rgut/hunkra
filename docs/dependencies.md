@@ -1,6 +1,6 @@
 # Проверенные зависимости — 2026-10-05
 
-Версии проверены ответами официального crates.io API `/api/v1/crates/NAME` (max_stable_version), GitHub release API и stable channel manifest Rust. Прямые зависимости закреплены `=version`, транзитивный согласованный граф — Cargo.lock (793 packages, включая targets других платформ). Обязательных `../zed` или плавающих Git-dependencies нет.
+Версии проверены ответами официального crates.io API `/api/v1/crates/NAME` (max_stable_version), GitHub release API и stable channel manifest Rust. Прямые зависимости закреплены `=version`, транзитивный согласованный граф — Cargo.lock (804 packages, включая targets других платформ). Обязательных `../zed` или плавающих Git-dependencies нет.
 
 | Зависимость / инструмент | Назначение | Последняя проверенная / выбрана | Первичный источник |
 |---|---|---|---|
@@ -14,6 +14,7 @@
 | unic-langid | ru and en identifiers | 0.9.6 / 0.9.6 | https://crates.io/api/v1/crates/unic-langid |
 | serde | application settings | 1.0.229 / 1.0.229 | https://crates.io/api/v1/crates/serde |
 | serde_json | settings, smoke evidence | 1.0.151 / 1.0.151 | https://crates.io/api/v1/crates/serde_json |
+| unicode-segmentation | owned text grapheme movement | 1.13.3 / 1.13.3 | https://crates.io/api/v1/crates/unicode-segmentation ; https://github.com/unicode-rs/unicode-segmentation |
 | Lefthook | local hooks | 2.1.17 / 2.1.17 | https://github.com/evilmartians/lefthook/releases/tag/v2.1.17 |
 | Cocogitto | conventional messages (no bump/changelog commands) | 7.0.0 / 7.0.0 | https://github.com/cocogitto/cocogitto/releases/tag/7.0.0 |
 | release-plz | sole version/changelog manager | 0.3.169 / 0.3.169 | https://github.com/release-plz/release-plz/releases/tag/release-plz-v0.3.169 ; https://release-plz.dev/docs/config |
@@ -32,3 +33,5 @@ The selected official GPUI release was sufficient after this single transitive c
 GPUI 0.2.2 pulls proc-macro-error2 2.0.1 with a future-incompatibility notice under Rust 1.99; current checks succeed. It is recorded, not suppressed. Latest gpui-component 0.7.1 was examined but not added: it requires gpui-pre 0.3.8, a different package; Hunkra uses official GPUI.
 
 Developer assets are Linux x86_64, pinned URLs + release SHA-256 in scripts/bootstrap.py; signatures on local Fedora RPMs are checked. CI action tag SHA resolved from official GitHub API. External workflow execution has not occurred: no push was made.
+
+Для check-editor добавлен отдельный feature gui-tests → gpui/test-support. Он добавляет девять транзитивных packages (backtrace и git2/libgit2 из GPUI test utilities); production gui dependency graph не содержит git2. Версии прежних lock packages, включая libc 0.2.189, сохранены. Test platform изолирует clipboard от рабочего стола владельца; это проверка dispatch/input API, не физический ввод через клавиатуру/IME.
