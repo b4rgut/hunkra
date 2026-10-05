@@ -2,6 +2,121 @@
 use crate::{CoreError, IndexLimitation, repository::git_error};
 use std::io::Write;
 
+pub(crate) type UndoStages = [Option<(u32, gix::ObjectId)>; 3];
+
+/// Reads one NUL-terminated REUC field, refusing truncated or excessively long paths/modes.
+fn undo_field<'a>(bytes: &mut &'a [u8], limit: usize) -> Result<&'a [u8], CoreError> {
+    let end = bytes
+        .iter()
+        .position(|byte| *byte == 0)
+        .ok_or(CoreError::UnsupportedWrite)?;
+    if end > limit {
+        return Err(CoreError::UnsupportedWrite);
+    }
+    let (field, rest) = bytes.split_at(end);
+    *bytes = &rest[1..];
+    Ok(field)
+}
+
+/// Decodes documented resolve-undo records; official gix currently keeps these fields private.
+fn decode_undo(
+    mut bytes: &[u8],
+    hash: gix::hash::Kind,
+) -> Result<std::collections::BTreeMap<Vec<u8>, UndoStages>, CoreError> {
+    let mut records = std::collections::BTreeMap::new();
+    while !bytes.is_empty() {
+        let path = undo_field(&mut bytes, 4096)?.to_vec();
+        if path.is_empty() || records.len() >= 100_000 {
+            return Err(CoreError::UnsupportedWrite);
+        }
+        let mut modes = [0; 3];
+        for mode in &mut modes {
+            let field = undo_field(&mut bytes, 6)?;
+            if field.is_empty() || field.iter().any(|byte| !matches!(byte, b'0'..=b'7')) {
+                return Err(CoreError::UnsupportedWrite);
+            }
+            *mode = u32::from_str_radix(std::str::from_utf8(field).unwrap(), 8)
+                .map_err(|_| CoreError::UnsupportedWrite)?;
+            if !matches!(*mode, 0 | 0o100644 | 0o100755 | 0o120000 | 0o160000) {
+                return Err(CoreError::UnsupportedWrite);
+            }
+        }
+        let mut stages = [None; 3];
+        for (stage, mode) in stages.iter_mut().zip(modes) {
+            if mode != 0 {
+                let id = bytes
+                    .get(..hash.len_in_bytes())
+                    .ok_or(CoreError::UnsupportedWrite)?;
+                *stage = Some((mode, gix::ObjectId::from_bytes_or_panic(id)));
+                bytes = &bytes[id.len()..];
+            }
+        }
+        if stages.iter().all(Option::is_none) || records.insert(path, stages).is_some() {
+            return Err(CoreError::UnsupportedWrite);
+        }
+    }
+    Ok(records)
+}
+
+/// Retrieves a previously resolved path without treating old REUC data as a live index conflict.
+pub(crate) fn undo_stages(
+    bytes: &[u8],
+    hash: gix::hash::Kind,
+    path: &[u8],
+) -> Result<Option<UndoStages>, CoreError> {
+    let offset = extension_offset(bytes, hash)?;
+    let end = bytes.len() - hash.len_in_bytes();
+    let mut found = None;
+    for (signature, payload) in gix::index::extension::Iter::new(&bytes[offset..end]) {
+        if &signature == b"REUC" {
+            if found.is_some() {
+                return Err(CoreError::UnsupportedWrite);
+            }
+            found = Some(decode_undo(payload, hash)?);
+        }
+    }
+    Ok(found.and_then(|mut records| records.remove(path)))
+}
+
+/// Replaces one resolve-undo record while retaining every other path's stages and object ids.
+pub(crate) fn with_resolve_undo(
+    preserved: &[u8],
+    hash: gix::hash::Kind,
+    path: &[u8],
+    stages: UndoStages,
+) -> Result<Vec<u8>, CoreError> {
+    let mut records = std::collections::BTreeMap::new();
+    let mut seen = false;
+    for (signature, payload) in gix::index::extension::Iter::new(preserved) {
+        if &signature != b"REUC" || seen {
+            return Err(CoreError::UnsupportedWrite);
+        }
+        seen = true;
+        records = decode_undo(payload, hash)?;
+    }
+    records.insert(path.to_vec(), stages);
+    let mut payload = Vec::new();
+    for (path, stages) in records {
+        payload.extend(path);
+        payload.push(0);
+        for stage in stages {
+            payload.extend(format!("{:o}", stage.map_or(0, |(mode, _)| mode)).bytes());
+            payload.push(0);
+        }
+        for (_, id) in stages.into_iter().flatten() {
+            payload.extend(id.as_slice());
+        }
+    }
+    let mut extension = b"REUC".to_vec();
+    extension.extend(
+        u32::try_from(payload.len())
+            .map_err(|_| CoreError::UnsupportedWrite)?
+            .to_be_bytes(),
+    );
+    extension.extend(payload);
+    Ok(extension)
+}
+
 /// Finds the extension boundary of an already validated v2/v3/v4 index without decoding paths.
 fn extension_offset(bytes: &[u8], hash: gix::hash::Kind) -> Result<usize, CoreError> {
     if let Some(offset) =

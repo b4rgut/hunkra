@@ -186,6 +186,11 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::NoOperation => "error-operation-none",
         CoreError::OperationAction => "error-operation-action",
         CoreError::OperationExecution { .. } => "error-operation-execution",
+        CoreError::NoConflict => "error-conflict-none",
+        CoreError::ConflictUnsupported => "error-conflict-unsupported",
+        CoreError::ConflictChunk => "error-conflict-chunk",
+        CoreError::ConflictBoundary => "error-conflict-boundary",
+        CoreError::WorktreeLock => "error-worktree-lock",
     }
 }
 

@@ -71,6 +71,16 @@ pub enum CoreError {
         capability: crate::OperationCapability,
         exit_code: Option<i32>,
     },
+    #[error("the selected file has no recoverable conflict stages")]
+    NoConflict,
+    #[error("this conflict document cannot be edited safely")]
+    ConflictUnsupported,
+    #[error("the selected conflict chunk is malformed or has changed")]
+    ConflictChunk,
+    #[error("joining these versions requires an explicit newline")]
+    ConflictBoundary,
+    #[error("could not acquire the working file lock")]
+    WorktreeLock,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -253,7 +263,12 @@ pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
 
 /// Refuses traversal and intermediate symlinks outside the worktree.
 pub(crate) fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
-    if path.as_os_str().is_empty() || !path.components().all(|p| matches!(p, Component::Normal(_)))
+    if path.as_os_str().is_empty()
+        || path.as_os_str().as_encoded_bytes().contains(&0)
+        || !path.components().all(|component| match component {
+            Component::Normal(name) => !name.as_encoded_bytes().eq_ignore_ascii_case(b".git"),
+            _ => false,
+        })
     {
         return Err(CoreError::InvalidPath);
     }
@@ -272,7 +287,11 @@ pub(crate) fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
 }
 
 /// Reads a bounded object, retaining presence, mode and size even for large blobs.
-fn blob(repo: &gix::Repository, id: gix::ObjectId, mode: u32) -> Result<Document, CoreError> {
+pub(crate) fn blob(
+    repo: &gix::Repository,
+    id: gix::ObjectId,
+    mode: u32,
+) -> Result<Document, CoreError> {
     let header = repo.find_header(id).map_err(git_error)?;
     let size = header.size();
     if size > MAX_BYTES as u64 {
@@ -318,7 +337,7 @@ fn at_index(
 }
 
 /// Reads a worktree file in Git representation using gix attributes/clean conversion.
-fn at_worktree(
+pub(crate) fn at_worktree(
     repo: &gix::Repository,
     index: &gix::index::State,
     root: &Path,
@@ -342,8 +361,11 @@ fn at_worktree(
     }
     let options = repo.filesystem_options().map_err(git_error)?;
     let path_bytes = gix::path::into_bstr(path);
-    let indexed_mode = index
-        .entry_by_path_and_stage(path_bytes.as_ref(), gix::index::entry::Stage::Unconflicted)
+    // Git add retains an existing mode with fileMode=false, preferring stage 2, then 1, then 3.
+    use gix::index::entry::Stage;
+    let indexed_mode = [Stage::Unconflicted, Stage::Ours, Stage::Base, Stage::Theirs]
+        .into_iter()
+        .find_map(|stage| index.entry_by_path_and_stage(path_bytes.as_bstr(), stage))
         .map_or(gix::index::entry::Mode::FILE, |entry| entry.mode);
     #[cfg(unix)]
     let executable = {

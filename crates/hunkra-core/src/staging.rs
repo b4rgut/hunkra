@@ -121,7 +121,7 @@ fn selected_document(diff: &DiffSnapshot, selection: &Selection) -> Result<Docum
 }
 
 /// Refuses actual index/hook variants until their semantics are tested, before any write.
-fn supported(
+pub(crate) fn supported(
     repo: &gix::Repository,
     index: &gix::index::State,
     path: &Path,
