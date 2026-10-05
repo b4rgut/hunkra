@@ -1,6 +1,6 @@
 //! Exact snapshot selection and atomic stage-zero index updates through official gix APIs.
 use crate::{
-    CoreError, DiffKind, DiffSnapshot, Document, Line, Presentation, read_diff,
+    CoreError, DiffKind, DiffSnapshot, Document, IndexLimitation, Line, Presentation, read_diff,
     repository::{capture_guard, git_error, open},
 };
 use gix::bstr::ByteSlice;
@@ -127,12 +127,17 @@ fn supported(
     path: &Path,
 ) -> Result<(), CoreError> {
     let filesystem = repo.filesystem_options().map_err(git_error)?;
-    if filesystem.ignore_case || filesystem.precompose_unicode {
-        return Err(CoreError::UnsupportedWrite);
+    if filesystem.ignore_case {
+        return Err(CoreError::IndexVariant(IndexLimitation::CaseFolding));
     }
-    // State::write_to currently serializes TREE/sdir/EOIE, but not conflict undo records.
-    if index.is_sparse() || index.link().is_some() || index.resolve_undo().is_some() {
-        return Err(CoreError::UnsupportedWrite);
+    if filesystem.precompose_unicode {
+        return Err(CoreError::IndexVariant(IndexLimitation::UnicodeComposition));
+    }
+    if index.is_sparse() {
+        return Err(CoreError::IndexVariant(IndexLimitation::Sparse));
+    }
+    if index.link().is_some() {
+        return Err(CoreError::IndexVariant(IndexLimitation::Split));
     }
     // File::at dissolves split indexes and removes LINK; decode the original state for preflight.
     match fs::read(repo.index_path()) {
@@ -146,7 +151,7 @@ fn supported(
             )
             .map_err(git_error)?;
             if original.link().is_some() {
-                return Err(CoreError::UnsupportedWrite);
+                return Err(CoreError::IndexVariant(IndexLimitation::Split));
             }
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -158,7 +163,7 @@ fn supported(
             .flags
             .contains(gix::index::entry::Flags::SKIP_WORKTREE)
     {
-        return Err(CoreError::UnsupportedWrite);
+        return Err(CoreError::IndexVariant(IndexLimitation::SkipWorktree));
     }
     // A file/directory collision needs a separate multi-path transaction, not a malformed index.
     let requested = bytes.as_bstr().as_bytes();
@@ -169,14 +174,14 @@ fn supported(
                 || (requested.starts_with(existing)
                     && requested.get(existing.len()) == Some(&b'/')))
     }) {
-        return Err(CoreError::UnsupportedWrite);
+        return Err(CoreError::IndexVariant(IndexLimitation::PathCollision));
     }
     let config = repo.config_snapshot();
     if config
         .string("core.sharedRepository")
         .is_some_and(|value| !matches!(value.as_bstr().as_bytes(), b"0" | b"false"))
     {
-        return Err(CoreError::UnsupportedWrite);
+        return Err(CoreError::IndexVariant(IndexLimitation::SharedPermissions));
     }
     let hooks = config
         .trusted_path("core.hooksPath")
@@ -198,14 +203,14 @@ fn supported(
         {
             use std::os::unix::fs::PermissionsExt;
             if metadata.permissions().mode() & 0o111 != 0 {
-                return Err(CoreError::UnsupportedWrite);
+                return Err(CoreError::IndexVariant(IndexLimitation::IndexHook));
             }
         }
         #[cfg(not(unix))]
-        return Err(CoreError::UnsupportedWrite);
+        return Err(CoreError::IndexVariant(IndexLimitation::IndexHook));
     }
     if fs::symlink_metadata(repo.index_path()).is_ok_and(|metadata| metadata.is_symlink()) {
-        return Err(CoreError::UnsupportedWrite);
+        return Err(CoreError::IndexVariant(IndexLimitation::Symlink));
     }
     Ok(())
 }
@@ -253,6 +258,11 @@ pub fn update_index(
     }
     let mut index = (*fresh.index_or_empty().map_err(git_error)?).clone();
     supported(&fresh, &index, &diff.path)?;
+    let preserved = match fs::read(fresh.index_path()) {
+        Ok(bytes) => crate::index_format::preserve(&bytes, fresh.object_hash())?,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+        Err(error) => return Err(error.into()),
+    };
     let bytes = gix::path::into_bstr(&diff.path);
     index.remove_entries(|_, path, _| path == bytes.as_bstr());
     if desired.present {
@@ -273,9 +283,7 @@ pub fn update_index(
     }
     // A valid but stale TREE cache otherwise causes Git commit/write-tree to lose staged content.
     index.remove_tree();
-    index
-        .write_to(&mut lock, Default::default())
-        .map_err(git_error)?;
+    crate::index_format::write(&index, &preserved, &mut lock)?;
     if let Ok(metadata) = fs::metadata(&lock_path) {
         lock.with_mut(|file| file.set_permissions(metadata.permissions()))?;
     }

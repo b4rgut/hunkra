@@ -21,6 +21,20 @@ impl ViewState {
             .as_ref()
             .is_some_and(|current| Arc::ptr_eq(current, rendered))
     }
+    /// Keeps retryable choices after a refusal; successful or stale writes invalidate coordinates.
+    pub fn finish_index_write(
+        &mut self,
+        result: &Result<hunkra_core::IndexWrite, hunkra_core::CoreError>,
+    ) -> bool {
+        let invalidated = result.is_ok() || matches!(result, Err(hunkra_core::CoreError::Stale));
+        if invalidated {
+            self.line_selection = Default::default();
+            self.selected_rows.clear();
+            self.diff = None;
+        }
+        self.diff_generation += 1;
+        invalidated
+    }
     /// Changes only the label profile; requests and all document/selection state stay intact.
     pub fn switch_locale(&mut self, locale: Locale) {
         self.locale = locale;
@@ -59,6 +73,43 @@ impl ViewState {
 mod tests {
     use super::*;
     use hunkra_core::Document;
+    #[test]
+    /// Retryable refusal keeps immutable coordinates; stale/success invalidates them before refresh.
+    fn write_refusal_preserves_selection_until_sources_change() {
+        use hunkra_core::{CoreError, IndexWrite};
+        let mut state = ViewState::default();
+        let generation = state.select("f".into(), DiffKind::Unstaged);
+        state.apply_diff(
+            generation,
+            DiffSnapshot::new(
+                "f".into(),
+                DiffKind::Unstaged,
+                Document::present(b"old\n".to_vec(), None),
+                Document::present(b"new\n".to_vec(), None),
+            ),
+        );
+        state.line_selection.added.insert(0);
+        let rendered = state.diff.clone().unwrap();
+        for error in [
+            CoreError::IndexLock,
+            CoreError::SelectionBoundary,
+            CoreError::UnsupportedWrite,
+        ] {
+            assert!(!state.finish_index_write(&Err(error)));
+            assert!(state.is_current_diff(&rendered));
+            assert!(state.line_selection.added.contains(&0));
+        }
+        let generation = state.diff_generation;
+        let unchanged = rendered.as_ref().clone();
+        assert!(state.apply_diff(generation, unchanged));
+        assert!(state.is_current_diff(&rendered));
+        assert!(state.line_selection.added.contains(&0));
+        assert!(state.finish_index_write(&Err(CoreError::Stale)));
+        assert!(state.diff.is_none() && state.line_selection.added.is_empty());
+        state.line_selection.added.insert(0);
+        assert!(state.finish_index_write(&Ok(IndexWrite { backend: "gix" })));
+        assert!(state.line_selection.added.is_empty());
+    }
     #[test]
     /// Runtime locale changes preserve file, selection, diff identity and message with no new job.
     fn locale_preserves_state() {

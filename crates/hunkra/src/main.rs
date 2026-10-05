@@ -11,8 +11,8 @@ use hunkra::{
     worker::LatestWorker,
 };
 use hunkra_core::{
-    ChangeKind, CoreError, DiffKind, DiffRow, DiffSnapshot, IndexWrite, Line, LineSelection,
-    Operation, Presentation, RepositorySnapshot, Selection,
+    ChangeKind, CoreError, DiffKind, DiffRow, DiffSnapshot, IndexLimitation, IndexWrite, Line,
+    LineSelection, Operation, Presentation, RepositorySnapshot, Selection,
 };
 use std::{
     path::PathBuf,
@@ -39,6 +39,7 @@ struct Smoke {
     worktree: Option<Vec<u8>>,
     index_versions: Vec<String>,
     close_on_write: bool,
+    refusal: bool,
 }
 struct Hunkra {
     view: ViewState,
@@ -81,6 +82,18 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::TooManyFiles => "error-many-files",
         CoreError::Stale => "error-stale",
         CoreError::UnsupportedWrite => "error-write-unsupported",
+        CoreError::IndexVariant(reason) => match reason {
+            IndexLimitation::CaseFolding => "error-index-case",
+            IndexLimitation::UnicodeComposition => "error-index-unicode",
+            IndexLimitation::Sparse => "error-index-sparse",
+            IndexLimitation::Split => "error-index-split",
+            IndexLimitation::SkipWorktree => "error-index-skip",
+            IndexLimitation::PathCollision => "error-index-collision",
+            IndexLimitation::SharedPermissions => "error-index-shared",
+            IndexLimitation::IndexHook => "error-index-hook",
+            IndexLimitation::Symlink => "error-index-symlink",
+            IndexLimitation::UnknownExtension => "error-index-extension",
+        },
         CoreError::SelectionBoundary => "error-boundary",
         CoreError::EmptySelection => "error-selection",
         CoreError::IndexLock => "error-index-lock",
@@ -109,6 +122,7 @@ impl Hunkra {
         smoke: Option<PathBuf>,
         stage_smoke: bool,
         close_smoke: bool,
+        refusal_smoke: bool,
         cx: &mut Context<Self>,
     ) -> Self {
         let settings = settings::load();
@@ -163,6 +177,7 @@ impl Hunkra {
                 worktree: None,
                 index_versions: Vec::new(),
                 close_on_write: close_smoke,
+                refusal: refusal_smoke,
             }),
         };
         if let Some(root) = root {
@@ -463,13 +478,11 @@ impl Hunkra {
         }
         if let Some((_, result)) = self.write_worker.take() {
             self.writing = false;
-            self.view.line_selection = Default::default();
-            self.anchor_removed = None;
-            self.anchor_added = None;
-            self.view.selected_rows.clear();
-            self.view.diff = None;
+            if self.view.finish_index_write(&result) {
+                self.anchor_removed = None;
+                self.anchor_added = None;
+            }
             self.diff_loading = false;
-            self.view.diff_generation += 1;
             match result {
                 Ok(result) => {
                     self.write_error_key = None;
@@ -665,6 +678,29 @@ impl Hunkra {
             if self.smoke.as_ref().unwrap().close_on_write {
                 assert!(!self.request_close(cx));
             }
+        } else if phase == 7 && self.smoke.as_ref().unwrap().refusal {
+            let diff = self.view.diff.as_ref().unwrap();
+            let range = diff.hunks.first().unwrap();
+            let expected = LineSelection {
+                removed: diff.rows[range.clone()]
+                    .iter()
+                    .filter_map(|row| row.left.as_ref().map(|line| line.number - 1))
+                    .collect(),
+                added: diff.rows[range.clone()]
+                    .iter()
+                    .filter_map(|row| row.right.as_ref().map(|line| line.number - 1))
+                    .collect(),
+            };
+            let preserved = self.view.line_selection.removed == expected.removed
+                && self.view.line_selection.added == expected.added;
+            let report = serde_json::json!({"ok": preserved && self.write_error_key == Some("error-index-lock") && self.last_write_backend.is_none(), "selection_preserved":preserved,"write_error":self.write_error_key,"frames":self.frames});
+            std::fs::write(
+                &self.smoke.as_ref().unwrap().report,
+                serde_json::to_vec_pretty(&report).unwrap(),
+            )
+            .expect("refusal smoke report");
+            cx.quit();
+            return;
         } else if phase == 7 && self.smoke.as_ref().unwrap().stage {
             let diff = self.view.diff.as_ref().unwrap();
             self.smoke
@@ -1313,6 +1349,7 @@ fn main() {
     let mut smoke = None;
     let mut stage_smoke = false;
     let mut close_smoke = false;
+    let mut refusal_smoke = false;
     while let Some(arg) = args.next() {
         if arg == "--smoke-test" {
             smoke = args.next().map(PathBuf::from);
@@ -1320,6 +1357,8 @@ fn main() {
             stage_smoke = true;
         } else if arg == "--smoke-close" {
             close_smoke = true;
+        } else if arg == "--smoke-refusal" {
+            refusal_smoke = true;
         } else {
             root = Some(PathBuf::from(arg));
         }
@@ -1337,7 +1376,7 @@ fn main() {
             },
             move |window, cx| {
                 cx.new(|cx| {
-                    let app = Hunkra::new(root, smoke, stage_smoke, close_smoke, cx);
+                    let app = Hunkra::new(root, smoke, stage_smoke, close_smoke, refusal_smoke, cx);
                     let entity = cx.entity().downgrade();
                     window.on_window_should_close(cx, move |_, cx| {
                         entity

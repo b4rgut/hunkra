@@ -7,7 +7,7 @@ Checkpoint первого GUI: b0c3699. Дальнейшая задача сох
 3. gix-lock index.lock; новый gix read под lock; compare guards/documents; выбранные + и − строки независимо; unstage не пишет worktree. Write blob + stage-zero entry, remove stale tree cache, checksum, atomic index commit. Повторная сверка источников непосредственно перед commit lock.
 4. Tests Git oracle: A staged/B+C worktree, части replacements, additions/deletions/new/unborn, CRLF/no newline, lock/stale worktree/index/HEAD, tree-cache, no fallback. Изменения только disposable repos.
 5. UI: selected added/deleted lines, file/hunk actions and explicit stage/unstage labels; writer queue serial, request snapshot immutable. Во время write refresh deferred. Ошибки translated; safe refusal без ложного success.
-6. Checks → docs/checkpoint; HNK-007 не done, пока полноценные variants/required tests отсутствуют.
+6. Checks → docs/checkpoint; HNK-007 done требует проверенных обычных variants и явных безопасных ограничений сложных форматов.
 
 Предел гарантии: index.lock координирует совместимые Git writers. Внешние приложения не предоставляют общий lock рабочих файлов; гарантируется применение к точному подтверждённому снимку и сохранность worktree, с последней проверкой перед atomic index replacement. Не обещать абсолютное исключение некооперативной внешней записи между final check и rename. Неподдержанные hooks/advanced indexes отражаются отдельно, не оправдывают CLI на поддержанном simple path.
 
@@ -16,3 +16,5 @@ Checkpoint первого GUI: b0c3699. Дальнейшая задача сох
 Поддержанные варианты и отказы — gix-capabilities.md. HNK-007 остаётся частичной: HNK-017 уточнит семантику независимой половины EOF replacement и расширение hook/advanced-index вариантов. Текущая половина без newline, которая склеила бы две строки, отвергается до lock; полная пара сохраняет EOF. GUI не создаёт Commit — HNK-008.
 
 Проверяющий implementation checkpoint: 78e0081 — feat(staging): update selected index lines through gix.
+
+HNK-017 завершён: REUC round-trip assembled from gix primitives, 12 format cases + real conflict reopening, unknown-extension refusal, 16 EOF-half combinations, localized capability reasons, retryable selection retention. scripts/dev check: 35 tests; check-ui/build-ui/smoke прошли. Третий native сценарий держит fixture index.lock и проверяет selection/error после refresh и точные index/worktree/lock bytes. HNK-007 закрывает staging; отдельная HNK-008 реализует Commit. Сложные неподдержанные форматы/индексные hooks остаются явными ограничениями до записи. Предыдущие отметки частичности выше относятся к checkpoint 78e0081.

@@ -20,12 +20,18 @@
     "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
   ],
   "files": 5,
-  "elapsed_ms": 1669,
+  "elapsed_ms": 1670,
   "close_during_write": {
     "ok": true,
     "close_deferred": true,
     "writer_finished": true,
     "write_backend": "gix"
+  },
+  "lock_refusal": {
+    "ok": true,
+    "selection_preserved": true,
+    "write_error": "error-index-lock",
+    "frames": 14
   },
   "oracle": "git version 2.55.0",
   "verified": [
@@ -34,6 +40,7 @@
     "worktree A+B+C unchanged",
     "shift range selects changed +/- lines only",
     "locale selection preserved",
-    "close waits for index transaction"
+    "close waits for index transaction",
+    "lock refusal preserves selection and index bytes"
   ]
 }

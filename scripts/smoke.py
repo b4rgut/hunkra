@@ -52,8 +52,23 @@ def smoke(destination):
         assert (repository / path).read_bytes() == before
         assert not (repository / ".git/index.lock").exists()
         report["close_during_write"] = close
+        # A held lock must refuse safely, retaining the selection and owned error after refresh.
+        index = (repository / ".git/index").read_bytes()
+        lock = repository / ".git/index.lock"
+        lock.write_bytes(b"fixture holds the lock")
+        refusal_path = fixture / "refusal-report.json"
+        result = subprocess.run([str(binary), str(repository), "--smoke-test", str(refusal_path), "--smoke-stage", "--smoke-refusal"], env=environment, capture_output=True, timeout=40)
+        assert result.returncode == 0, result.stderr.decode(errors="replace")
+        refusal = json.loads(refusal_path.read_text())
+        assert refusal["ok"] and refusal["selection_preserved"]
+        assert refusal["write_error"] == "error-index-lock"
+        assert (repository / ".git/index").read_bytes() == index
+        assert lock.read_bytes() == b"fixture holds the lock"
+        assert (repository / path).read_bytes() == before
+        lock.unlink()
+        report["lock_refusal"] = refusal
         report["oracle"] = git("--version").decode().strip()
-        report["verified"] = ["stage B preserves A", "unstage hunk B preserves A", "worktree A+B+C unchanged", "shift range selects changed +/- lines only", "locale selection preserved", "close waits for index transaction"]
+        report["verified"] = ["stage B preserves A", "unstage hunk B preserves A", "worktree A+B+C unchanged", "shift range selects changed +/- lines only", "locale selection preserved", "close waits for index transaction", "lock refusal preserves selection and index bytes"]
         Path(destination).write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
         print(f"Native GPUI stage/unstage passed: {report['frames']} frames; Git index/worktree oracle passed")
 

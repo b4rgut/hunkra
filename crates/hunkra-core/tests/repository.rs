@@ -624,7 +624,9 @@ fn unsupported_index_hook_is_a_preflight_refusal() {
             &repo.diff("f", DiffKind::Unstaged),
             &Selection::File
         ),
-        Err(CoreError::UnsupportedWrite)
+        Err(CoreError::IndexVariant(
+            hunkra_core::IndexLimitation::IndexHook
+        ))
     ));
     assert_eq!(fs::read(repo.path().join(".git/index")).unwrap(), before);
     assert!(!repo.path().join("hook-ran").exists());
@@ -796,10 +798,21 @@ fn unsupported_index_variants_leave_bytes_unchanged() {
         };
         let diff = repo.diff(file, DiffKind::Unstaged);
         let before = fs::read(repo.path().join(".git/index")).unwrap();
+        use hunkra_core::IndexLimitation;
+        let expected = match variant {
+            "collision" => IndexLimitation::PathCollision,
+            "shared" => IndexLimitation::SharedPermissions,
+            "split" => IndexLimitation::Split,
+            "skip" => IndexLimitation::SkipWorktree,
+            "sparse" => IndexLimitation::Sparse,
+            "case" => IndexLimitation::CaseFolding,
+            "unicode" => IndexLimitation::UnicodeComposition,
+            _ => unreachable!(),
+        };
         assert!(
             matches!(
                 update_index(repo.path(), &diff, &Selection::File),
-                Err(CoreError::UnsupportedWrite)
+                Err(CoreError::IndexVariant(actual)) if actual == expected
             ),
             "{variant}"
         );
@@ -969,39 +982,169 @@ fn eof_replacement_does_not_concatenate_unselected_lines() {
 }
 
 #[test]
-/// Existing conflict undo records for another path survive a refused index rewrite.
+/// Both comparisons preserve EOF bytes or refuse a half that needs an unselected separator.
+fn eof_halves_follow_exact_line_boundaries() {
+    use hunkra_core::{CoreError, LineSelection, Selection, update_index};
+    for (old, new) in [
+        ("old", "new"),
+        ("old\n", "new"),
+        ("old\r\n", "new"),
+        ("old", "new\n"),
+    ] {
+        for kind in [DiffKind::Staged, DiffKind::Unstaged] {
+            for added in [false, true] {
+                let repo = Repo::new();
+                repo.write("f", old);
+                repo.initial();
+                repo.write("f", new);
+                if kind == DiffKind::Staged {
+                    repo.git(&["add", "f"]);
+                }
+                let before = fs::read(repo.path().join(".git/index")).unwrap();
+                let result = update_index(
+                    repo.path(),
+                    &repo.diff("f", kind),
+                    &Selection::Lines(LineSelection {
+                        removed: if added {
+                            Default::default()
+                        } else {
+                            [0].into()
+                        },
+                        added: if added {
+                            [0].into()
+                        } else {
+                            Default::default()
+                        },
+                    }),
+                );
+                let combines = (kind == DiffKind::Unstaged) == added;
+                if combines && !old.ends_with('\n') {
+                    assert!(matches!(result, Err(CoreError::SelectionBoundary)));
+                    assert_eq!(fs::read(repo.path().join(".git/index")).unwrap(), before);
+                } else {
+                    assert_eq!(result.unwrap().backend, "gix");
+                    let expected = if combines {
+                        format!("{old}{new}")
+                    } else {
+                        String::new()
+                    };
+                    assert_eq!(repo.git(&["show", ":f"]), expected.as_bytes());
+                }
+                assert_eq!(fs::read(repo.path().join("f")).unwrap(), new.as_bytes());
+            }
+        }
+    }
+}
+
+#[test]
+/// Unknown optional extension data remains byte-for-byte intact after an observable refusal.
+fn unknown_index_extension_is_refused_before_object_write() {
+    use hunkra_core::{CoreError, IndexLimitation, Selection, update_index};
+    for format in ["sha1", "sha256"] {
+        let repo = Repo::with_format(format);
+        repo.write("f", "base\n");
+        repo.initial();
+        let index_path = repo.path().join(".git/index");
+        let mut index = fs::read(&index_path).unwrap();
+        let hash = if format == "sha1" {
+            gix::hash::Kind::Sha1
+        } else {
+            gix::hash::Kind::Sha256
+        };
+        index.truncate(index.len() - hash.len_in_bytes());
+        index.extend(b"XTRA\0\0\0\x04data");
+        let mut hasher = gix::hash::hasher(hash);
+        hasher.update(&index);
+        index.extend(hasher.try_finalize().unwrap().as_slice());
+        fs::write(&index_path, &index).unwrap();
+        repo.write("f", "changed\n");
+        assert!(matches!(
+            update_index(
+                repo.path(),
+                &repo.diff("f", DiffKind::Unstaged),
+                &Selection::File
+            ),
+            Err(CoreError::IndexVariant(IndexLimitation::UnknownExtension))
+        ));
+        assert_eq!(fs::read(index_path).unwrap(), index);
+        assert_eq!(repo.git(&["show", ":f"]), b"base\n");
+        assert_eq!(fs::read(repo.path().join("f")).unwrap(), b"changed\n");
+    }
+}
+
+#[test]
+/// Conflict undo survives ordinary writes across hash/index formats and remains usable by Git.
 fn resolve_undo_extension_is_not_silently_discarded() {
-    use hunkra_core::{CoreError, Selection, update_index};
-    let repo = Repo::new();
-    repo.write("f", "base\n");
-    repo.write("conflict", "base\n");
-    repo.initial();
-    repo.git(&["switch", "-c", "other"]);
-    repo.write("conflict", "other\n");
-    repo.git(&["commit", "-am", "other"]);
-    repo.git(&["switch", "main"]);
-    repo.write("conflict", "main\n");
-    repo.git(&["commit", "-am", "main"]);
-    assert!(!repo.command(&["merge", "other"]).status.success());
-    repo.write("conflict", "resolved\n");
-    repo.git(&["add", "conflict"]);
-    let undo = repo.git(&["ls-files", "--resolve-undo"]);
-    assert!(!undo.is_empty());
-    repo.write("f", "changed\n");
-    let before = fs::read(repo.path().join(".git/index")).unwrap();
-    assert!(matches!(
-        update_index(
-            repo.path(),
-            &repo.diff("f", DiffKind::Unstaged),
-            &Selection::File
-        ),
-        Err(CoreError::UnsupportedWrite)
-    ));
-    assert_eq!(fs::read(repo.path().join(".git/index")).unwrap(), before);
-    assert_eq!(repo.git(&["ls-files", "--resolve-undo"]), undo);
-    assert_eq!(
-        fs::read(repo.path().join("conflict")).unwrap(),
-        b"resolved\n"
-    );
-    assert_eq!(fs::read(repo.path().join("f")).unwrap(), b"changed\n");
+    use hunkra_core::{Selection, update_index};
+    for format in ["sha1", "sha256"] {
+        for version in ["2", "3", "4"] {
+            for eoie in ["false", "true"] {
+                let repo = Repo::with_format(format);
+                repo.git(&["config", "index.recordEndOfIndexEntries", eoie]);
+                repo.write("f", "base\n");
+                repo.write("conflict", "base\n");
+                repo.initial();
+                repo.git(&["switch", "-c", "other"]);
+                repo.write("conflict", "other\n");
+                repo.git(&["commit", "-am", "other"]);
+                repo.git(&["switch", "main"]);
+                repo.write("conflict", "main\n");
+                repo.git(&["commit", "-am", "main"]);
+                assert!(!repo.command(&["merge", "other"]).status.success());
+                repo.write("conflict", "resolved\n");
+                repo.git(&["add", "conflict"]);
+                let undo = repo.git(&["ls-files", "--resolve-undo"]);
+                assert!(!undo.is_empty());
+                repo.write("intent", "not staged\n");
+                repo.git(&["add", "-N", "intent"]);
+                repo.git(&["update-index", "--index-version", version]);
+                repo.write("f", "changed\n");
+                assert_eq!(
+                    update_index(
+                        repo.path(),
+                        &repo.diff("f", DiffKind::Unstaged),
+                        &Selection::File
+                    )
+                    .unwrap()
+                    .backend,
+                    "gix"
+                );
+                assert_eq!(repo.git(&["ls-files", "--resolve-undo"]), undo);
+                assert_eq!(repo.git(&["show", ":f"]), b"changed\n");
+                assert_eq!(
+                    fs::read(repo.path().join("conflict")).unwrap(),
+                    b"resolved\n"
+                );
+                assert_eq!(fs::read(repo.path().join("f")).unwrap(), b"changed\n");
+                // Updating the already resolved path must retain its own conflict undo, like Git add.
+                repo.write("conflict", "resolved again\n");
+                update_index(
+                    repo.path(),
+                    &repo.diff("conflict", DiffKind::Unstaged),
+                    &Selection::File,
+                )
+                .unwrap();
+                assert_eq!(repo.git(&["ls-files", "--resolve-undo"]), undo);
+                repo.git(&["checkout", "-m", "conflict"]);
+                let reopened = repo.git(&["ls-files", "--unmerged", "conflict"]);
+                assert_eq!(
+                    reopened
+                        .split(|byte| *byte == b'\n')
+                        .filter(|line| !line.is_empty())
+                        .count(),
+                    3
+                );
+                assert!(
+                    fs::read_to_string(repo.path().join("conflict"))
+                        .unwrap()
+                        .contains("<<<<<<<")
+                );
+                assert_eq!(repo.git(&["show", ":f"]), b"changed\n");
+                assert_eq!(
+                    fs::read(repo.path().join("intent")).unwrap(),
+                    b"not staged\n"
+                );
+            }
+        }
+    }
 }

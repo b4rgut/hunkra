@@ -24,12 +24,28 @@ pub enum CoreError {
     Stale,
     #[error("this repository or file variant is not supported for index writes")]
     UnsupportedWrite,
+    #[error("index capability is not supported: {0:?}")]
+    IndexVariant(IndexLimitation),
     #[error("select both sides of this EOF replacement to preserve line boundaries")]
     SelectionBoundary,
     #[error("no changed lines selected")]
     EmptySelection,
     #[error("could not acquire the index lock")]
     IndexLock,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum IndexLimitation {
+    CaseFolding,
+    UnicodeComposition,
+    Sparse,
+    Split,
+    SkipWorktree,
+    PathCollision,
+    SharedPermissions,
+    IndexHook,
+    Symlink,
+    UnknownExtension,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
