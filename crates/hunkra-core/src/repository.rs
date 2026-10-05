@@ -81,6 +81,12 @@ pub enum CoreError {
     ConflictBoundary,
     #[error("could not acquire the working file lock")]
     WorktreeLock,
+    #[error("history objects or metadata exceed the supported limits")]
+    HistoryLimit,
+    #[error("the history request is invalid or its reader must be restarted")]
+    HistoryRequest,
+    #[error("select an actual parent of this commit, or the empty tree for a root commit")]
+    HistoryBase,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -261,8 +267,8 @@ pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
     })
 }
 
-/// Refuses traversal and intermediate symlinks outside the worktree.
-pub(crate) fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
+/// Validates repository-relative syntax independently of the current working filesystem.
+pub(crate) fn relative_path(path: &Path) -> Result<(), CoreError> {
     if path.as_os_str().is_empty()
         || path.as_os_str().as_encoded_bytes().contains(&0)
         || !path.components().all(|component| match component {
@@ -272,6 +278,12 @@ pub(crate) fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
     {
         return Err(CoreError::InvalidPath);
     }
+    Ok(())
+}
+
+/// Refuses traversal and intermediate symlinks outside the worktree.
+pub(crate) fn check_path(root: &Path, path: &Path) -> Result<(), CoreError> {
+    relative_path(path)?;
     // Walk existing parents: deleted files may have absent directories.
     let mut parent = root.join(path).parent().map(Path::to_path_buf);
     while let Some(candidate) = parent {

@@ -13,6 +13,14 @@ pub struct LatestWorker<Q, R> {
 impl<Q: Send + 'static, R: Send + 'static> LatestWorker<Q, R> {
     /// Runs blocking service work on one named thread; rapid requests are coalesced.
     pub fn new(name: &str, mut run: impl FnMut(Q) -> R + Send + 'static) -> Self {
+        Self::with_state(name, || (), move |_, query| run(query))
+    }
+    /// Initializes thread-confined service state inside the worker; only queries/replies need Send.
+    pub fn with_state<S: 'static>(
+        name: &str,
+        initialize: impl FnOnce() -> S + Send + 'static,
+        mut run: impl FnMut(&mut S, Q) -> R + Send + 'static,
+    ) -> Self {
         let shared = Arc::new((
             Mutex::new(Mailbox {
                 pending: None,
@@ -25,6 +33,7 @@ impl<Q: Send + 'static, R: Send + 'static> LatestWorker<Q, R> {
         std::thread::Builder::new()
             .name(name.into())
             .spawn(move || {
+                let mut state = initialize();
                 loop {
                     let request = {
                         let (mutex, signal) = &*thread_shared;
@@ -38,7 +47,7 @@ impl<Q: Send + 'static, R: Send + 'static> LatestWorker<Q, R> {
                         mailbox.pending.take().expect("pending request")
                     };
                     let (generation, query) = request;
-                    let reply = run(query);
+                    let reply = run(&mut state, query);
                     let mut mailbox = thread_shared.0.lock().expect("worker mailbox");
                     mailbox.reply = Some((generation, reply));
                 }
@@ -70,6 +79,38 @@ impl<Q, R> Drop for LatestWorker<Q, R> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    /// A non-Send Rc service is constructed and retained on its worker, never transferred from UI.
+    fn state_is_initialized_on_its_own_thread() {
+        let owner = std::thread::current().id();
+        let (reply_tx, reply_rx) = std::sync::mpsc::channel();
+        let worker = LatestWorker::with_state(
+            "confined-state",
+            move || {
+                assert_ne!(std::thread::current().id(), owner);
+                std::rc::Rc::new(std::cell::Cell::new(0usize))
+            },
+            move |state, amount| {
+                state.set(state.get() + amount);
+                reply_tx.send(state.get()).unwrap();
+                state.get()
+            },
+        );
+        worker.submit(1, 3);
+        assert_eq!(
+            reply_rx
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            3
+        );
+        worker.submit(2, 4);
+        assert_eq!(
+            reply_rx
+                .recv_timeout(std::time::Duration::from_secs(2))
+                .unwrap(),
+            7
+        );
+    }
     #[test]
     /// A blocked running request leaves room for only the newest pending selection.
     fn replaces_pending_requests() {

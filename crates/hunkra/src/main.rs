@@ -245,6 +245,9 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::ConflictChunk => "error-conflict-chunk",
         CoreError::ConflictBoundary => "error-conflict-boundary",
         CoreError::WorktreeLock => "error-worktree-lock",
+        CoreError::HistoryLimit => "error-history-limit",
+        CoreError::HistoryRequest => "error-history-request",
+        CoreError::HistoryBase => "error-history-base",
     }
 }
 

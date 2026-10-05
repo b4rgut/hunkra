@@ -172,3 +172,6 @@ cancel-action = Keep editing
 
 result-not-staged = Saved Result differs from index · mark resolved again before Continue
 error-result-index = Save Result, then explicitly mark its current version resolved before continuing.
+error-history-limit = History metadata or the selected commit exceeds the supported display limits.
+error-history-request = This history request is no longer available. Reload history.
+error-history-base = Select an actual parent of this commit as the comparison base.
