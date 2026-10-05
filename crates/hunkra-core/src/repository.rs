@@ -42,7 +42,7 @@ pub enum CoreError {
     Unresolved,
     #[error("complete the current Git operation before creating an ordinary commit")]
     ActiveOperation,
-    #[error("commit hook failed: {0}")]
+    #[error("Git hook failed: {0}")]
     Hook(&'static str),
     #[error("commit signing failed")]
     Signing,
@@ -50,6 +50,16 @@ pub enum CoreError {
     ReferenceUpdate,
     #[error("this commit configuration is not supported: {0}")]
     CommitUnsupported(&'static str),
+    #[error("the local branch name is invalid")]
+    BranchName,
+    #[error("the local branch already exists")]
+    BranchExists,
+    #[error("the branch cannot be created before the first commit")]
+    Unborn,
+    #[error("the reference set is unsupported or exceeds its limit")]
+    ReferenceLimit,
+    #[error("the operation metadata is invalid, unsafe or exceeds its limit")]
+    OperationMetadata,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,6 +128,14 @@ pub(crate) fn open(path: &Path) -> Result<gix::Repository, CoreError> {
     Ok(repo)
 }
 
+/// Resolves existing symbolic HEAD chains; only a genuinely unborn HEAD has no object id.
+pub(crate) fn resolved_head(repo: &gix::Repository) -> Result<Option<String>, CoreError> {
+    if repo.head().map_err(git_error)?.is_unborn() {
+        return Ok(None);
+    }
+    Ok(Some(repo.head_id().map_err(git_error)?.to_string()))
+}
+
 /// Scans both comparisons without persisting gix's optional index stat updates.
 pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
     let repo = open(path)?;
@@ -126,7 +144,7 @@ pub fn scan(path: &Path) -> Result<RepositorySnapshot, CoreError> {
     let head = repo.head().map_err(git_error)?;
     let branch = head.referent_name().map(|name| name.shorten().to_string());
     let unborn = head.is_unborn();
-    let head_id = head.id().map(|id| id.to_string());
+    let head_id = resolved_head(&repo)?;
     let index = repo.index_or_empty().map_err(git_error)?;
     let mut files = BTreeMap::<PathBuf, FileStatus>::new();
     for entry in index.entries() {
@@ -456,11 +474,7 @@ pub(crate) fn capture_guard(
     Ok(RepositoryGuard {
         root: root.to_path_buf(),
         index: index_digest(&repo.index_path())?,
-        head: repo
-            .head()
-            .map_err(git_error)?
-            .id()
-            .map(|id| id.to_string()),
+        head: resolved_head(repo)?,
         raw_worktree,
         mode,
     })

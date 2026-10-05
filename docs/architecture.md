@@ -1,5 +1,7 @@
 # Границы реализации
 
+UI/UX по прямому запросу владельца следует Zed: компактные панели и вкладки, тёмная палитра, спокойные разделители, нижняя строка состояния и клавиатурные действия. Это собственная GPUI-композиция; GPL editor/workspace Zed не копируется. Read-only One Dark theme изучена как визуальный ориентир; её MIT license проверена, тема целиком не переносится. Настройки и checkout Zed не изменяются.
+
 Два crate: hunkra-core (обычные модели Git/status/document/diff, gix adapter), hunkra (GPUI standalone + Fluent + app-local settings). UI получает snapshots и структурированные ошибки. Переводы на границе UI. Блокирующие операции в ограниченном worker; snapshot list и выбранный diff имеют независимые поколения.
 
 В будущей Zed интеграции standalone host заменяется адаптером Panel/Item, GitStore, host buffers/unsaved content и remote projects. Shared view не открывает окна и не читает standalone settings. Второй GitStore не создаётся.

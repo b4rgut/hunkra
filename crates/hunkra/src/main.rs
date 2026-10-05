@@ -143,8 +143,14 @@ fn error_key(error: &CoreError) -> &'static str {
             "encoding" => "error-commit-encoding",
             "sparse" => "error-commit-sparse",
             "cleanup" | "comment-auto" => "error-commit-cleanup",
+            "symbolic-head" => "error-reference-format",
             _ => "error-commit-unsupported",
         },
+        CoreError::BranchName => "error-branch-name",
+        CoreError::BranchExists => "error-branch-exists",
+        CoreError::Unborn => "error-branch-unborn",
+        CoreError::ReferenceLimit => "error-reference-limit",
+        CoreError::OperationMetadata => "error-operation-metadata",
     }
 }
 

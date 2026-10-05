@@ -1,7 +1,7 @@
 //! Index-only commits assembled from official gix tree, signing, command and ref primitives.
 use crate::{
     CoreError,
-    repository::{git_error, index_digest, open},
+    repository::{git_error, index_digest, open, resolved_head},
 };
 use gix::{
     bstr::ByteSlice,
@@ -39,11 +39,7 @@ pub struct CommitWrite {
 fn capture(repo: &gix::Repository) -> Result<CommitSnapshot, CoreError> {
     Ok(CommitSnapshot {
         root: repo.workdir().ok_or(CoreError::Bare)?.canonicalize()?,
-        head: repo
-            .head()
-            .map_err(git_error)?
-            .id()
-            .map(|id| id.to_string()),
+        head: resolved_head(repo)?,
         backend: "gix",
         index: index_digest(&repo.index_path())?,
         head_file: fs::read(repo.git_dir().join("HEAD"))?,
@@ -88,8 +84,8 @@ fn executable(path: &Path) -> Result<bool, CoreError> {
     }
 }
 
-/// Runs a configured commit hook through gix command/context; owned errors never expose its output.
-fn hook(
+/// Runs a configured Git hook through gix command/context; owned errors never expose its output.
+pub(crate) fn hook(
     repo: &gix::Repository,
     name: &'static str,
     args: &[&Path],
@@ -217,6 +213,10 @@ pub fn create_commit(snapshot: &CommitSnapshot, message: &str) -> Result<CommitW
     }
     if snapshot.operation.is_some() {
         return Err(CoreError::ActiveOperation);
+    }
+    if matches!(&repo.head().map_err(git_error)?.kind, gix::head::Kind::Symbolic(reference) if reference.target.try_id().is_none())
+    {
+        return Err(CoreError::CommitUnsupported("symbolic-head"));
     }
     let message = clean_message(&repo, message)?;
     if repo

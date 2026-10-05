@@ -1,7 +1,9 @@
 //! Git and diff services. Public models contain no GPUI or gix types.
+pub mod branches;
 pub mod commit;
 pub mod diff;
 mod index_format;
+pub mod operations;
 pub mod repository;
 pub mod staging;
 
@@ -11,5 +13,7 @@ pub use repository::{
     scan,
 };
 
+pub use branches::{Branch, BranchSnapshot, BranchWrite, create_branch, read_branches};
 pub use commit::{CommitSnapshot, CommitWrite, create_commit, prepare_commit};
+pub use operations::{OperationSnapshot, OperationState, prepare_operation};
 pub use staging::{IndexWrite, LineSelection, Selection, update_index};
