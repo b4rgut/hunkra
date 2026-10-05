@@ -5,4 +5,6 @@ pub mod i18n;
 pub mod settings;
 pub mod state;
 pub mod text;
+#[cfg(feature = "gui")]
+pub mod theme;
 pub mod worker;

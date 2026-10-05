@@ -40,7 +40,7 @@ pub enum CoreError {
     Identity,
     #[error("unresolved index stages must be resolved before committing")]
     Unresolved,
-    #[error("complete the current Git operation before creating an ordinary commit")]
+    #[error("complete the current Git operation before starting another action")]
     ActiveOperation,
     #[error("Git hook failed: {0}")]
     Hook(&'static str),
@@ -54,12 +54,23 @@ pub enum CoreError {
     BranchName,
     #[error("the local branch already exists")]
     BranchExists,
-    #[error("the branch cannot be created before the first commit")]
+    #[error("a committed HEAD is required for this action")]
     Unborn,
     #[error("the reference set is unsupported or exceeds its limit")]
     ReferenceLimit,
     #[error("the operation metadata is invalid, unsafe or exceeds its limit")]
     OperationMetadata,
+    #[error("the selected local branch no longer exists")]
+    BranchMissing,
+    #[error("there is no active Git operation")]
+    NoOperation,
+    #[error("this action does not apply to the current operation")]
+    OperationAction,
+    #[error("the Git coordinator failed; refresh the actual state before retrying")]
+    OperationExecution {
+        capability: crate::OperationCapability,
+        exit_code: Option<i32>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

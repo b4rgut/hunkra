@@ -19,6 +19,7 @@ case "$command" in
   run) cargo run -p hunkra --features gui --locked --bin hunkra -- "$@" ;;
   demo) python3 scripts/demo.py "$@" ;;
   smoke) python3 scripts/smoke.py "$@" ;;
+  smoke-operations) python3 scripts/operations-smoke.py "$@" ;;
   check-release) python3 scripts/validate.py release ;;
   *) printf 'Unknown command: %s\n' "$command" >&2; exit 2 ;;
 esac

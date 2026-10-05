@@ -59,6 +59,7 @@ fn state_files(repo: &gix::Repository) -> Result<(StateFiles, Vec<PathBuf>), Cor
         "MERGE_HEAD",
         "MERGE_MSG",
         "MERGE_MODE",
+        "MERGE_AUTOSTASH",
         "AUTO_MERGE",
         "ORIG_HEAD",
         "REBASE_HEAD",

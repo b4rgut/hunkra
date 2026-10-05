@@ -6,6 +6,7 @@ mod index_format;
 pub mod operations;
 pub mod repository;
 pub mod staging;
+pub mod transitions;
 
 pub use diff::{DiffKind, DiffRow, DiffSnapshot, Document, Line, Presentation};
 pub use repository::{
@@ -17,3 +18,7 @@ pub use branches::{Branch, BranchSnapshot, BranchWrite, create_branch, read_bran
 pub use commit::{CommitSnapshot, CommitWrite, create_commit, prepare_commit};
 pub use operations::{OperationSnapshot, OperationState, prepare_operation};
 pub use staging::{IndexWrite, LineSelection, Selection, update_index};
+pub use transitions::{
+    OperationAction, OperationCapability, OperationOutcome, OperationRoute, OperationWrite,
+    operation_route, run_operation,
+};

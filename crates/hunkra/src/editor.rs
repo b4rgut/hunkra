@@ -1,5 +1,5 @@
 //! Owned native multiline text surface using GPUI's platform input contract.
-use crate::text::TextBuffer;
+use crate::{text::TextBuffer, theme};
 use gpui::{
     App, Bounds, ClipboardItem, ContentMask, Context, CursorStyle, Element, ElementId,
     ElementInputHandler, Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable,
@@ -13,6 +13,7 @@ use unicode_segmentation::UnicodeSegmentation;
 const LINE_HEIGHT: f32 = 22.;
 pub struct TextChanged;
 pub struct TextRejected;
+pub struct TextSubmitted;
 #[derive(Clone)]
 struct Row {
     start: usize,
@@ -24,6 +25,7 @@ pub struct NativeEditor {
     pub buffer: TextBuffer,
     pub placeholder: SharedString,
     pub enabled: bool,
+    pub single_line: bool,
     focus: FocusHandle,
     rows: Vec<Row>,
     bounds: Option<Bounds<Pixels>>,
@@ -35,6 +37,7 @@ pub struct NativeEditor {
 }
 impl EventEmitter<TextChanged> for NativeEditor {}
 impl EventEmitter<TextRejected> for NativeEditor {}
+impl EventEmitter<TextSubmitted> for NativeEditor {}
 impl Focusable for NativeEditor {
     /// Exposes the platform focus handle without moving selection or text.
     fn focus_handle(&self, _: &App) -> FocusHandle {
@@ -48,6 +51,7 @@ impl NativeEditor {
             buffer: TextBuffer::new(limit),
             placeholder: placeholder.into(),
             enabled: true,
+            single_line: false,
             focus: cx.focus_handle(),
             rows: Vec::new(),
             bounds: None,
@@ -57,6 +61,16 @@ impl NativeEditor {
             scroll_row: 0,
             horizontal: px(0.),
         }
+    }
+    /// Creates a branch/filter input that rejects newline paste/composition and emits Enter separately.
+    pub fn single_line(limit: usize, placeholder: String, cx: &mut Context<Self>) -> Self {
+        let mut editor = Self::new(limit, placeholder, cx);
+        editor.single_line = true;
+        editor
+    }
+    /// Keeps single-line values exact by refusing newline input rather than silently rewriting it.
+    fn accepts(&self, text: &str) -> bool {
+        !self.single_line || !text.contains(['\n', '\r'])
     }
     /// Notifies both the editor and its owning shell after an accepted text mutation.
     fn changed(&mut self, cx: &mut Context<Self>) {
@@ -185,7 +199,7 @@ impl NativeEditor {
             }
             (true, "v") if self.enabled => {
                 if let Some(text) = cx.read_from_clipboard().and_then(|item| item.text()) {
-                    changed = self.buffer.replace(None, &text);
+                    changed = self.accepts(&text) && self.buffer.replace(None, &text);
                     if !changed {
                         cx.emit(TextRejected);
                     }
@@ -215,12 +229,16 @@ impl NativeEditor {
                 changed = self.buffer.replace(None, "");
             }
             (false, "enter") if self.enabled => {
-                let newline = if self.buffer.text().contains("\r\n") {
-                    "\r\n"
+                if self.single_line {
+                    cx.emit(TextSubmitted);
                 } else {
-                    "\n"
-                };
-                changed = self.buffer.replace(None, newline);
+                    let newline = if self.buffer.text().contains("\r\n") {
+                        "\r\n"
+                    } else {
+                        "\n"
+                    };
+                    changed = self.buffer.replace(None, newline);
+                }
             }
             (false, "left" | "right") => {
                 self.buffer.unmark();
@@ -321,7 +339,7 @@ impl EntityInputHandler for NativeEditor {
         cx: &mut Context<Self>,
     ) {
         if self.enabled {
-            if self.buffer.replace(range, text) {
+            if self.accepts(text) && self.buffer.replace(range, text) {
                 self.changed(cx);
             } else {
                 cx.emit(TextRejected);
@@ -338,7 +356,7 @@ impl EntityInputHandler for NativeEditor {
         cx: &mut Context<Self>,
     ) {
         if self.enabled {
-            if self.buffer.compose(range, text, selected) {
+            if self.accepts(text) && self.buffer.compose(range, text, selected) {
                 self.changed(cx);
             } else {
                 cx.emit(TextRejected);
@@ -391,11 +409,11 @@ impl Render for NativeEditor {
             .font_family("monospace")
             .text_size(px(14.))
             .line_height(px(LINE_HEIGHT))
-            .text_color(rgb(0xdce3ed))
-            .bg(rgb(0x101419))
-            .rounded_md()
+            .text_color(rgb(theme::TEXT))
+            .bg(rgb(theme::BACKGROUND))
+            .rounded_sm()
             .border_1()
-            .border_color(rgb(0x35414e))
+            .border_color(rgb(theme::BORDER))
             .p_2()
             .on_key_down(cx.listener(Self::key_down))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::mouse_down))
@@ -492,7 +510,7 @@ impl Element for TextSurface {
                         len: text.len(),
                         font: style.font(),
                         color: if placeholder {
-                            rgb(0x99a8b9).into()
+                            rgb(theme::MUTED).into()
                         } else {
                             style.color
                         },
@@ -602,12 +620,12 @@ impl Element for TextSurface {
                 let _ = row.line.paint(row.origin, px(LINE_HEIGHT), window, cx);
             }
             for marked in &state.marked {
-                window.paint_quad(fill(*marked, rgb(0x93c9bd)));
+                window.paint_quad(fill(*marked, rgb(theme::ACCENT)));
             }
             if focus.is_focused(window)
                 && let Some(caret) = state.caret
             {
-                window.paint_quad(fill(caret, rgb(0xdce3ed)));
+                window.paint_quad(fill(caret, rgb(theme::TEXT)));
             }
         });
         self.editor.update(cx, |editor, _| {
@@ -622,6 +640,34 @@ impl Element for TextSurface {
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+    #[gpui::test]
+    /// Single-line fields retain exact Unicode and selection when clipboard/native composition includes newlines.
+    fn single_line_refuses_multiline_input(cx: &mut TestAppContext) {
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let editor = NativeEditor::single_line(4096, "branch".into(), cx);
+            window.focus(&editor.focus);
+            editor
+        });
+        cx.simulate_input("задача/ветка🦀");
+        let before = editor.read_with(cx, |editor, _| {
+            (
+                editor.buffer.text().to_owned(),
+                editor.buffer.selection,
+                editor.buffer.revision,
+            )
+        });
+        cx.write_to_clipboard(ClipboardItem::new_string("line one\nline two".into()));
+        cx.simulate_keystrokes("ctrl-v enter");
+        cx.simulate_input("\r\n");
+        let after = editor.read_with(cx, |editor, _| {
+            (
+                editor.buffer.text().to_owned(),
+                editor.buffer.selection,
+                editor.buffer.revision,
+            )
+        });
+        assert_eq!(before, after);
+    }
     #[gpui::test]
     /// Exercises registered native keyboard, Unicode insertion and clipboard handlers on GPUI's isolated platform.
     fn keyboard_clipboard_and_disabled_input(cx: &mut TestAppContext) {

@@ -6,38 +6,57 @@ use gpui::{
     px, rgb, size, uniform_list,
 };
 use hunkra::{
-    editor::{NativeEditor, TextChanged, TextRejected},
+    editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
     i18n::{Locale, Translator},
     settings::{self, Settings},
     state::ViewState,
+    theme::{ACCENT, BACKGROUND as BG, BORDER as LINE, HOVER, MUTED, PANEL, SELECTED, TEXT},
     worker::LatestWorker,
 };
 use hunkra_core::{
-    ChangeKind, CommitSnapshot, CommitWrite, CoreError, DiffKind, DiffRow, DiffSnapshot,
-    IndexLimitation, IndexWrite, Line, LineSelection, Operation, Presentation, RepositorySnapshot,
-    Selection,
+    Branch, BranchSnapshot, BranchWrite, ChangeKind, CommitSnapshot, CommitWrite, CoreError,
+    DiffKind, DiffRow, DiffSnapshot, IndexLimitation, IndexWrite, Line, LineSelection, Operation,
+    OperationAction, OperationOutcome, OperationSnapshot, OperationWrite, Presentation,
+    RepositorySnapshot, Selection,
 };
 use std::{
     path::PathBuf,
     time::{Duration, Instant},
 };
 
-const BG: u32 = 0x101419;
-const PANEL: u32 = 0x181e25;
-const LINE: u32 = 0x2b3541;
-const TEXT: u32 = 0xdce3ed;
-const MUTED: u32 = 0x99a8b9;
-const ACCENT: u32 = 0x93c9bd;
 const SMOKE_MESSAGE: &str = "Подготовить A+B 🦀\n\nСообщение из поля";
 
 type DiffQuery = (PathBuf, PathBuf, DiffKind);
+struct StatusRead {
+    repository: RepositorySnapshot,
+    branches: BranchSnapshot,
+    operation: OperationSnapshot,
+}
+/// Reads a consistent status/branch/operation bundle through the one bounded status worker.
+fn read_status(root: &std::path::Path) -> Result<StatusRead, CoreError> {
+    let repository = hunkra_core::scan(root)?;
+    let branches = hunkra_core::read_branches(root)?;
+    let operation = hunkra_core::prepare_operation(root)?;
+    if repository.commit != branches.repository || repository.commit != operation.repository {
+        return Err(CoreError::Stale);
+    }
+    Ok(StatusRead {
+        repository,
+        branches,
+        operation,
+    })
+}
 enum WriteQuery {
     Index(PathBuf, std::sync::Arc<DiffSnapshot>, Selection),
     Commit(CommitSnapshot, String),
+    Branch(CommitSnapshot, String),
+    Operation(std::sync::Arc<OperationSnapshot>, OperationAction),
 }
 enum WriteResult {
     Index(IndexWrite),
     Commit(CommitWrite),
+    Branch(BranchWrite),
+    Operation(OperationWrite),
 }
 
 #[derive(Default)]
@@ -47,6 +66,7 @@ struct SmokeOptions {
     refusal: bool,
     commit: bool,
     hook: bool,
+    operation: Option<String>,
 }
 struct Smoke {
     report: PathBuf,
@@ -61,6 +81,7 @@ struct Smoke {
     refusal: bool,
     commit: bool,
     hook_refusal: bool,
+    operation: Option<String>,
     message_ready: bool,
     input_prepared: bool,
     message_selection: Option<hunkra::text::Selection>,
@@ -69,11 +90,20 @@ struct Hunkra {
     view: ViewState,
     translator: Translator,
     settings: Settings,
-    status_worker: LatestWorker<PathBuf, Result<RepositorySnapshot, CoreError>>,
+    status_worker: LatestWorker<PathBuf, Result<StatusRead, CoreError>>,
     diff_worker: LatestWorker<DiffQuery, Result<DiffSnapshot, CoreError>>,
     settings_worker: LatestWorker<Settings, std::io::Result<()>>,
     write_worker: LatestWorker<WriteQuery, Result<WriteResult, CoreError>>,
     message: Entity<NativeEditor>,
+    branch_input: Entity<NativeEditor>,
+    branches: Option<BranchSnapshot>,
+    operation: Option<std::sync::Arc<OperationSnapshot>>,
+    reviewed_operation: Option<std::sync::Arc<OperationSnapshot>>,
+    selected_branch: Option<Branch>,
+    branch_created: Option<BranchWrite>,
+    operation_written: Option<OperationWrite>,
+    branch_tab: bool,
+    branch_scroll: UniformListScrollHandle,
     _message_subscriptions: Vec<Subscription>,
     committed: Option<CommitWrite>,
     reviewed_commit: Option<CommitSnapshot>,
@@ -81,6 +111,7 @@ struct Hunkra {
     close_requested: bool,
     write_error_key: Option<&'static str>,
     last_write_backend: Option<&'static str>,
+    last_operation_route: Option<hunkra_core::OperationRoute>,
     anchor_removed: Option<usize>,
     anchor_added: Option<usize>,
     root: Option<PathBuf>,
@@ -129,7 +160,7 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::NothingStaged => "error-commit-empty",
         CoreError::Identity => "error-commit-identity",
         CoreError::Unresolved => "error-commit-conflict",
-        CoreError::ActiveOperation => "error-commit-operation",
+        CoreError::ActiveOperation => "error-active-operation",
         CoreError::Hook(name) => match *name {
             "pre-commit" => "error-hook-pre-commit",
             "prepare-commit-msg" => "error-hook-prepare",
@@ -151,6 +182,10 @@ fn error_key(error: &CoreError) -> &'static str {
         CoreError::Unborn => "error-branch-unborn",
         CoreError::ReferenceLimit => "error-reference-limit",
         CoreError::OperationMetadata => "error-operation-metadata",
+        CoreError::BranchMissing => "error-branch-missing",
+        CoreError::NoOperation => "error-operation-none",
+        CoreError::OperationAction => "error-operation-action",
+        CoreError::OperationExecution { .. } => "error-operation-execution",
     }
 }
 
@@ -158,14 +193,14 @@ fn error_key(error: &CoreError) -> &'static str {
 fn button(id: impl Into<gpui::ElementId>, text: String, active: bool) -> gpui::Stateful<gpui::Div> {
     div()
         .id(id)
-        .px_3()
-        .py_2()
-        .rounded_md()
+        .px_2()
+        .py_1()
+        .rounded_sm()
         .text_sm()
         .cursor_pointer()
-        .bg(rgb(if active { 0x304940 } else { 0x252e38 }))
+        .bg(rgb(if active { SELECTED } else { PANEL }))
         .text_color(rgb(if active { ACCENT } else { TEXT }))
-        .hover(|style| style.bg(rgb(0x35414e)))
+        .hover(|style| style.bg(rgb(HOVER)))
         .child(text)
 }
 
@@ -188,6 +223,17 @@ impl Hunkra {
             app.write_error_key = Some("error-commit-message");
             cx.notify();
         });
+        let branch_input = cx.new(|cx| {
+            NativeEditor::single_line(4096, translator.text("branch-placeholder", None), cx)
+        });
+        let branch_changed = cx.subscribe(&branch_input, |_, _, _: &TextChanged, cx| cx.notify());
+        let branch_rejected = cx.subscribe(&branch_input, |app, _, _: &TextRejected, cx| {
+            app.write_error_key = Some("error-branch-name");
+            cx.notify();
+        });
+        let branch_submitted = cx.subscribe(&branch_input, |app, _, _: &TextSubmitted, cx| {
+            app.create_branch(cx);
+        });
         let mut app = Self {
             view: ViewState {
                 locale,
@@ -195,13 +241,26 @@ impl Hunkra {
             },
             translator,
             message,
-            _message_subscriptions: vec![message_subscription, rejected_subscription],
+            branch_input,
+            branches: None,
+            operation: None,
+            reviewed_operation: None,
+            selected_branch: None,
+            branch_created: None,
+            operation_written: None,
+            branch_tab: false,
+            branch_scroll: UniformListScrollHandle::new(),
+            _message_subscriptions: vec![
+                message_subscription,
+                rejected_subscription,
+                branch_changed,
+                branch_rejected,
+                branch_submitted,
+            ],
             committed: None,
             reviewed_commit: None,
             settings,
-            status_worker: LatestWorker::new("hunkra-status", |root: PathBuf| {
-                hunkra_core::scan(&root)
-            }),
+            status_worker: LatestWorker::new("hunkra-status", |root: PathBuf| read_status(&root)),
             diff_worker: LatestWorker::new("hunkra-diff", |(root, path, kind): DiffQuery| {
                 hunkra_core::read_diff(&root, &path, kind)
             }),
@@ -213,11 +272,18 @@ impl Hunkra {
                 WriteQuery::Commit(snapshot, message) => {
                     hunkra_core::create_commit(&snapshot, &message).map(WriteResult::Commit)
                 }
+                WriteQuery::Branch(snapshot, name) => {
+                    hunkra_core::create_branch(&snapshot, &name).map(WriteResult::Branch)
+                }
+                WriteQuery::Operation(snapshot, action) => {
+                    hunkra_core::run_operation(&snapshot, &action).map(WriteResult::Operation)
+                }
             }),
             writing: false,
             close_requested: false,
             write_error_key: None,
             last_write_backend: None,
+            last_operation_route: None,
             anchor_removed: None,
             anchor_added: None,
             root: None,
@@ -247,6 +313,7 @@ impl Hunkra {
                 refusal: smoke_options.refusal,
                 commit: smoke_options.commit,
                 hook_refusal: smoke_options.hook,
+                operation: smoke_options.operation,
                 message_ready: false,
                 input_prepared: false,
                 message_selection: None,
@@ -289,6 +356,11 @@ impl Hunkra {
             editor.placeholder = placeholder.into();
             cx.notify();
         });
+        let placeholder = self.t("branch-placeholder");
+        self.branch_input.update(cx, |editor, cx| {
+            editor.placeholder = placeholder.into();
+            cx.notify();
+        });
         self.settings.locale = locale;
         if self.smoke.is_none() {
             self.settings_worker.submit(0, self.settings.clone());
@@ -302,6 +374,16 @@ impl Hunkra {
         }
         self.committed = None;
         self.reviewed_commit = None;
+        self.branches = None;
+        self.operation = None;
+        self.reviewed_operation = None;
+        self.selected_branch = None;
+        self.branch_created = None;
+        self.operation_written = None;
+        self.branch_input.update(cx, |editor, cx| {
+            editor.buffer.reset(String::new());
+            cx.notify();
+        });
         self.message.update(cx, |editor, cx| {
             editor.buffer.reset(String::new());
             cx.notify();
@@ -316,6 +398,7 @@ impl Hunkra {
         self.anchor_added = None;
         self.write_error_key = None;
         self.last_write_backend = None;
+        self.last_operation_route = None;
         self.view.diff_generation += 1;
         self.diff_loading = false;
         self.error_key = None;
@@ -497,10 +580,67 @@ impl Hunkra {
             .submit(0, WriteQuery::Commit(snapshot, message));
         cx.notify();
     }
+    /// Creates a branch from the last displayed HEAD, preserving input after any refusal.
+    fn create_branch(&mut self, cx: &mut Context<Self>) {
+        if self.writing
+            || self.scanning
+            || self
+                .operation
+                .as_ref()
+                .is_some_and(|snapshot| snapshot.state.is_some())
+        {
+            return;
+        }
+        let Some(snapshot) = self.reviewed_commit.clone() else {
+            return;
+        };
+        let name = self.branch_input.read(cx).buffer.text().to_owned();
+        self.begin_write(cx);
+        self.write_worker
+            .submit(0, WriteQuery::Branch(snapshot, name));
+        cx.notify();
+    }
+    /// Uses the last displayed operation snapshot and immutable selected target, never an unseen fresh read.
+    fn perform_operation(&mut self, action: OperationAction, cx: &mut Context<Self>) {
+        if self.writing || self.scanning {
+            return;
+        }
+        let Some(snapshot) = self.reviewed_operation.clone() else {
+            return;
+        };
+        if matches!(
+            action,
+            OperationAction::Switch(_) | OperationAction::Merge(_) | OperationAction::Rebase(_)
+        ) && snapshot.state.is_some()
+        {
+            return;
+        }
+        if action == OperationAction::Continue
+            && self
+                .view
+                .repository
+                .as_ref()
+                .is_some_and(|repo| repo.files.iter().any(|file| file.conflicted))
+        {
+            return;
+        }
+        let route = hunkra_core::operation_route(&snapshot, &action).ok();
+        self.begin_write(cx);
+        self.last_operation_route = route;
+        self.write_worker
+            .submit(0, WriteQuery::Operation(snapshot, action));
+        cx.notify();
+    }
     /// Invalidates pending reads and freezes message edits for either kind of accepted write.
     fn begin_write(&mut self, cx: &mut Context<Self>) {
         self.writing = true;
         self.committed = None;
+        self.branch_created = None;
+        self.operation_written = None;
+        self.branch_input.update(cx, |editor, cx| {
+            editor.enabled = false;
+            cx.notify();
+        });
         self.message.update(cx, |editor, cx| {
             editor.enabled = false;
             cx.notify();
@@ -508,6 +648,7 @@ impl Hunkra {
         self.error_key = None;
         self.write_error_key = None;
         self.last_write_backend = None;
+        self.last_operation_route = None;
         self.scan_generation += 1;
         self.scanning = false;
         self.view.diff_generation += 1;
@@ -522,7 +663,17 @@ impl Hunkra {
             self.scanning = false;
             changed = true;
             match result {
-                Ok(snapshot) => {
+                Ok(read) => {
+                    let snapshot = read.repository;
+                    self.selected_branch = self.selected_branch.take().and_then(|selected| {
+                        read.branches
+                            .branches
+                            .iter()
+                            .find(|branch| branch.name == selected.name)
+                            .cloned()
+                    });
+                    self.branches = Some(read.branches);
+                    self.operation = Some(std::sync::Arc::new(read.operation));
                     self.error_key = None;
                     self.root = Some(snapshot.root.clone());
                     let selected = self
@@ -590,6 +741,10 @@ impl Hunkra {
         }
         if let Some((_, result)) = self.write_worker.take() {
             self.writing = false;
+            self.branch_input.update(cx, |editor, cx| {
+                editor.enabled = true;
+                cx.notify();
+            });
             self.message.update(cx, |editor, cx| {
                 editor.enabled = true;
                 cx.notify();
@@ -613,11 +768,26 @@ impl Hunkra {
                     });
                     self.committed = Some(result);
                 }
+                Ok(WriteResult::Branch(result)) => {
+                    self.write_error_key = None;
+                    self.last_write_backend = Some(result.backend);
+                    self.selected_branch = Some(result.branch.clone());
+                    self.branch_input.update(cx, |editor, cx| {
+                        editor.buffer.reset(String::new());
+                        cx.notify();
+                    });
+                    self.branch_created = Some(result);
+                }
+                Ok(WriteResult::Operation(result)) => {
+                    self.write_error_key = None;
+                    self.last_write_backend = Some(result.route.backend);
+                    self.operation_written = Some(result);
+                }
                 Err(error) => self.write_error_key = Some(error_key(&error)),
             }
             if self.close_requested && self.last_write_backend.is_some() {
                 if let Some(smoke) = &self.smoke {
-                    let report = serde_json::json!({"ok":self.last_write_backend==Some("gix"), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
+                    let report = serde_json::json!({"ok":self.last_write_backend==Some(if smoke.operation.as_deref().is_some_and(|action| !action.starts_with("branch")) {"git-cli"} else {"gix"}), "close_deferred":true, "writer_finished":true, "write_backend":self.last_write_backend, "commit_id":self.committed.as_ref().map(|commit| &commit.id), "message_cleared":self.message.read(cx).buffer.text().is_empty()});
                     std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap())
                         .expect("close smoke report");
                 }
@@ -669,7 +839,7 @@ impl Hunkra {
     /// Provides file/hunk navigation and open/refresh keyboard shortcuts.
     fn key_down(&mut self, event: &KeyDownEvent, _window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
-        if event.keystroke.modifiers.control && key == "enter" {
+        if event.keystroke.modifiers.control && !event.keystroke.modifiers.shift && key == "enter" {
             self.commit(cx);
             return;
         }
@@ -687,6 +857,47 @@ impl Hunkra {
         }
         if key == "f7" {
             self.move_hunk(!event.keystroke.modifiers.shift, cx);
+            return;
+        }
+        if event.keystroke.modifiers.control && matches!(key, "1" | "2") {
+            self.branch_tab = key == "2";
+            cx.notify();
+            return;
+        }
+        if event.keystroke.modifiers.control && event.keystroke.modifiers.shift && key == "enter" {
+            self.perform_operation(OperationAction::Continue, cx);
+            return;
+        }
+        if self.branch_tab && key == "enter" {
+            if let Some(branch) = self.selected_branch.clone() {
+                self.perform_operation(OperationAction::Switch(branch), cx);
+            }
+            return;
+        }
+        if self.branch_tab && matches!(key, "up" | "down") {
+            if let Some(branches) = &self.branches
+                && !branches.branches.is_empty()
+            {
+                let current = self
+                    .selected_branch
+                    .as_ref()
+                    .and_then(|selected| {
+                        branches
+                            .branches
+                            .iter()
+                            .position(|branch| branch == selected)
+                    })
+                    .unwrap_or(0);
+                let next = if key == "up" {
+                    current.saturating_sub(1)
+                } else {
+                    (current + 1).min(branches.branches.len() - 1)
+                };
+                self.selected_branch = Some(branches.branches[next].clone());
+                self.branch_scroll
+                    .scroll_to_item(next, ScrollStrategy::Center);
+                cx.notify();
+            }
             return;
         }
         if matches!(key, "up" | "down")
@@ -718,6 +929,10 @@ impl Hunkra {
             let report = serde_json::json!({"ok":false,"reason":"timeout","frames":self.frames,"error":self.error_key});
             let _ = std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap());
             cx.quit();
+            return;
+        }
+        if smoke.operation.is_some() {
+            self.smoke_operation_tick(cx);
             return;
         }
         if smoke.commit && !smoke.message_ready {
@@ -917,8 +1132,158 @@ impl Hunkra {
         smoke.last_frame = self.frames;
         cx.notify();
     }
+    /// Runs branch/coordinator handlers in a real finite native window using only caller-owned disposable fixtures.
+    fn smoke_operation_tick(&mut self, cx: &mut Context<Self>) {
+        let smoke = self.smoke.as_ref().unwrap();
+        if self.writing
+            || self.scanning
+            || self.diff_loading
+            || self.view.repository.is_none()
+            || self.reviewed_operation.is_none()
+            || !smoke.input_prepared
+            || self.frames <= smoke.last_frame
+        {
+            return;
+        }
+        let phase = smoke.phase;
+        let operation = smoke.operation.clone().unwrap();
+        if phase == 0 {
+            self.branch_tab = operation != "preview-changes";
+        } else if phase <= 3 {
+            let message = &self.message.read(cx).buffer;
+            let preserved = (
+                message.text().to_owned(),
+                message.selection,
+                message.revision,
+            );
+            let input = &self.branch_input.read(cx).buffer;
+            let branch_preserved = (input.text().to_owned(), input.selection, input.revision);
+            let generation = self.scan_generation;
+            self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 1], cx);
+            let message = &self.message.read(cx).buffer;
+            assert_eq!(
+                (
+                    message.text().to_owned(),
+                    message.selection,
+                    message.revision
+                ),
+                preserved
+            );
+            let input = &self.branch_input.read(cx).buffer;
+            assert_eq!(
+                (input.text().to_owned(), input.selection, input.revision),
+                branch_preserved
+            );
+            assert_eq!(self.scan_generation, generation);
+            let label = self.t("branches");
+            self.smoke.as_mut().unwrap().locales.push(label);
+        } else if phase == 4 {
+            if operation.starts_with("preview") {
+                if self.selected_branch.is_none() {
+                    self.selected_branch = self
+                        .branches
+                        .as_ref()
+                        .and_then(|snapshot| snapshot.branches.first())
+                        .cloned();
+                }
+                if self.smoke.as_ref().unwrap().started.elapsed() < Duration::from_secs(5) {
+                    cx.notify();
+                    return;
+                }
+            } else if operation.starts_with("branch") {
+                self.create_branch(cx);
+            } else {
+                let target = |name| {
+                    self.branches
+                        .as_ref()
+                        .unwrap()
+                        .branches
+                        .iter()
+                        .find(|branch| branch.name == name)
+                        .unwrap()
+                        .clone()
+                };
+                let action = match operation.as_str() {
+                    "switch" => OperationAction::Switch(target("other")),
+                    "merge" | "merge-hook" => OperationAction::Merge(target("other")),
+                    "rebase" => OperationAction::Rebase(target("main")),
+                    "continue" => OperationAction::Continue,
+                    "abort" => OperationAction::Abort,
+                    "skip" => OperationAction::Skip,
+                    _ => panic!("unknown isolated operation smoke"),
+                };
+                self.perform_operation(action, cx);
+            }
+            if !operation.starts_with("preview") {
+                assert!(self.writing);
+                assert!(!self.message.read(cx).enabled && !self.branch_input.read(cx).enabled);
+            }
+            if self.smoke.as_ref().unwrap().close_on_write {
+                assert!(!self.request_close(cx));
+            }
+        } else {
+            let smoke = self.smoke.as_ref().unwrap();
+            let message_retained = self.message.read(cx).buffer.text() == SMOKE_MESSAGE;
+            let branch_retained = self.branch_input.read(cx).buffer.text() == "задача/интерфейс";
+            let refusal = operation == "branch-refusal" || operation == "merge-hook";
+            let ok = message_retained
+                && self.frames > 0
+                && smoke.locales.len() == 3
+                && if operation.starts_with("preview") {
+                    self.write_error_key.is_none() && self.last_write_backend.is_none()
+                } else if refusal {
+                    branch_retained
+                        && self.write_error_key.is_some()
+                        && self.last_write_backend.is_none()
+                        && !self.close_requested
+                } else {
+                    self.write_error_key.is_none()
+                        && self.last_write_backend.is_some()
+                        && (operation != "branch" || !branch_retained)
+                };
+            let state = self.operation.as_ref().unwrap().state.as_ref();
+            let report = serde_json::json!({"ok":ok,"native_display":true,"frames":self.frames,"action":operation,
+                "write_backend":self.last_write_backend,"write_error":self.write_error_key,
+                "route":self.last_operation_route.map(|route| format!("{:?}", route.capability)),
+                "message_retained":message_retained,"branch_retained":branch_retained,"locales":smoke.locales,
+                "head":self.view.repository.as_ref().unwrap().head,
+                "branch":self.view.repository.as_ref().unwrap().branch,
+                "operation":state.map(|state| format!("{:?}", state.kind)),
+                "progress":state.and_then(|state| state.progress),
+                "outcome":self.operation_written.as_ref().map(|write| format!("{:?}",write.outcome)),
+                "branch_created":self.branch_created.as_ref().map(|write| &write.branch.name)});
+            std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
+            cx.quit();
+            return;
+        }
+        let smoke = self.smoke.as_mut().unwrap();
+        smoke.phase += 1;
+        smoke.last_frame = self.frames;
+        cx.notify();
+    }
     /// Exercises real native input callbacks, Cyrillic composition and editing keys in the smoke window.
     fn smoke_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self
+            .smoke
+            .as_ref()
+            .is_some_and(|smoke| smoke.operation.is_some() && !smoke.input_prepared)
+        {
+            self.message.update(cx, |editor, cx| {
+                editor.replace_text_in_range(None, SMOKE_MESSAGE, window, cx);
+                editor.buffer.select(0, false);
+                editor.buffer.select("Подготовить".len(), true);
+                cx.notify();
+            });
+            self.branch_input.update(cx, |editor, cx| {
+                editor.replace_text_in_range(None, "задача/интерфейс", window, cx);
+                editor.buffer.select(0, false);
+                editor.buffer.select("задача".len(), true);
+                cx.notify();
+            });
+            let smoke = self.smoke.as_mut().unwrap();
+            smoke.input_prepared = true;
+            smoke.message_ready = true;
+        }
         let Some(smoke) = self
             .smoke
             .as_ref()
@@ -989,17 +1354,17 @@ impl Hunkra {
         };
         div()
             .id(("file", index))
-            .h(px(44.))
+            .h(px(30.))
             .px_3()
             .flex()
             .items_center()
             .gap_2()
             .cursor_pointer()
             .overflow_hidden()
-            .bg(rgb(if active { 0x2a383c } else { PANEL }))
+            .bg(rgb(if active { SELECTED } else { PANEL }))
             .border_l_2()
             .border_color(rgb(if active { ACCENT } else { PANEL }))
-            .hover(|style| style.bg(rgb(0x24303a)))
+            .hover(|style| style.bg(rgb(HOVER)))
             .child(
                 div()
                     .w(px(32.))
@@ -1086,9 +1451,9 @@ impl Hunkra {
             .border_r_1()
             .border_color(rgb(LINE))
             .bg(rgb(if selected {
-                0x43505c
+                SELECTED
             } else if changed {
-                if left { 0x342326 } else { 0x18302a }
+                if left { 0x3a2d36 } else { 0x2b3834 }
             } else {
                 BG
             }))
@@ -1130,8 +1495,37 @@ impl Hunkra {
             .bg(rgb(PANEL))
             .border_r_1()
             .border_color(rgb(LINE));
+        sidebar = sidebar.child(
+            div()
+                .h(px(36.))
+                .flex()
+                .items_center()
+                .gap_1()
+                .px_2()
+                .border_b_1()
+                .border_color(rgb(LINE))
+                .child(
+                    button("changes-tab", self.t("changes"), !self.branch_tab).on_click(
+                        cx.listener(|app, _, _, cx| {
+                            app.branch_tab = false;
+                            cx.notify();
+                        }),
+                    ),
+                )
+                .child(
+                    button("branches-tab", self.t("branches"), self.branch_tab).on_click(
+                        cx.listener(|app, _, _, cx| {
+                            app.branch_tab = true;
+                            cx.notify();
+                        }),
+                    ),
+                ),
+        );
+        if self.branch_tab {
+            return sidebar.child(self.branch_panel(cx));
+        }
         let mut info = div()
-            .p_4()
+            .p_3()
             .flex()
             .flex_col()
             .gap_2()
@@ -1205,6 +1599,217 @@ impl Hunkra {
             );
         }
         sidebar
+    }
+    /// Renders a local branch selection separately from the explicit switch/merge/rebase actions.
+    fn branch_row(&self, index: usize, cx: &Context<Self>) -> gpui::Stateful<gpui::Div> {
+        let snapshot = self.branches.as_ref().unwrap();
+        let branch = snapshot.branches[index].clone();
+        let root = snapshot.repository.root.clone();
+        let selected = self.selected_branch.as_ref() == Some(&branch);
+        let current = self
+            .view
+            .repository
+            .as_ref()
+            .and_then(|repo| repo.branch.as_deref())
+            == Some(&branch.name);
+        div()
+            .id(("branch-row", index))
+            .h(px(30.))
+            .px_3()
+            .flex()
+            .items_center()
+            .gap_2()
+            .bg(rgb(if selected { SELECTED } else { PANEL }))
+            .cursor_pointer()
+            .hover(|style| style.bg(rgb(HOVER)))
+            .child(
+                div()
+                    .text_color(rgb(if current { ACCENT } else { MUTED }))
+                    .child(if current { "●" } else { "⑂" }),
+            )
+            .child(
+                div()
+                    .flex_1()
+                    .min_w_0()
+                    .text_sm()
+                    .text_ellipsis()
+                    .child(branch.name.clone()),
+            )
+            .child(
+                div()
+                    .text_xs()
+                    .text_color(rgb(MUTED))
+                    .child(branch.id.chars().take(7).collect::<String>()),
+            )
+            .on_click(cx.listener(move |app, _, window, cx| {
+                if app.root.as_ref() == Some(&root) && !app.writing {
+                    app.selected_branch = Some(branch.clone());
+                    window.focus(&app.focus);
+                    cx.notify();
+                }
+            }))
+    }
+    /// Builds the compact branch panel with a native single-line name field and virtual branch rows.
+    fn branch_panel(&self, cx: &Context<Self>) -> gpui::Div {
+        let ready = !self.writing
+            && !self.scanning
+            && self.reviewed_operation.is_some()
+            && self
+                .operation
+                .as_ref()
+                .is_some_and(|snapshot| snapshot.state.is_none());
+        let mut panel = div().flex_1().min_h_0().flex().flex_col().child(
+            div()
+                .px_3()
+                .py_2()
+                .flex()
+                .flex_col()
+                .gap_2()
+                .child(div().h(px(40.)).child(self.branch_input.clone()))
+                .child(
+                    button("create-branch", self.t("create-branch"), false)
+                        .opacity(if ready { 1. } else { 0.5 })
+                        .on_click(cx.listener(|app, _, _, cx| app.create_branch(cx))),
+                ),
+        );
+        if let Some(snapshot) = &self.branches {
+            panel = panel.child(
+                uniform_list(
+                    "branches",
+                    snapshot.branches.len(),
+                    cx.processor(|app, range: std::ops::Range<usize>, _, cx| {
+                        range
+                            .map(|index| app.branch_row(index, cx))
+                            .collect::<Vec<_>>()
+                    }),
+                )
+                .flex_1()
+                .min_h_0()
+                .track_scroll(self.branch_scroll.clone()),
+            );
+        }
+        if let Some(branch) = &self.selected_branch {
+            let switch = branch.clone();
+            let merge = branch.clone();
+            let rebase = branch.clone();
+            panel = panel.child(
+                div()
+                    .p_3()
+                    .border_t_1()
+                    .border_color(rgb(LINE))
+                    .flex()
+                    .flex_col()
+                    .gap_2()
+                    .child(div().text_sm().text_ellipsis().child(branch.name.clone()))
+                    .child(
+                        div()
+                            .flex()
+                            .gap_1()
+                            .child(
+                                button("switch-branch", self.t("switch-branch"), false)
+                                    .opacity(if ready { 1. } else { 0.5 })
+                                    .on_click(cx.listener(move |app, _, _, cx| {
+                                        app.perform_operation(
+                                            OperationAction::Switch(switch.clone()),
+                                            cx,
+                                        )
+                                    })),
+                            )
+                            .child(
+                                button("merge-branch", self.t("merge-branch"), false)
+                                    .opacity(if ready { 1. } else { 0.5 })
+                                    .on_click(cx.listener(move |app, _, _, cx| {
+                                        app.perform_operation(
+                                            OperationAction::Merge(merge.clone()),
+                                            cx,
+                                        )
+                                    })),
+                            )
+                            .child(
+                                button("rebase-branch", self.t("rebase-branch"), false)
+                                    .opacity(if ready { 1. } else { 0.5 })
+                                    .on_click(cx.listener(move |app, _, _, cx| {
+                                        app.perform_operation(
+                                            OperationAction::Rebase(rebase.clone()),
+                                            cx,
+                                        )
+                                    })),
+                            ),
+                    ),
+            );
+        }
+        panel
+    }
+    /// Presents recovered operation progress and separate continue/abort/skip controls in the shared workspace.
+    fn operation_bar(&self, cx: &Context<Self>) -> Option<gpui::Div> {
+        let state = self.operation.as_ref()?.state.as_ref()?;
+        let ready = !self.writing && !self.scanning;
+        let unresolved = self
+            .view
+            .repository
+            .as_ref()
+            .is_some_and(|repo| repo.files.iter().any(|file| file.conflicted));
+        let supported = matches!(state.kind, Operation::Merge | Operation::Rebase);
+        let label = self.t(match state.kind {
+            Operation::Merge => "operation-merge",
+            Operation::Rebase => "operation-rebase",
+            Operation::Other => "operation-other",
+        });
+        let mut bar = div()
+            .px_3()
+            .py_2()
+            .flex()
+            .items_center()
+            .gap_2()
+            .bg(rgb(PANEL))
+            .border_b_1()
+            .border_color(rgb(LINE))
+            .child(div().text_sm().text_color(rgb(0xe2bb77)).child(label));
+        if let Some((current, total)) = state.progress {
+            bar = bar.child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(MUTED))
+                    .child(format!("{current}/{total}")),
+            );
+        }
+        if let Some(branch) = &state.original_branch {
+            bar = bar.child(
+                div()
+                    .text_sm()
+                    .min_w_0()
+                    .text_ellipsis()
+                    .child(branch.clone()),
+            );
+        }
+        bar = bar.child(div().flex_1());
+        if supported {
+            bar = bar
+                .child(
+                    button("continue-operation", self.t("continue-operation"), false)
+                        .opacity(if ready && !unresolved { 1. } else { 0.5 })
+                        .on_click(cx.listener(|app, _, _, cx| {
+                            app.perform_operation(OperationAction::Continue, cx)
+                        })),
+                )
+                .child(
+                    button("abort-operation", self.t("abort-operation"), false)
+                        .opacity(if ready { 1. } else { 0.5 })
+                        .on_click(cx.listener(|app, _, _, cx| {
+                            app.perform_operation(OperationAction::Abort, cx)
+                        })),
+                );
+            if state.kind == Operation::Rebase {
+                bar = bar.child(
+                    button("skip-operation", self.t("skip-operation"), false)
+                        .opacity(if ready { 1. } else { 0.5 })
+                        .on_click(cx.listener(|app, _, _, cx| {
+                            app.perform_operation(OperationAction::Skip, cx)
+                        })),
+                );
+            }
+        }
+        Some(bar)
     }
     /// Displays correctly labeled comparison sources and a virtual shared diff surface.
     fn diff_panel(&self, cx: &Context<Self>) -> gpui::Div {
@@ -1435,6 +2040,7 @@ impl Render for Hunkra {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.frames += 1;
         self.smoke_input(window, cx);
+        self.reviewed_operation = self.operation.clone();
         self.reviewed_commit = self
             .view
             .repository
@@ -1450,8 +2056,8 @@ impl Render for Hunkra {
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down));
         let mut toolbar = div()
-            .p_3()
-            .h(px(65.))
+            .px_3()
+            .h(px(42.))
             .flex_none()
             .flex()
             .items_center()
@@ -1460,7 +2066,7 @@ impl Render for Hunkra {
             .border_color(rgb(LINE))
             .child(
                 div()
-                    .text_xl()
+                    .text_sm()
                     .font_weight(gpui::FontWeight::BOLD)
                     .text_color(rgb(ACCENT))
                     .child("Hunkra"),
@@ -1525,6 +2131,9 @@ impl Render for Hunkra {
                     .text_color(rgb(0xf5b3a4))
                     .child(self.t(error)),
             );
+        }
+        if let Some(bar) = self.operation_bar(cx) {
+            content = content.child(bar);
         }
         if self.root.is_some() {
             content = content.child(
@@ -1613,19 +2222,61 @@ impl Render for Hunkra {
                 );
             }
         }
-        content.child(
-            div()
-                .h(px(30.))
-                .flex_none()
-                .px_4()
-                .flex()
-                .items_center()
-                .border_t_1()
-                .border_color(rgb(LINE))
-                .text_sm()
-                .text_color(rgb(MUTED))
-                .child(self.t("view-only")),
-        )
+        if self
+            .branch_created
+            .as_ref()
+            .is_some_and(|branch| branch.post_hook_failed || branch.reference_warning)
+        {
+            content = content.child(
+                div()
+                    .px_3()
+                    .py_2()
+                    .text_sm()
+                    .text_color(rgb(0xe2bb77))
+                    .child(self.t("branch-warning")),
+            );
+        }
+        let mut status = div()
+            .h(px(26.))
+            .flex_none()
+            .px_3()
+            .flex()
+            .items_center()
+            .gap_3()
+            .bg(rgb(PANEL))
+            .border_t_1()
+            .border_color(rgb(LINE))
+            .text_xs()
+            .text_color(rgb(MUTED));
+        if let Some(repo) = &self.view.repository {
+            status = status
+                .child(format!(
+                    "⑂ {}",
+                    repo.branch.clone().unwrap_or_else(|| self.t("detached"))
+                ))
+                .child(self.translator.count(repo.files.len()));
+        }
+        if let Some(branch) = &self.branch_created {
+            status = status.child(format!(
+                "{}: {}",
+                self.t("branch-created"),
+                branch.branch.name
+            ));
+        } else if let Some(operation) = &self.operation_written {
+            status = status.child(self.t(match operation.outcome {
+                OperationOutcome::Completed => "operation-completed",
+                OperationOutcome::StoppedWithConflicts => "operation-conflicts",
+                OperationOutcome::StoppedForReview => "operation-review",
+            }));
+        } else if self.writing || self.scanning {
+            status = status.child(self.t(if self.writing {
+                "write-busy"
+            } else {
+                "loading"
+            }));
+        }
+        status = status.child(div().flex_1()).child(self.t("view-only"));
+        content.child(status)
     }
 }
 
@@ -1646,6 +2297,10 @@ fn main() {
             smoke_options.refusal = true;
         } else if arg == "--smoke-commit" {
             smoke_options.commit = true;
+        } else if arg == "--smoke-operation" {
+            smoke_options.operation = args
+                .next()
+                .map(|value| value.to_string_lossy().into_owned());
         } else if arg == "--smoke-hook" {
             smoke_options.hook = true;
         } else {
