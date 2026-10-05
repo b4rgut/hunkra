@@ -1,0 +1,21 @@
+[workspace]
+git_only = true
+publish = false
+release_always = false
+semver_check = false
+
+[[package]]
+name = "hunkra"
+version_group = "hunkra-product"
+git_tag_name = "v{{ version }}"
+git_release_name = "Hunkra v{{ version }}"
+changelog_path = "CHANGELOG.md"
+changelog_include = ["hunkra-core"]
+
+[[package]]
+name = "hunkra-core"
+version_group = "hunkra-product"
+git_tag_name = "v{{ version }}"
+git_tag_enable = false
+git_release_enable = false
+changelog_update = false

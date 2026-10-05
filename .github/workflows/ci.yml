@@ -1,0 +1,28 @@
+name: CI
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  checks:
+    name: headless-and-ui
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev
+      - run: scripts/dev bootstrap --no-native
+      - run: scripts/dev check
+      - run: scripts/dev check-ui
+      - run: scripts/dev build-ui
+      - run: scripts/dev check-release
+      - name: Conventional PR title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: .tools/bin/cog verify "$PR_TITLE"

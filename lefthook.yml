@@ -1,0 +1,12 @@
+pre-commit:
+  commands:
+    fast:
+      run: scripts/dev check-fast
+commit-msg:
+  commands:
+    conventional:
+      run: .tools/bin/cog verify --file {1}
+pre-push:
+  commands:
+    headless:
+      run: scripts/dev check

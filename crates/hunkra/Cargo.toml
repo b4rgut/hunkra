@@ -1,0 +1,32 @@
+[package]
+name = "hunkra"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+default = []
+gui = ["dep:gpui"]
+
+[dependencies]
+hunkra-core = { path = "../hunkra-core", version = "=0.1.0" }
+fluent-bundle.workspace = true
+fluent-syntax.workspace = true
+unic-langid.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+gpui = { workspace = true, optional = true }
+
+[[bin]]
+name = "hunkra"
+path = "src/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "check-i18n"
+path = "src/bin/check-i18n.rs"
+
+[lints]
+workspace = true

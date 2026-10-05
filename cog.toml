@@ -1,0 +1,14 @@
+# Cocogitto validates messages only; release-plz exclusively owns version/changelog updates.
+ignore_merge_commits = true
+[commit_types]
+feat = { changelog_title = "feat" }
+fix = { changelog_title = "fix" }
+perf = { changelog_title = "perf" }
+refactor = { changelog_title = "refactor" }
+docs = { changelog_title = "docs" }
+test = { changelog_title = "test" }
+build = { changelog_title = "build" }
+ci = { changelog_title = "ci" }
+chore = { changelog_title = "chore" }
+style = { changelog_title = "style" }
+revert = { changelog_title = "revert" }

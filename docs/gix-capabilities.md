@@ -1,3 +1,17 @@
-# gix-first: реестр проверок
+# gix-first — проверено gix 0.88.0
 
-До реализации проверяются library API и реальные repo fixtures; отсутствие high-level command не оправдывает fallback. Ошибки gix не переводятся автоматически в Git CLI. Read/write routes должны проверяться тестами. В первом slice запись пользователем отсутствует; новые операции и их семантика записываются по мере реализации.
+Production core does not start Git subprocesses. Tests and demo generator use independent Git 2.55.0 only in disposable repos. User errors remain errors; no blanket fallback or second executor retry exists.
+
+Primary API source: https://docs.rs/gix/0.88.0/gix/struct.Repository.html ; downloaded crates.io source gix 0.88.0 and its official gix-* packages. Reproduction: `scripts/dev check` (crates/hunkra-core/tests/repository.rs).
+
+| Операция / точная семантика | Проверенный API | Поддержка / результат | Исполнитель / fallback |
+|---|---|---|---|
+| Discover working repository, canonical root, normal/unborn/detached and linked worktree; reject bare as missing worktree | gix::discover, Repository::workdir, head, Head::referent_name/is_unborn/id | Full for tested variants: unborn/new/delete, detached, linked and SHA-1/SHA-256 tests pass | gix; none |
+| Status HEAD→index and index→worktree; enumerate untracked files, ignored omitted, conflict stages and mode changes; no rename guessing | Repository::status(...).untracked_files(Files).tree_index_track_renames(Disabled).into_iter; index.entries/stage; state | Full for tested variants; file can have both flags. Read-only: Outcome::write_changes never called. Tests compare sources and exact index bytes | gix; none |
+| Stage-zero index blob and HEAD tree blob with mode/presence; absent side for add/delete/unborn | index_or_empty, entry_by_path_and_stage, find_header/find_object, head_tree.lookup_entry_by_path | Full for tested versions including SHA-256, Cyrillic/spaces, BOM, CRLF, no-final-newline. Blob size checked before loading; gitlinks presented unsupported | gix; none |
+| Worktree→Git representation (view only); attributes/clean conversion, symlink target itself | Repository::filter_pipeline(None), Pipeline::convert_to_git; bounded std::fs read; read_link | text/eol=crlf test passes; no worktree mutation. General custom process filters/working-tree-encoding exist at API but remain unverified fixtures; not claimed universal | gix pipeline + OS bytes; none |
+| Aligned text diff on selected file with newline tokens and histogram/slider heuristics | gix::diff::blob::{InternedInput,sources::lines,diff_with_slider_heuristics,Algorithm::Histogram}, Diff::hunks | Full for tested content reconstruction; own alignment combines +/- rows. No equal-hunk-shape requirement against Git. Binary/NUL, invalid UTF-8, >2MiB / >40k total lines / >16k byte line return explicit safe view | gix; none |
+| Detect externally started merge/rebase/other and nonzero index stages | Repository::state, index entries/stage | Merge conflict fixture passes; rebase demo prepared. Read-only notice; resolving/continue not implemented | gix; none |
+| Stage/unstage file/hunk/lines, Commit incl hooks/signing, branch/network/merge/rebase mutations | Not yet audited for application semantics | Pending HNK-007..011, not implicitly assigned to CLI | Executor undecided until required API tests; no fallback presently |
+
+Viewing retains source bytes; presentation strips newline for labels only and records CRLF/LF/EOF, with ∅ marker. Unsupported encodings have no lossy-edit path. Text clipping/scroll UX and performance measurements are separate UI tasks, not evidence of Git support. Locking/writing/credentials/hooks/signature scenarios are not certified by these read tests. Writes remain unavailable until their own capability/race/attribute tests pass.

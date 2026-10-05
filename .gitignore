@@ -1,0 +1,5 @@
+/target/
+/.tools/
+/.local-sysroot/
+/demo-repositories/
+*.log

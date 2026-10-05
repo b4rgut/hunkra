@@ -1,0 +1,31 @@
+# Intentionally manual until the owner configures HUNKRA_RELEASE_TOKEN and repository rules.
+name: Release control
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        type: choice
+        options: [release-pr, release]
+        required: true
+permissions:
+  contents: read
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: release
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: scripts/dev bootstrap --no-native
+      - run: scripts/dev check-release
+      - name: Owner-authorized release-plz operation
+        env:
+          GITHUB_TOKEN: ${{ secrets.HUNKRA_RELEASE_TOKEN }}
+          OPERATION: ${{ inputs.operation }}
+        run: |
+          test -n "$GITHUB_TOKEN"
+          .tools/bin/release-plz "$OPERATION" --config release-plz.toml
