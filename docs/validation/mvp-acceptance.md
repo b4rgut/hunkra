@@ -2,7 +2,7 @@
 
 HNK-015 remains in progress. This matrix checks the original full scope against actual evidence; it does not replace the requirements or certify untested desktop interactions.
 
-The latest reviewed Fedora44 RPM is built from clean source `ec25ff5988abf9bbcaf69bde701c943f8c300f86`. [Updated package checks](package-updated-check.json) verify repeat whole-RPM assembly, every payload file/dependency notice and all78 fixture-only native scenarios on its extracted optimized binary. Earlier reports retain their own source/binary identity. Local build/test evidence is separate from remote CI and publication.
+The latest reviewed Fedora44 RPM is built from clean source `efec339783a5daa76e62ed93cbc5aede5a2ffcda`. [Updated package checks](package-current-check.json) verify repeat whole-RPM assembly, every payload file/dependency notice and all78 fixture-only native scenarios on its extracted optimized binary. Earlier reports retain their own source/binary identity. Local build/test evidence is separate from remote CI and publication.
 
 | Requirement | Evidence | Acceptance boundary |
 |---|---|---|
@@ -21,4 +21,4 @@ The latest reviewed Fedora44 RPM is built from clean source `ec25ff5988abf9bbcaf
 | Reusable core/UI boundaries for future Zed host | [architecture](../architecture.md), exact local/upstream API audit; injected host history test | Actual Panel/Item/GitStore/host-buffer/remote adapters are HNK-101, outside MVP; NetworkView still constructs its standalone reader. |
 | Fedora artifact, git-only release-plz, hooks/shared checks | updated RPM checks/install report; actual disposable release-plz update/squash/tag-gate fixtures | HNK-014 implemented; real GitHub PR/token/protection/tag-trigger/artifact chain is unverified and forbidden in this run. Product license remains unselected. |
 
-Next independent acceptance work: update the clean optimized artifact after the bounded diff/opening source checkpoints, validate its actual native payload and installation, continue reviewing the prepared host boundaries. Unavailable physical desktop/remote release checks do not justify marking the whole MVP done.
+Next independent acceptance work: continue reviewing the prepared host boundaries and available UI acceptance. Fresh rootless Fedora44 installation with nodocs/rpm-V/source/notices/version/hash passes in package-current-install.json. Unavailable physical desktop/remote release checks do not justify marking the whole MVP done.
