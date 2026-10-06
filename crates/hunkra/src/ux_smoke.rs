@@ -150,7 +150,23 @@ impl Hunkra {
         } else if phase <= 4 {
             let generation = self.scan_generation;
             let diff_generation = self.view.diff_generation;
-            self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 2], cx);
+            if phase == 2 {
+                self.ux_key("ctrl-,", window, cx);
+            }
+            assert!(self.settings_open);
+            self.set_language(
+                settings::Language::explicit([Locale::En, Locale::Ru, Locale::RuDev][phase - 2]),
+                cx,
+            );
+            if phase == 3 {
+                self.toggle_diff_details(cx);
+                assert!(self.settings.diff_details);
+            } else if phase == 4 {
+                self.toggle_diff_details(cx);
+                assert!(!self.settings.diff_details);
+                self.ux_key("escape", window, cx);
+                assert!(!self.settings_open);
+            }
             assert_eq!(
                 (generation, diff_generation),
                 (self.scan_generation, self.view.diff_generation)

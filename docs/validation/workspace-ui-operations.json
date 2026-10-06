@@ -1,0 +1,343 @@
+{
+  "ok": true,
+  "oracle": "git version 2.55.0",
+  "runs": [
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "branch",
+      "write_backend": "gix",
+      "write_error": null,
+      "route": null,
+      "message_retained": true,
+      "branch_retained": false,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "68a29cc61b270af900a2f96427e29dead093ff6f",
+      "branch": "main",
+      "operation": null,
+      "progress": null,
+      "outcome": null,
+      "branch_created": "задача/интерфейс"
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "branch",
+      "write_backend": "gix",
+      "write_error": null,
+      "route": null,
+      "message_retained": true,
+      "branch_retained": false,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "e5aa27fa0640aed118bd6f86fb088086ab1953661b62fe5546b1e118eba53b13",
+      "branch": "main",
+      "operation": null,
+      "progress": null,
+      "outcome": null,
+      "branch_created": "задача/интерфейс"
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "branch-refusal",
+      "write_backend": null,
+      "write_error": "error-branch-exists",
+      "route": null,
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "c54b0466209c820a66db2a9246b38cdbad61f507",
+      "branch": "main",
+      "operation": null,
+      "progress": null,
+      "outcome": null,
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "switch",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "WorktreeSwitchCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "c6b3028234b9e5fc5b8a91d1a7e5868d579129e1",
+      "branch": "other",
+      "operation": null,
+      "progress": null,
+      "outcome": "Completed",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "close_deferred": true,
+      "writer_finished": true,
+      "write_backend": "git-cli",
+      "commit_id": null,
+      "message_cleared": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "merge",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "MergeRepositoryCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "cc8b011810a60fdb03e820ffa6d1b20f8a68b023",
+      "branch": "main",
+      "operation": null,
+      "progress": null,
+      "outcome": "Completed",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "action": "merge-hook",
+      "write_backend": null,
+      "write_error": "error-operation-execution",
+      "route": "MergeRepositoryCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "be14e4549ede223d2b41d259aa14bb0acf3b39c7",
+      "branch": "main",
+      "operation": "Merge",
+      "progress": null,
+      "outcome": null,
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "action": "merge",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "MergeRepositoryCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "c92aa54d4494a5922d26cb38f3b40a97baf782b6",
+      "branch": "main",
+      "operation": "Merge",
+      "progress": null,
+      "outcome": "StoppedWithConflicts",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "abort",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "MergeRepositoryCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "c92aa54d4494a5922d26cb38f3b40a97baf782b6",
+      "branch": "main",
+      "operation": null,
+      "progress": null,
+      "outcome": "Completed",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "action": "rebase",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "ad6954be68cd138e2fa27e10eca572d66bbfa7e7",
+      "branch": null,
+      "operation": "Rebase",
+      "progress": [
+        1,
+        2
+      ],
+      "outcome": "StoppedWithConflicts",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "action": "continue",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "f6a91e5843978a4b81af9e00a59899e6a634efc6",
+      "branch": null,
+      "operation": "Rebase",
+      "progress": [
+        2,
+        2
+      ],
+      "outcome": "StoppedWithConflicts",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "continue",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "5088fb94d97e7ad36aea5d7ef781a7a2cee2ccb7",
+      "branch": "topic",
+      "operation": null,
+      "progress": null,
+      "outcome": "Completed",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "action": "skip",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "acff3c8445516624082925df6ae2925f48b6c65a",
+      "branch": null,
+      "operation": "Rebase",
+      "progress": [
+        2,
+        2
+      ],
+      "outcome": "StoppedWithConflicts",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "skip",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "acff3c8445516624082925df6ae2925f48b6c65a",
+      "branch": "topic",
+      "operation": null,
+      "progress": null,
+      "outcome": "Completed",
+      "branch_created": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 11,
+      "action": "abort",
+      "write_backend": "git-cli",
+      "write_error": null,
+      "route": "RebaseSequencerCoordinator",
+      "message_retained": true,
+      "branch_retained": true,
+      "locales": [
+        "Branches",
+        "Ветки",
+        "Ветки"
+      ],
+      "head": "c1a9cd332c73c877c6567e89c1819547b04bc76b",
+      "branch": "topic",
+      "operation": null,
+      "progress": null,
+      "outcome": "Completed",
+      "branch_created": null
+    }
+  ],
+  "verified": [
+    "gix branch creation SHA-1/SHA-256",
+    "native Unicode name and message retention across three locales",
+    "branch refusal preserves input and cancels pending close",
+    "explicit CLI coordinator route/reason",
+    "switch/close waits for writer",
+    "merge two parents and actual tree",
+    "hook failure refreshes actual state without retry",
+    "merge conflict recovery/abort",
+    "two native rebase stops and separate continue",
+    "external rebase recovery/skip/abort"
+  ]
+}

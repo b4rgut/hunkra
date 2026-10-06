@@ -2,6 +2,130 @@
 use super::*;
 use gpui::TestAppContext;
 
+#[gpui::test]
+/// Exercises registered preferences clicks and shortcuts while keeping Git generations, diff identity and editable state unchanged.
+fn preferences_preserve_workspace_and_use_sidebar_layout(cx: &mut TestAppContext) {
+    let fixture = tempfile::tempdir().unwrap();
+    let root = repository(fixture.path(), "preferences");
+    let repository = hunkra_core::scan(&root).unwrap();
+    let diff = Arc::new(
+        hunkra_core::read_diff(&root, std::path::Path::new("f"), DiffKind::Unstaged).unwrap(),
+    );
+    let index = std::fs::read(root.join(".git/index")).ok();
+    let (app, cx) = cx.add_window_view(|window, cx| {
+        let mut app = host(cx);
+        app.root = Some(root.clone());
+        app.view.repository = Some(repository);
+        app.view.selected = Some("f".into());
+        app.view.diff = Some(diff.clone());
+        app.path_filter.rows = vec![0].into();
+        app.view.line_selection.added.insert(0);
+        app.message.update(cx, |editor, _| {
+            editor.buffer.reset("Сообщение🦀\r\nEOF".into());
+            editor.buffer.select(0, false);
+            editor.buffer.select(12, true);
+        });
+        window.focus(&app.focus);
+        app
+    });
+    cx.simulate_resize(size(px(1280.), px(820.)));
+    cx.run_until_parked();
+    let before = app.read_with(cx, |app, cx| {
+        let message = &app.message.read(cx).buffer;
+        (
+            app.scan_generation,
+            app.view.diff_generation,
+            message.text().to_owned(),
+            message.selection,
+            message.revision,
+        )
+    });
+    let sidebar = cx.debug_bounds("workspace-sidebar").unwrap();
+    let commit = cx.debug_bounds("commit-panel").unwrap();
+    let comparison = cx.debug_bounds("workspace-diff").unwrap();
+    assert_eq!(sidebar.size.width, px(workspace_ui::SIDEBAR_WIDTH));
+    assert!(sidebar.contains(&commit.origin));
+    assert!(commit.right() <= sidebar.right() && commit.bottom() <= sidebar.bottom());
+    assert!(comparison.origin.x >= sidebar.right());
+    assert!(comparison.size.height > px(650.));
+    cx.update(|window, cx| window.focus(&app.read(cx).filter_input.read(cx).focus_handle(cx)));
+    cx.run_until_parked();
+    let settings_button = cx.debug_bounds("settings-menu").unwrap();
+    cx.simulate_click(settings_button.center(), Default::default());
+    cx.run_until_parked();
+    assert!(app.read_with(cx, |app, _| app.settings_open));
+    app.read_with(cx, |app, cx| {
+        assert_eq!(
+            app.settings_focus.as_ref(),
+            Some(&app.filter_input.read(cx).focus_handle(cx))
+        )
+    });
+    assert!(cx.debug_bounds("preferences-panel").is_some());
+    for (selector, language, locale) in [
+        (
+            "language-setting-1",
+            settings::Language::RuDev,
+            Locale::RuDev,
+        ),
+        ("language-setting-2", settings::Language::Ru, Locale::Ru),
+        ("language-setting-3", settings::Language::En, Locale::En),
+        (
+            "language-setting-0",
+            settings::Language::System,
+            settings::system_locale(),
+        ),
+    ] {
+        let bounds = cx.debug_bounds(selector).unwrap();
+        cx.simulate_click(bounds.center(), Default::default());
+        cx.run_until_parked();
+        app.read_with(cx, |app, cx| {
+            assert!(app.settings_open);
+            assert_eq!(app.settings.locale, language);
+            assert_eq!(app.view.locale, locale);
+            assert_eq!(app.scan_generation, before.0);
+            assert_eq!(app.view.diff_generation, before.1);
+            assert!(Arc::ptr_eq(app.view.diff.as_ref().unwrap(), &diff));
+            assert!(app.view.line_selection.added.contains(&0));
+            let message = &app.message.read(cx).buffer;
+            assert_eq!(
+                (message.text(), message.selection, message.revision),
+                (before.2.as_str(), before.3, before.4)
+            );
+        });
+    }
+    let bounds = cx.debug_bounds("diff-details-setting").unwrap();
+    cx.simulate_click(bounds.center(), Default::default());
+    cx.run_until_parked();
+    assert!(app.read_with(cx, |app, _| app.settings.diff_details));
+    cx.simulate_keystrokes("ctrl-enter");
+    assert!(!app.read_with(cx, |app, _| app.writing));
+    cx.simulate_keystrokes("escape");
+    assert!(!app.read_with(cx, |app, _| app.settings_open));
+    assert!(cx.update(|window, cx| {
+        app.read(cx)
+            .filter_input
+            .read(cx)
+            .focus_handle(cx)
+            .is_focused(window)
+    }));
+    cx.simulate_keystrokes("ctrl-,");
+    assert!(app.read_with(cx, |app, _| app.settings_open));
+    cx.simulate_keystrokes("ctrl-,");
+    assert!(!app.read_with(cx, |app, _| app.settings_open));
+    cx.simulate_keystrokes("ctrl-,");
+    app.update(cx, |app, _| app.writing = true);
+    cx.run_until_parked();
+    let close = cx.debug_bounds("window-close").unwrap();
+    cx.simulate_click(close.center(), Default::default());
+    assert!(app.read_with(cx, |app, _| app.close_requested && !app.settings_open));
+    app.update(cx, |app, _| {
+        app.writing = false;
+        app.close_requested = false;
+    });
+    assert_eq!(std::fs::read(root.join("f")).unwrap(), b"worktree\r\nEOF");
+    assert_eq!(std::fs::read(root.join(".git/index")).ok(), index);
+}
+
 /// Creates the real host without periodic timers or writes to even the shared isolated test settings directory.
 fn host(cx: &mut Context<Hunkra>) -> Hunkra {
     let mut app = Hunkra::new(None, None, SmokeOptions::default(), cx);

@@ -30,7 +30,7 @@ impl HorizontalDiff {
     }
     /// Handles trackpad horizontal deltas and Shift+wheel before the list; ordinary vertical wheel remains available to virtualization.
     pub fn wheel(&self, event: &ScrollWheelEvent) -> bool {
-        let delta = event.delta.pixel_delta(px(25.));
+        let delta = event.delta.pixel_delta(px(20.));
         let horizontal = if event.modifiers.shift {
             if delta.x == px(0.) { delta.y } else { delta.x }
         } else {

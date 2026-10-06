@@ -1,9 +1,14 @@
-//! Owned compact dark palette shared by the shell and native inputs, with Zed as the visual reference.
-pub const BACKGROUND: u32 = 0x252a32;
-pub const PANEL: u32 = 0x2d323b;
-pub const BORDER: u32 = 0x3b424c;
-pub const TEXT: u32 = 0xd6dbe2;
-pub const MUTED: u32 = 0x9da5b3;
-pub const ACCENT: u32 = 0x77a9df;
-pub const SELECTED: u32 = 0x394250;
-pub const HOVER: u32 = 0x353c47;
+//! GitHub Dark palette shared by the owned workspace, diff views and native inputs.
+pub const BACKGROUND: u32 = 0x0d1117;
+pub const PANEL: u32 = 0x010409;
+pub const ELEVATED: u32 = 0x161b22;
+pub const BORDER: u32 = 0x30363d;
+pub const TEXT: u32 = 0xe6edf3;
+pub const MUTED: u32 = 0x8b949e;
+pub const ACCENT: u32 = 0x58a6ff;
+pub const SELECTED: u32 = 0x1f2c3e;
+pub const HOVER: u32 = 0x161b22;
+pub const ADDED: u32 = 0x3fb950;
+pub const REMOVED: u32 = 0xf85149;
+pub const ADDED_BACKGROUND: u32 = 0x12261e;
+pub const REMOVED_BACKGROUND: u32 = 0x301a20;

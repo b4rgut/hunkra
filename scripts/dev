@@ -30,6 +30,7 @@ case "$command" in
   smoke-ux) python3 scripts/ux-smoke.py "$@" ;;
   smoke-load) python3 scripts/load-smoke.py "$@" ;;
   smoke-editor) python3 scripts/editor-smoke.py "$@" ;;
+  smoke-window) python3 scripts/window-smoke.py "$@" ;;
   measure) cargo build -p hunkra --bin measure --locked; python3 scripts/measure.py "$@" ;;
   package-rpm) cargo build -p hunkra --features gui --locked --release --bin hunkra; python3 scripts/package.py --output "$@" ;;
   check-package) python3 scripts/package-check.py "$@" ;;

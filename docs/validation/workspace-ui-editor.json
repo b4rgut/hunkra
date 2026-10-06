@@ -1,0 +1,76 @@
+{
+  "ok": true,
+  "native_display": true,
+  "scenario": "editor-layout",
+  "frames": 32,
+  "locales": [
+    "Changes",
+    "Изменения",
+    "Изменения"
+  ],
+  "giant_line_bytes": 32768,
+  "newline_document_bytes": 2097152,
+  "text_retained": true,
+  "notice_has_no_source_coordinates": true,
+  "replacement_undo_redo": true,
+  "large_result_bytes": 1599833,
+  "stable_result_phases": 16,
+  "marker_summary_before": {
+    "requests": 9,
+    "parser": {
+      "count": 5,
+      "mean_ms": 0.11857480000000001,
+      "max_ms": 0.31314400000000003
+    },
+    "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+  },
+  "marker_summary": {
+    "requests": 26,
+    "parser": {
+      "count": 6,
+      "mean_ms": 0.33556233333333335,
+      "max_ms": 1.4205
+    },
+    "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+  },
+  "grapheme_navigation": {
+    "text_bytes": 1599833,
+    "handler_calls": 32,
+    "total_ms": 0.0038959999999999997,
+    "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+  },
+  "utf16_queries": {
+    "text_bytes": 1599833,
+    "first_selection_query_ms": 0.862493,
+    "repeated_pairs": 32,
+    "repeated_selection_and_text_ms": 0.018984,
+    "scope": "actual native UTF-16 input-query callback CPU-code wall time at EOF; first request after text revision and unchanged repeated requests separated; text/selection restored; painting/scheduling/GPU excluded"
+  },
+  "word_run_navigation": {
+    "samples": [
+      {
+        "sample": "regional_flags",
+        "text_bytes": 16000,
+        "handler_calls": 32,
+        "total_ms": 3.520384
+      },
+      {
+        "sample": "cyrillic_letters",
+        "text_bytes": 16000,
+        "handler_calls": 32,
+        "total_ms": 8.442603
+      }
+    ],
+    "scope": "actual native Ctrl Left/Right handler CPU-code wall time on complete 16k-byte Unicode runs; replacement/painting/scheduling/GPU excluded; temporary samples are replaced before rendering final Result"
+  },
+  "word_navigation_preserves_graphemes_and_revision": true,
+  "multiple_click_selection_preserves_text_revision": true,
+  "wheel_preserves_text_cursor_and_revision": true,
+  "explicit_home_restores_source_coordinates": true,
+  "page_navigation_preserves_text_revision": true,
+  "page_selection_and_source_coordinates": true,
+  "read_only": true,
+  "scope": "actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+  "stable_marker_summary_parses": 1,
+  "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant"
+}

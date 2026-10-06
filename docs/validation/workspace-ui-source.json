@@ -1,0 +1,91 @@
+{
+  "date": "2026-10-06",
+  "timezone": "Europe/Moscow",
+  "base_head": "895e6515e612ab0b5705b86d82fe03880ad514d1",
+  "binary": "/home/akalsin/Documents/Projects/hunkra/target/release/hunkra",
+  "binary_sha256": "ce41770ff346e6b4bcfad534a2c44cde522e213be660af5b5be519eb2ba2171d",
+  "binary_bytes": 39575752,
+  "version": "Hunkra 0.1.0",
+  "profile": "release",
+  "development_binary_sha256": "7b1ccf91a74bc0c97bb37d24b560661e04e6f0042bc2050e42fb8a2c882c4e27",
+  "source_sha256": {
+    "crates/hunkra/src/main.rs": "fbc263dfb63bbf988d1968c75522ee21c8e24cc2260d360cadb90e7234fb7a9e",
+    "crates/hunkra/src/workspace_ui.rs": "96b362b558caab58a63fcde86cc453345b07e1c6b2b1df70fbd2a63e85b15705",
+    "crates/hunkra/src/settings.rs": "9c1591e14a16450f72426e7aeb81edb32033a44ed0a0db986ecf56aae9dd2e06",
+    "crates/hunkra/src/theme.rs": "1d627b56af1fab1e083f7fb99e9b0bfba5b5bb52ebdf5273a2a12e30f6633db8",
+    "crates/hunkra/src/history_view.rs": "7b05e4fba5fb8988393f4943d9c87c5ba822b4e80e42885da417dde7d2468699",
+    "crates/hunkra/src/horizontal_diff.rs": "0fa3f16d3e06d116855e73368f44597fad98a9b2983abf15a538f551babcbb9d",
+    "crates/hunkra/src/ux_smoke.rs": "c802633196443a4bdb046fb7e013407609bc1de667ea5237f9cb489ee1e67571",
+    "crates/hunkra/src/opening_tests.rs": "d8e8be9ae033e82c4d6cbdc95059d0a8ab43774dc39911c1f0097c269522371e",
+    "crates/hunkra/locales/en.ftl": "dd4435d052d499f0de29ca4430831fc5f448389b8408b64ea73d7157e3a81765",
+    "crates/hunkra/locales/ru.ftl": "7ff4570522da398bad34587873d9671282e4c36ed4d4e29d0c8c2c7bf6406c14",
+    "crates/hunkra/locales/ru-dev.ftl": "2533de276d7d8337cc02379ff971102bdd7661deffe8207db2f1a93f9bd5b443",
+    "scripts/dev": "8be3543a3f5924dfea60e0bc0c4aa300a24b875e7a153dda8bdd6412d406f354",
+    "scripts/window-smoke.py": "85b87164e047a130aaa6cb7adca13e2258b5ba2b77cd7e7cffd505d2fa6c1fd0",
+    "Cargo.toml": "ff59e2b14c3c52273f6d6d4d59f6da72cb13eaaca56b2d3cc6068ff7dd41d119",
+    "Cargo.lock": "3f74a144fe2f83adc38c99c87d52bd2acdd0b3348de56ce88e9e6db08acd74e9"
+  },
+  "reference_image_sha256": "f0876c5d492fb58f043825859b33a7f09792a51f3c0c78395e59e1a343ec20f4",
+  "checks": {
+    "check": true,
+    "check_ui": true,
+    "check_editor": true,
+    "build_ui": true,
+    "build_ui_release": true,
+    "headless_tests": 145,
+    "core_tests": 109,
+    "app_headless_tests": 36,
+    "gui_tests": 56,
+    "gui_lib_tests": 50,
+    "gui_host_tests": 6,
+    "native_cases": 81
+  },
+  "native_reports": {
+    "ux": {
+      "file": "workspace-ui-ux.json",
+      "cases": 3,
+      "sha256": "a446af6e71853fc6e778509f78e23c432ff91b8578037f9de686da47dd616e2e"
+    },
+    "staging": {
+      "file": "workspace-ui-staging.json",
+      "cases": 6,
+      "sha256": "e567c85bab156b6ae2530ba3f952b133eb639d750ddbeed649859221eb80b81e"
+    },
+    "history": {
+      "file": "workspace-ui-history.json",
+      "cases": 12,
+      "sha256": "8216d1f9ed023e01e6340852b540804c2407d6523a974ba1d89cf443404e6ab6"
+    },
+    "conflicts": {
+      "file": "workspace-ui-conflicts.json",
+      "cases": 17,
+      "sha256": "ce31fc4504f6ad8e274afca231e7ee3bae99fca2f54514f2d1145daf3a40c71d"
+    },
+    "operations": {
+      "file": "workspace-ui-operations.json",
+      "cases": 15,
+      "sha256": "11af65210bac7434633b072038fb774539419dcdc985528aab4ddae4a2fe453b"
+    },
+    "network": {
+      "file": "workspace-ui-network.json",
+      "cases": 19,
+      "sha256": "f62a60e8b944371c56de81d9db863bfdb92333df42cc118a806f91ed336fb017"
+    },
+    "load": {
+      "file": "workspace-ui-load.json",
+      "cases": 7,
+      "sha256": "8ed697ca0e17ef8079377ae6e8e2f0bfb0350e494ea9b5c939b541c9ce52c1f3"
+    },
+    "editor": {
+      "file": "workspace-ui-editor.json",
+      "cases": 1,
+      "sha256": "50c93a4544adc8aeb2ef88e8c9e028502325a6ab23f44c566e8eb3f506734b07"
+    },
+    "window": {
+      "file": "workspace-ui-window.json",
+      "cases": 1,
+      "sha256": "665c0597e164d17935d3585e69023b15299d43ae48c637686c44f4262c916343"
+    }
+  },
+  "scope": "Functional optimized native Wayland plus registered isolated GPUI dispatch/layout; compositor maximize/restore acknowledged and minimize dispatched, no minimized appearance/pixel/physical desktop QA, no new RPM install."
+}

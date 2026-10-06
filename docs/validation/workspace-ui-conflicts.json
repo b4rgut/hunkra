@@ -1,0 +1,303 @@
+{
+  "ok": true,
+  "fixture_only": true,
+  "physical_input_claim": false,
+  "runs": [
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-save",
+      "writer_backend": "filesystem",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 20,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-resolve",
+      "writer_backend": "gix",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": true
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-save",
+      "writer_backend": "filesystem",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 20,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-resolve",
+      "writer_backend": "gix",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": true
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-refusal",
+      "writer_backend": null,
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "close_deferred": true,
+      "writer_finished": true,
+      "write_backend": "filesystem",
+      "commit_id": null,
+      "message_cleared": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-stale",
+      "writer_backend": null,
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 13,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-delete-cancel",
+      "writer_backend": null,
+      "dirty_confirmation": true,
+      "delete_confirmation": true,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 12,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-save-navigate",
+      "writer_backend": "filesystem",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 28,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-restage-continue",
+      "writer_backend": "git-cli",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 20,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-resolve",
+      "writer_backend": "gix",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 13,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-external",
+      "writer_backend": "gix",
+      "dirty_confirmation": false,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 13,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-external",
+      "writer_backend": "gix",
+      "dirty_confirmation": false,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 20,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-delete-resolve",
+      "writer_backend": "gix",
+      "dirty_confirmation": true,
+      "delete_confirmation": true,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 20,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-delete-resolve",
+      "writer_backend": "gix",
+      "dirty_confirmation": true,
+      "delete_confirmation": true,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 23,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-continue",
+      "writer_backend": "git-cli",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "f кириллица.txt",
+      "second_edit": false
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 22,
+      "locales": [
+        "Result",
+        "Результат",
+        "Result"
+      ],
+      "scenario": "conflict-continue",
+      "writer_backend": "git-cli",
+      "dirty_confirmation": true,
+      "delete_confirmation": false,
+      "draft_retained": true,
+      "close_cancelled": true,
+      "saved_file": "g",
+      "second_edit": false
+    }
+  ]
+}

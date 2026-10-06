@@ -5,6 +5,7 @@ mod network_smoke;
 #[cfg(all(test, feature = "gui-tests"))]
 mod opening_tests;
 mod ux_smoke;
+mod workspace_ui;
 use gpui::{
     App, Application, Bounds, Context, Entity, EntityInputHandler, FocusHandle, Focusable,
     KeyDownEvent, Keystroke, PathPromptOptions, ScrollStrategy, SharedString, Subscription, Task,
@@ -193,6 +194,9 @@ struct Hunkra {
     view: ViewState,
     translator: Translator,
     settings: Settings,
+    settings_open: bool,
+    settings_focus: Option<FocusHandle>,
+    menu_open: bool,
     status_worker: LatestWorker<PathBuf, Result<StatusRead, CoreError>>,
     diff_worker: LatestWorker<DiffQuery, Result<DiffRead, CoreError>>,
     settings_worker: LatestWorker<Settings, std::io::Result<()>>,
@@ -359,7 +363,7 @@ impl Hunkra {
         cx: &mut Context<Self>,
     ) -> Self {
         let settings = settings::load();
-        let locale = settings.locale;
+        let locale = settings.locale.resolve();
         let translator = Translator::new(locale);
         let message = cx.new(|cx| {
             NativeEditor::new(
@@ -467,6 +471,9 @@ impl Hunkra {
             committed: None,
             reviewed_commit: None,
             settings,
+            settings_open: false,
+            settings_focus: None,
+            menu_open: false,
             status_worker: LatestWorker::new("hunkra-status", |root: PathBuf| read_status(&root)),
             diff_worker: LatestWorker::with_state(
                 "hunkra-diff",
@@ -840,6 +847,10 @@ impl Hunkra {
     }
     /// Switches a profile without issuing repository requests or replacing diff state.
     fn set_locale(&mut self, locale: Locale, cx: &mut Context<Self>) {
+        self.set_language(settings::Language::explicit(locale), cx);
+    }
+    /// Updates translated labels and placeholders without altering language preference or repository work.
+    fn apply_locale(&mut self, locale: Locale, cx: &mut Context<Self>) {
         self.view.switch_locale(locale);
         self.translator = Translator::new(locale);
         if let Some(conflict) = &self.conflict {
@@ -872,10 +883,6 @@ impl Hunkra {
                 editor.preview_notice = notice.clone().into();
                 cx.notify();
             });
-        }
-        self.settings.locale = locale;
-        if self.smoke.is_none() {
-            self.settings_worker.submit(0, self.settings.clone());
         }
         cx.notify();
     }
@@ -1835,6 +1842,23 @@ impl Hunkra {
             }
             return;
         }
+        if event.keystroke.modifiers.control && key == "," {
+            self.toggle_settings(window, cx);
+            cx.stop_propagation();
+            return;
+        }
+        if self.settings_open || self.menu_open {
+            if key == "escape" {
+                if self.settings_open {
+                    self.toggle_settings(window, cx);
+                } else {
+                    self.menu_open = false;
+                    cx.notify();
+                }
+            }
+            cx.stop_propagation();
+            return;
+        }
         if event.keystroke.modifiers.control && key == "r" {
             self.recent_open = !self.recent_open;
             window.focus(&self.focus);
@@ -1994,6 +2018,25 @@ impl Hunkra {
     }
     /// Runs a native scripted render scenario, with a finite timeout and isolated settings.
     fn smoke_tick(&mut self, cx: &mut Context<Self>) {
+        if let Some(smoke) = self
+            .smoke
+            .as_ref()
+            .filter(|smoke| smoke.operation.as_deref() == Some("window-controls"))
+        {
+            assert!(
+                smoke.started.elapsed() < Duration::from_secs(15),
+                "window control deadline at phase {}",
+                smoke.phase
+            );
+            if smoke.phase == 3 {
+                let report = serde_json::json!({"ok":true,"native_display":true,"maximized_acknowledged":true,"restored_acknowledged":true,"minimize_dispatched":true,"frames":self.frames,"read_only":true});
+                std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
+                cx.quit();
+            } else {
+                cx.notify();
+            }
+            return;
+        }
         if self.pending_open.is_some() {
             cx.notify();
             return;
@@ -3027,8 +3070,8 @@ impl Hunkra {
         };
         div()
             .id(("file", index))
-            .h(px(30.))
-            .px_3()
+            .h(px(26.))
+            .px_2()
             .flex()
             .items_center()
             .gap_2()
@@ -3068,11 +3111,12 @@ impl Hunkra {
         let row = &self.view.diff.as_ref().unwrap().rows[index];
         div()
             .id(("diff", index))
-            .h(px(25.))
+            .h(px(20.))
             .flex()
             .w_full()
             .overflow_hidden()
             .child(self.diff_cell(&row.left, row, true, index, window, cx))
+            .child(div().w(px(1.)).flex_none().h_full().bg(rgb(LINE)))
             .child(self.diff_cell(&row.right, row, false, index, window, cx))
             .on_scroll_wheel(cx.listener(|app, event, _, cx| {
                 if app.horizontal.wheel(event) {
@@ -3136,12 +3180,24 @@ impl Hunkra {
             .font_family("DejaVu Sans Mono")
             .text_size(px(12.))
             .gap_2()
-            .border_r_1()
-            .border_color(rgb(LINE))
+            .border_l_2()
+            .border_color(rgb(if changed {
+                if left {
+                    hunkra::theme::REMOVED
+                } else {
+                    hunkra::theme::ADDED
+                }
+            } else {
+                BG
+            }))
             .bg(rgb(if selected {
                 SELECTED
             } else if changed {
-                if left { 0x3a2d36 } else { 0x2b3834 }
+                if left {
+                    hunkra::theme::REMOVED_BACKGROUND
+                } else {
+                    hunkra::theme::ADDED_BACKGROUND
+                }
             } else {
                 BG
             }))
@@ -3157,7 +3213,11 @@ impl Hunkra {
                 div()
                     .w(px(12.))
                     .flex_none()
-                    .text_color(rgb(if left { 0xf29d9d } else { ACCENT }))
+                    .text_color(rgb(if left {
+                        hunkra::theme::REMOVED
+                    } else {
+                        hunkra::theme::ADDED
+                    }))
                     .child(marker),
             )
             .child(self.horizontal.text(
@@ -3172,7 +3232,9 @@ impl Hunkra {
     /// Builds the standalone sidebar, while lazily rendering only visible file rows.
     fn sidebar(&self, cx: &Context<Self>) -> gpui::Div {
         let mut sidebar = div()
-            .w(px(280.))
+            .debug_selector(|| "workspace-sidebar".into())
+            .w(px(workspace_ui::SIDEBAR_WIDTH))
+            .min_h_0()
             .flex_none()
             .flex()
             .flex_col()
@@ -3180,50 +3242,18 @@ impl Hunkra {
             .border_r_1()
             .border_color(rgb(LINE));
         if self.branch_tab {
-            return sidebar.child(self.branch_panel(cx));
+            return sidebar
+                .child(self.branch_panel(cx))
+                .child(self.commit_panel(cx));
         }
         let mut info = div()
-            .p_3()
+            .px_2()
+            .py_1()
             .flex()
             .flex_col()
-            .gap_2()
+            .gap_1()
             .border_b_1()
             .border_color(rgb(LINE));
-        if let Some(repo) = &self.view.repository {
-            info = info.child(
-                div()
-                    .text_sm()
-                    .text_color(rgb(MUTED))
-                    .child(repo.root.to_string_lossy().into_owned()),
-            );
-            let branch = repo.branch.clone().unwrap_or_else(|| self.t("detached"));
-            info = info.child(div().text_color(rgb(ACCENT)).child(format!("⑂  {branch}")));
-            if repo.unborn {
-                info = info.child(
-                    div()
-                        .text_sm()
-                        .text_color(rgb(MUTED))
-                        .child(self.t("unborn")),
-                );
-            }
-            if let Some(operation) = repo.operation {
-                info = info.child(div().text_sm().text_color(rgb(0xe1be86)).child(self.t(
-                    match operation {
-                        Operation::Merge => "operation-merge",
-                        Operation::Rebase => "operation-rebase",
-                        Operation::Other => "operation-other",
-                    },
-                )));
-            }
-            info = info.child(
-                div()
-                    .text_sm()
-                    .text_color(rgb(MUTED))
-                    .child(self.translator.count(repo.files.len())),
-            );
-        } else {
-            info = info.child(self.t(if self.scanning { "loading" } else { "changes" }));
-        }
         info = info.child(div().text_xs().text_color(rgb(MUTED)).child(format!(
             "{}  /  {}",
             self.t("staged"),
@@ -3276,23 +3306,29 @@ impl Hunkra {
             );
         } else {
             sidebar = sidebar.child(
-                div().p_4().text_sm().text_color(rgb(MUTED)).child(
-                    self.t(if self.path_filter.loading {
-                        "filter-loading"
-                    } else if self
-                        .view
-                        .repository
-                        .as_ref()
-                        .is_some_and(|repo| !repo.files.is_empty())
-                    {
-                        "filter-empty"
-                    } else {
-                        "empty"
-                    }),
-                ),
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .p_4()
+                    .text_sm()
+                    .text_color(rgb(MUTED))
+                    .child(
+                        self.t(if self.path_filter.loading {
+                            "filter-loading"
+                        } else if self
+                            .view
+                            .repository
+                            .as_ref()
+                            .is_some_and(|repo| !repo.files.is_empty())
+                        {
+                            "filter-empty"
+                        } else {
+                            "empty"
+                        }),
+                    ),
             );
         }
-        sidebar
+        sidebar.child(self.commit_panel(cx))
     }
     /// Renders a local branch selection separately from the explicit switch/merge/rebase actions.
     fn branch_row(&self, index: usize, cx: &Context<Self>) -> gpui::Stateful<gpui::Div> {
@@ -3520,9 +3556,18 @@ impl Hunkra {
         {
             return div().flex_1().min_h_0().min_w_0().child(conflict.clone());
         }
-        let mut panel = div().flex_1().min_w_0().flex().flex_col().overflow_hidden();
+        let mut panel = div()
+            .debug_selector(|| "workspace-diff".into())
+            .flex_1()
+            .min_w_0()
+            .min_h_0()
+            .flex()
+            .flex_col()
+            .overflow_hidden();
         let header = div()
-            .p_3()
+            .px_3()
+            .h(px(34.))
+            .flex_none()
             .flex()
             .items_center()
             .justify_between()
@@ -3574,7 +3619,8 @@ impl Hunkra {
         panel = panel.child(
             div()
                 .px_3()
-                .py_2()
+                .h(px(34.))
+                .flex_none()
                 .flex()
                 .gap_2()
                 .items_center()
@@ -3629,25 +3675,43 @@ impl Hunkra {
                             app.write_index(Selection::File, cx);
                         }
                     })),
+                )
+                .child(div().flex_1())
+                .child(
+                    button("previous", "↑".into(), false)
+                        .on_click(cx.listener(|app, _, _, cx| app.move_hunk(false, cx))),
+                )
+                .child(
+                    button("next", "↓".into(), false)
+                        .on_click(cx.listener(|app, _, _, cx| app.move_hunk(true, cx))),
+                )
+                .child(
+                    button(
+                        "diff-details-toggle",
+                        "ⓘ".into(),
+                        self.settings.diff_details,
+                    )
+                    .on_click(cx.listener(|app, _, _, cx| app.toggle_diff_details(cx))),
                 ),
         );
         let labels =
             div()
-                .h(px(34.))
+                .h(px(26.))
+                .flex_none()
                 .flex()
                 .bg(rgb(PANEL))
                 .border_b_1()
                 .border_color(rgb(LINE))
                 .text_sm()
                 .text_color(rgb(MUTED))
-                .child(div().flex_1().px_4().py_2().child(self.t(
+                .child(div().flex_1().px_3().py_1().child(self.t(
                     if self.mode == DiffKind::Staged {
                         "head"
                     } else {
                         "index"
                     },
                 )))
-                .child(div().flex_1().px_4().py_2().child(self.t(
+                .child(div().flex_1().px_3().py_1().child(self.t(
                     if self.mode == DiffKind::Staged {
                         "index"
                     } else {
@@ -3724,11 +3788,15 @@ impl Hunkra {
                 .items_center()
                 .gap_3()
                 .child(
-                    button("previous", format!("↑  {}", self.t("previous-hunk")), false)
-                        .on_click(cx.listener(|app, _, _, cx| app.move_hunk(false, cx))),
+                    button(
+                        "previous-detail",
+                        format!("↑  {}", self.t("previous-hunk")),
+                        false,
+                    )
+                    .on_click(cx.listener(|app, _, _, cx| app.move_hunk(false, cx))),
                 )
                 .child(
-                    button("next", format!("↓  {}", self.t("next-hunk")), false)
+                    button("next-detail", format!("↓  {}", self.t("next-hunk")), false)
                         .on_click(cx.listener(|app, _, _, cx| app.move_hunk(true, cx))),
                 )
                 .child(format!(
@@ -3773,7 +3841,10 @@ impl Hunkra {
                     ),
                 ),
         );
-        panel.child(footer.child(self.t("select-lines")))
+        if self.settings.diff_details || diff.rows.is_empty() {
+            panel = panel.child(footer.child(self.t("select-lines")));
+        }
+        panel
     }
 }
 
@@ -3786,6 +3857,7 @@ impl Render for Hunkra {
             window.focus(&self.focus);
         }
         self.frames += 1;
+        self.smoke_window_input(window, cx);
         self.smoke_input(window, cx);
         self.smoke_editor_layout_input(window, cx);
         self.smoke_ux_input(window, cx);
@@ -3804,96 +3876,7 @@ impl Render for Hunkra {
             .font_family("DejaVu Sans")
             .track_focus(&self.focus)
             .on_key_down(cx.listener(Self::key_down));
-        let mut toolbar = div()
-            .px_3()
-            .h(px(42.))
-            .flex_none()
-            .flex()
-            .items_center()
-            .gap_3()
-            .border_b_1()
-            .border_color(rgb(LINE))
-            .child(
-                div()
-                    .text_sm()
-                    .font_weight(gpui::FontWeight::BOLD)
-                    .text_color(rgb(ACCENT))
-                    .child("Hunkra"),
-            )
-            .child(
-                button("open", self.t("open"), false)
-                    .on_click(cx.listener(|app, _, _, cx| app.choose_repository(cx))),
-            )
-            .child(
-                button("new-repository", self.t("network-init"), false).on_click(cx.listener(
-                    |app, _, window, cx| {
-                        app.show_creation(NetworkPage::Init, cx);
-                        app.focus_tab(window, cx);
-                    },
-                )),
-            )
-            .child(
-                button("clone-repository", self.t("network-clone"), false).on_click(cx.listener(
-                    |app, _, window, cx| {
-                        app.show_creation(NetworkPage::Clone, cx);
-                        app.focus_tab(window, cx);
-                    },
-                )),
-            )
-            .child(
-                button(
-                    "refresh",
-                    self.t(if self.scanning { "loading" } else { "refresh" }),
-                    false,
-                )
-                .on_click(cx.listener(|app, _, _, cx| app.refresh_visible(cx))),
-            )
-            .child(
-                button(
-                    "commit",
-                    self.t(if self.writing { "write-busy" } else { "commit" }),
-                    false,
-                )
-                .opacity(
-                    if self.writing
-                        || self.scanning
-                        || self.diff_loading
-                        || self.reviewed_commit.is_none()
-                        || self.history_tab
-                        || self.network_tab
-                        || self.confirmation.is_some()
-                    {
-                        0.5
-                    } else {
-                        1.
-                    },
-                )
-                .on_click(cx.listener(|app, _, _, cx| app.commit(cx))),
-            )
-            .child(div().flex_1());
-        for (index, locale) in [Locale::En, Locale::Ru, Locale::RuDev]
-            .into_iter()
-            .enumerate()
-        {
-            toolbar = toolbar.child(
-                button(
-                    ("locale", index),
-                    locale.label().to_owned(),
-                    self.view.locale == locale,
-                )
-                .on_click(cx.listener(move |app, _, _, cx| app.set_locale(locale, cx))),
-            );
-        }
-        toolbar = toolbar.child(
-            button("recent-menu", self.t("recent"), self.recent_open).on_click(cx.listener(
-                |app, _, window, cx| {
-                    app.recent_open = !app.recent_open;
-                    window.focus(&app.focus);
-                    cx.notify();
-                },
-            )),
-        );
-        content = content.child(toolbar);
+        content = content.child(self.workspace_titlebar(window, cx));
         if self.recent_open {
             content = content.child(self.recent_panel(cx));
         }
@@ -3913,36 +3896,7 @@ impl Render for Hunkra {
             content = content.child(bar);
         }
         if self.root.is_some() {
-            let mut tabs = div()
-                .h(px(36.))
-                .flex_none()
-                .px_2()
-                .flex()
-                .items_center()
-                .gap_1()
-                .bg(rgb(PANEL))
-                .border_b_1()
-                .border_color(rgb(LINE));
-            for (index, key) in ["changes", "branches", "history", "network"]
-                .into_iter()
-                .enumerate()
-            {
-                let active = match index {
-                    0 => !self.history_tab && !self.branch_tab && !self.network_tab,
-                    1 => !self.history_tab && self.branch_tab,
-                    2 => self.history_tab,
-                    _ => self.network_tab,
-                };
-                tabs = tabs.child(
-                    button(("workspace-tab", index), self.t(key), active).on_click(cx.listener(
-                        move |app, _, window, cx| {
-                            app.select_tab(index, cx);
-                            app.focus_tab(window, cx);
-                        },
-                    )),
-                );
-            }
-            content = content.child(tabs);
+            content = content.child(self.workspace_tabs(cx));
             if self.network_tab
                 && let Some(network) = &self.network
             {
@@ -3959,34 +3913,7 @@ impl Render for Hunkra {
                         .min_h_0()
                         .overflow_hidden()
                         .child(self.sidebar(cx))
-                        .child(
-                            div()
-                                .flex_1()
-                                .min_w_0()
-                                .flex()
-                                .flex_col()
-                                .child(self.diff_panel(cx))
-                                .child(
-                                    div()
-                                        .h(px(138.))
-                                        .flex_none()
-                                        .p_3()
-                                        .flex()
-                                        .flex_col()
-                                        .gap_2()
-                                        .border_t_1()
-                                        .border_color(rgb(LINE))
-                                        .child(
-                                            div()
-                                                .text_sm()
-                                                .text_color(rgb(MUTED))
-                                                .child(self.t("commit-hint")),
-                                        )
-                                        .child(
-                                            div().flex_1().min_h_0().child(self.message.clone()),
-                                        ),
-                                ),
-                        ),
+                        .child(self.diff_panel(cx)),
                 );
             }
         } else {
@@ -4104,7 +4031,12 @@ impl Render for Hunkra {
         if self.watch.unavailable() {
             status = status.child(self.t("watch-periodic"));
         }
-        let content = content.child(status);
+        let mut content = content.child(status).relative();
+        if self.settings_open {
+            content = content.child(self.preferences_overlay(cx));
+        } else if self.menu_open {
+            content = content.child(self.application_overlay(window, cx));
+        }
         self.measurements.ui_prepare.record(started.elapsed());
         let host = cx.entity();
         window.on_next_frame(move |_, cx| {

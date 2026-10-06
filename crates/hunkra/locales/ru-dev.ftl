@@ -1,5 +1,6 @@
 # Russian grammar is preserved; only Git terminology and dependent phrases differ.
 commit = Коммит
+commit-message-label = Сообщение коммита
 commit-created = Коммит создан
 welcome-detail = Откройте Git-репозиторий для сравнения индекса, рабочих файлов и последнего коммита.
 unborn = Пока нет коммитов

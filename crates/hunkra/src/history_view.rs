@@ -483,7 +483,11 @@ impl HistoryView {
             .overflow_hidden()
             .font_family("DejaVu Sans Mono")
             .bg(rgb(if changed {
-                if left { 0x382c30 } else { 0x283c31 }
+                if left {
+                    theme::REMOVED_BACKGROUND
+                } else {
+                    theme::ADDED_BACKGROUND
+                }
             } else {
                 theme::BACKGROUND
             }));
@@ -524,7 +528,7 @@ impl HistoryView {
     ) -> gpui::Stateful<gpui::Div> {
         div()
             .id(("history-diff-row", index))
-            .h(px(25.))
+            .h(px(20.))
             .w_full()
             .flex()
             .overflow_hidden()

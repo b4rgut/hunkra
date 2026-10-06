@@ -1,0 +1,10 @@
+{
+  "ok": true,
+  "native_display": true,
+  "maximized_acknowledged": true,
+  "restored_acknowledged": true,
+  "minimize_dispatched": true,
+  "frames": 9,
+  "read_only": true,
+  "oracle": "every private Git/worktree byte invariant; compositor maximize/restore states observed; minimize request sent, minimized appearance not captured"
+}
