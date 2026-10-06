@@ -1,6 +1,8 @@
 //! Native GPUI shell. Blocking repository reads run in separate bounded workers.
 mod load_smoke;
 mod network_smoke;
+#[cfg(all(test, feature = "gui-tests"))]
+mod opening_tests;
 mod ux_smoke;
 use gpui::{
     App, Application, Bounds, Context, Entity, EntityInputHandler, FocusHandle, Focusable,
@@ -230,6 +232,8 @@ struct Hunkra {
     anchor_removed: Option<usize>,
     anchor_added: Option<usize>,
     root: Option<PathBuf>,
+    picker_generation: u64,
+    pending_picker: Option<u64>,
     scan_generation: u64,
     scanning: bool,
     diff_loading: bool,
@@ -482,6 +486,8 @@ impl Hunkra {
             anchor_removed: None,
             anchor_added: None,
             root: None,
+            picker_generation: 0,
+            pending_picker: None,
             scan_generation: 0,
             scanning: false,
             diff_loading: false,
@@ -576,6 +582,7 @@ impl Hunkra {
         kind: ConfirmationKind,
         cx: &mut Context<Self>,
     ) {
+        self.invalidate_repository_choice();
         self.confirmation = Some(Confirmation { intent, kind });
         if let Some(network) = &self.network {
             network.update(cx, |view, cx| view.set_busy(true, cx));
@@ -786,6 +793,7 @@ impl Hunkra {
     }
     /// Defers ordinary window closure until an accepted index transaction has finished.
     fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
+        self.invalidate_repository_choice();
         if self.writing {
             self.close_requested = true;
             cx.notify();
@@ -833,6 +841,7 @@ impl Hunkra {
         if self.writing {
             return;
         }
+        self.invalidate_repository_choice();
         if self.guard_intent(Intent::Open(root.clone()), cx) {
             return;
         }
@@ -965,6 +974,7 @@ impl Hunkra {
     }
     /// Accepts a recent project without reopening the already active repository or clearing its message/draft.
     fn open_recent(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        self.invalidate_repository_choice();
         if self.root.as_ref() == Some(&path) {
             self.recent_open = false;
             cx.notify();
@@ -1041,6 +1051,7 @@ impl Hunkra {
     }
     /// Opens native creation controls without losing the current project's message/Result or entered destination.
     fn show_creation(&mut self, page: NetworkPage, cx: &mut Context<Self>) {
+        self.invalidate_repository_choice();
         self.select_tab(3, cx);
         if self.network_tab
             && let Some(network) = &self.network
@@ -1048,32 +1059,86 @@ impl Hunkra {
             network.update(cx, |view, cx| view.select_page(page, cx));
         }
     }
-    /// Uses GPUI's asynchronous native directory picker.
-    fn choose_repository(&mut self, cx: &mut Context<Self>) {
-        if self.writing {
+    /// Retires the answer of an outstanding dialog without pretending the platform dialog has closed.
+    fn invalidate_repository_choice(&mut self) {
+        self.picker_generation += 1;
+    }
+    /// Allows one live picker while no accepted write, close or product confirmation can be displaced.
+    fn begin_repository_choice(&mut self) -> Option<u64> {
+        if self.writing
+            || self.close_requested
+            || self.confirmation.is_some()
+            || self.pending_picker.is_some()
+        {
+            return None;
+        }
+        self.picker_generation += 1;
+        self.pending_picker = Some(self.picker_generation);
+        self.pending_picker
+    }
+    /// Accepts only this dialog's current answer; cancellation, superseded errors and duplicate replies are quiet.
+    fn finish_repository_choice(
+        &mut self,
+        ticket: u64,
+        result: Result<Option<PathBuf>, ()>,
+        cx: &mut Context<Self>,
+    ) {
+        if self.pending_picker != Some(ticket) {
             return;
         }
+        self.pending_picker = None;
+        if ticket != self.picker_generation
+            || self.writing
+            || self.close_requested
+            || self.confirmation.is_some()
+        {
+            return;
+        }
+        match result {
+            Ok(Some(path)) => self.open_recent(path, cx),
+            Ok(None) => {}
+            Err(()) => {
+                self.error_key = Some("error-io");
+                cx.notify();
+            }
+        }
+    }
+    /// Awaits the platform result on GPUI's executor and checks the captured ticket when the host still exists.
+    fn await_repository_choice(
+        &mut self,
+        ticket: u64,
+        result: impl Future<Output = Result<Option<PathBuf>, ()>> + 'static,
+        cx: &mut Context<Self>,
+    ) {
+        cx.spawn(async move |entity, cx| {
+            let result = result.await;
+            let _ = entity.update(cx, |app, cx| {
+                app.finish_repository_choice(ticket, result, cx)
+            });
+        })
+        .detach();
+    }
+    /// Uses GPUI's asynchronous native directory picker with one outstanding request and no stale project switch.
+    fn choose_repository(&mut self, cx: &mut Context<Self>) {
+        let Some(ticket) = self.begin_repository_choice() else {
+            return;
+        };
         let receiver = cx.prompt_for_paths(PathPromptOptions {
             files: false,
             directories: true,
             multiple: false,
             prompt: Some(self.t("open").into()),
         });
-        cx.spawn(async move |entity, cx| match receiver.await {
-            Ok(Ok(Some(paths))) => {
-                if let Some(path) = paths.into_iter().next() {
-                    let _ = entity.update(cx, |app, cx| app.open(path, cx));
+        self.await_repository_choice(
+            ticket,
+            async move {
+                match receiver.await {
+                    Ok(Ok(paths)) => Ok(paths.and_then(|paths| paths.into_iter().next())),
+                    _ => Err(()),
                 }
-            }
-            Ok(Ok(None)) => {}
-            _ => {
-                let _ = entity.update(cx, |app, cx| {
-                    app.error_key = Some("error-io");
-                    cx.notify();
-                });
-            }
-        })
-        .detach();
+            },
+            cx,
+        );
     }
     /// Requests one diff and retains the old rendering while the same document refreshes.
     fn select(&mut self, path: PathBuf, cx: &mut Context<Self>) {
@@ -1305,6 +1370,7 @@ impl Hunkra {
     }
     /// Invalidates pending reads and freezes message edits for either kind of accepted write.
     fn begin_write(&mut self, cx: &mut Context<Self>) {
+        self.invalidate_repository_choice();
         self.writing = true;
         self.committed = None;
         self.branch_created = None;
