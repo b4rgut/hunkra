@@ -108,6 +108,7 @@ impl NativeEditor {
     }
     /// Reveals an existing byte range without changing text or its undo/redo history.
     pub fn reveal_range(&mut self, range: Range<usize>, cx: &mut Context<Self>) {
+        self.preferred_column = None;
         self.buffer.select(range.start, false);
         self.buffer.select(range.end, true);
         self.scroll_row = self.buffer.text()[..self.buffer.boundary(range.start)]
@@ -1146,7 +1147,7 @@ mod tests {
     }
 
     #[gpui::test]
-    /// Registered page keys navigate immutable Unicode/CRLF sources by the actual viewport, retain columns and extend selection without text mutations.
+    /// Registered page keys retain columns across rows but follow explicit revealed ranges and new sources without changing Unicode/CRLF text.
     fn page_keys_follow_the_native_viewport(cx: &mut TestAppContext) {
         let text = scrolling_document();
         let lines = NativeEditor::index_lines(&text).unwrap();
@@ -1191,6 +1192,26 @@ mod tests {
             editor.read_with(cx, |editor, _| editor.buffer.selection.cursor == column
                 && editor.scroll_row == 0
                 && editor.buffer.revision == revision
+                && editor.buffer.text() == text)
+        );
+        let reveal_row = page + 2;
+        let reveal_column = text[lines[reveal_row].clone()]
+            .grapheme_indices(true)
+            .nth(4)
+            .unwrap()
+            .0;
+        let revealed = lines[reveal_row].start + reveal_column;
+        editor.update(cx, |editor, cx| {
+            editor.reveal_range(revealed..revealed, cx);
+        });
+        cx.simulate_keystrokes("down");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            lines[reveal_row + 1].start + reveal_column,
+            "revealed range retained the previous vertical navigation column"
+        );
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.revision == revision
                 && editor.buffer.text() == text)
         );
         let replacement = (0..200)
