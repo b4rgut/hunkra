@@ -235,6 +235,9 @@ struct Hunkra {
     root: Option<PathBuf>,
     picker_generation: u64,
     pending_picker: Option<u64>,
+    pending_open: Option<PathBuf>,
+    reviewed_open: Option<StatusRead>,
+    opening_backend: Option<&'static str>,
     scan_generation: u64,
     scanning: bool,
     diff_loading: bool,
@@ -504,6 +507,9 @@ impl Hunkra {
             root: None,
             picker_generation: 0,
             pending_picker: None,
+            pending_open: None,
+            reviewed_open: None,
+            opening_backend: None,
             scan_generation: 0,
             scanning: false,
             diff_loading: false,
@@ -599,6 +605,9 @@ impl Hunkra {
         cx: &mut Context<Self>,
     ) {
         self.invalidate_repository_choice();
+        if !matches!(intent, Intent::Open(_)) {
+            self.cancel_repository_open();
+        }
         self.confirmation = Some(Confirmation { intent, kind });
         if let Some(network) = &self.network {
             network.update(cx, |view, cx| view.set_busy(true, cx));
@@ -610,6 +619,7 @@ impl Hunkra {
     }
     /// Cancels the product prompt without losing Result, source selection or undo history.
     fn cancel_confirmation(&mut self, cx: &mut Context<Self>) {
+        self.cancel_repository_open();
         self.confirmation = None;
         self.after_save = None;
         if let Some(network) = &self.network {
@@ -810,6 +820,7 @@ impl Hunkra {
     /// Defers ordinary window closure until an accepted index transaction has finished.
     fn request_close(&mut self, cx: &mut Context<Self>) -> bool {
         self.invalidate_repository_choice();
+        self.cancel_repository_open();
         if self.writing {
             self.close_requested = true;
             cx.notify();
@@ -859,15 +870,54 @@ impl Hunkra {
         }
         cx.notify();
     }
-    /// Opens a path by generation, invalidating pending replies for the previous repository.
+    /// Validates a target on the existing bounded status worker while retaining the active project and editable text.
     fn open(&mut self, root: PathBuf, cx: &mut Context<Self>) {
-        if self.writing {
+        if self.writing
+            || self.close_requested
+            || self.confirmation.is_some() && !self.applying_intent
+        {
             return;
         }
         self.invalidate_repository_choice();
-        if self.guard_intent(Intent::Open(root.clone()), cx) {
+        if self.root.as_ref() == Some(&root) {
+            self.cancel_repository_open();
+            self.recent_open = false;
+            cx.notify();
             return;
         }
+        if self.applying_intent
+            && self
+                .reviewed_open
+                .as_ref()
+                .is_some_and(|read| read.repository.root == root)
+        {
+            let read = self.reviewed_open.take().expect("reviewed target");
+            self.activate_repository(read, cx);
+            return;
+        }
+        self.reviewed_open = None;
+        self.opening_backend = None;
+        self.pending_open = Some(root.clone());
+        self.scan_generation += 1;
+        self.scanning = true;
+        self.last_scan = Instant::now();
+        self.error_key = None;
+        self.status_worker.submit(self.scan_generation, root);
+        cx.notify();
+    }
+    /// Retires pending target reads without clearing the active repository or its drafts.
+    fn cancel_repository_open(&mut self) {
+        if self.pending_open.take().is_some() {
+            self.scan_generation += 1;
+            self.scanning = false;
+        }
+        self.reviewed_open = None;
+        self.opening_backend = None;
+    }
+    /// Replaces workspace state only after a successful read and the concrete dirty Result decision.
+    fn activate_repository(&mut self, read: StatusRead, cx: &mut Context<Self>) {
+        self.invalidate_repository_choice();
+        let root = read.repository.root.clone();
         self.recent_open = false;
         self.recent_selected = 0;
         self.horizontal.reset();
@@ -909,17 +959,18 @@ impl Hunkra {
         self.anchor_removed = None;
         self.anchor_added = None;
         self.write_error_key = None;
-        self.last_write_backend = None;
+        self.last_write_backend = self.opening_backend.take();
         self.last_operation_route = None;
         self.view.diff_generation += 1;
         self.diff_loading = false;
         self.error_key = None;
         self.refresh_queued = false;
-        self.refresh(cx);
+        self.apply_status(read, cx);
+        cx.notify();
     }
     /// Coalesces manual refresh requests while a status scan is active.
     fn refresh(&mut self, cx: &mut Context<Self>) {
-        if self.writing {
+        if self.writing || self.pending_open.is_some() {
             self.refresh_queued = true;
             return;
         }
@@ -999,6 +1050,7 @@ impl Hunkra {
     fn open_recent(&mut self, path: PathBuf, cx: &mut Context<Self>) {
         self.invalidate_repository_choice();
         if self.root.as_ref() == Some(&path) {
+            self.cancel_repository_open();
             self.recent_open = false;
             cx.notify();
         } else {
@@ -1075,6 +1127,7 @@ impl Hunkra {
     /// Opens native creation controls without losing the current project's message/Result or entered destination.
     fn show_creation(&mut self, page: NetworkPage, cx: &mut Context<Self>) {
         self.invalidate_repository_choice();
+        self.cancel_repository_open();
         self.select_tab(3, cx);
         if self.network_tab
             && let Some(network) = &self.network
@@ -1095,6 +1148,7 @@ impl Hunkra {
         {
             return None;
         }
+        self.cancel_repository_open();
         self.picker_generation += 1;
         self.pending_picker = Some(self.picker_generation);
         self.pending_picker
@@ -1146,6 +1200,7 @@ impl Hunkra {
         let Some(ticket) = self.begin_repository_choice() else {
             return;
         };
+        cx.notify();
         let receiver = cx.prompt_for_paths(PathPromptOptions {
             files: false,
             directories: true,
@@ -1394,6 +1449,7 @@ impl Hunkra {
     /// Invalidates pending reads and freezes message edits for either kind of accepted write.
     fn begin_write(&mut self, cx: &mut Context<Self>) {
         self.invalidate_repository_choice();
+        self.cancel_repository_open();
         self.writing = true;
         self.committed = None;
         self.branch_created = None;
@@ -1421,6 +1477,97 @@ impl Hunkra {
         self.view.diff_generation += 1;
         self.diff_loading = false;
     }
+    /// Rejects superseded replies and applies opening errors without replacing the current workspace.
+    fn receive_status(
+        &mut self,
+        generation: u64,
+        result: Result<StatusRead, CoreError>,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        if generation != self.scan_generation {
+            return false;
+        }
+        self.scanning = false;
+        let opening = self.pending_open.take().is_some();
+        if opening {
+            self.refresh_queued = false;
+        }
+        match result {
+            Ok(read) if opening => {
+                self.error_key = None;
+                let root = read.repository.root.clone();
+                if self.root.as_ref() == Some(&root) {
+                    self.recent_open = false;
+                } else {
+                    self.reviewed_open = Some(read);
+                    if !self.guard_intent(Intent::Open(root), cx) {
+                        let read = self.reviewed_open.take().expect("validated target");
+                        self.activate_repository(read, cx);
+                    }
+                }
+            }
+            Ok(read) => self.apply_status(read, cx),
+            Err(error) => self.error_key = Some(error_key(&error)),
+        }
+        true
+    }
+    /// Projects an accepted actual status bundle; refresh and successful opening use identical source/selection rules.
+    fn apply_status(&mut self, read: StatusRead, cx: &mut Context<Self>) {
+        self.measurements.status.record(read.elapsed);
+        let snapshot = read.repository;
+        self.selected_branch = self.selected_branch.take().and_then(|selected| {
+            read.branches
+                .branches
+                .iter()
+                .find(|branch| branch.name == selected.name)
+                .cloned()
+        });
+        self.branches = Some(read.branches);
+        self.operation = Some(std::sync::Arc::new(read.operation));
+        self.error_key = None;
+        self.root = Some(snapshot.root.clone());
+        let retain_conflict = self.confirmation.is_some()
+            || self.conflict.as_ref().is_some_and(|conflict| {
+                let view = conflict.read(cx);
+                view.dirty(cx)
+                    || self.operation.as_ref().is_some_and(|operation| {
+                        operation.state.is_some()
+                            && view.snapshot.operation.state == operation.state
+                    })
+            });
+        let selected = self
+            .view
+            .selected
+            .clone()
+            .filter(|path| retain_conflict || snapshot.files.iter().any(|file| &file.path == path))
+            .or_else(|| {
+                snapshot
+                    .files
+                    .iter()
+                    .find(|file| file.staged.is_some() && file.unstaged.is_some())
+                    .or_else(|| snapshot.files.first())
+                    .map(|file| file.path.clone())
+            });
+        if self.settings.recent.first() != Some(&snapshot.root) && self.smoke.is_none() {
+            self.settings.recent.retain(|path| path != &snapshot.root);
+            self.settings.recent.insert(0, snapshot.root.clone());
+            self.settings.recent.truncate(10);
+            self.settings_worker.submit(0, self.settings.clone());
+        }
+        self.path_filter
+            .replace(Some(read.paths), self.filter_input.read(cx).buffer.text());
+        self.view.repository = Some(snapshot);
+        if let Some(path) = selected {
+            if self.view.selected.as_ref() != Some(&path) || !self.diff_loading {
+                self.select(path, cx);
+            }
+        } else {
+            self.view.selected = None;
+            self.view.diff = None;
+            self.view.selected_rows.clear();
+            self.view.line_selection = Default::default();
+        }
+    }
     /// Reads completed mailboxes, rejecting obsolete generations before touching UI state.
     fn poll(&mut self, cx: &mut Context<Self>) {
         let mut changed = self.watch.poll() | self.path_filter.poll();
@@ -1447,73 +1594,8 @@ impl Hunkra {
         if let Some(network) = &self.network {
             network.update(cx, |view, cx| view.poll(cx));
         }
-        if let Some((generation, result)) = self.status_worker.take()
-            && generation == self.scan_generation
-        {
-            self.scanning = false;
-            changed = true;
-            match result {
-                Ok(read) => {
-                    self.measurements.status.record(read.elapsed);
-                    let snapshot = read.repository;
-                    self.selected_branch = self.selected_branch.take().and_then(|selected| {
-                        read.branches
-                            .branches
-                            .iter()
-                            .find(|branch| branch.name == selected.name)
-                            .cloned()
-                    });
-                    self.branches = Some(read.branches);
-                    self.operation = Some(std::sync::Arc::new(read.operation));
-                    self.error_key = None;
-                    self.root = Some(snapshot.root.clone());
-                    let retain_conflict = self.confirmation.is_some()
-                        || self.conflict.as_ref().is_some_and(|conflict| {
-                            let view = conflict.read(cx);
-                            view.dirty(cx)
-                                || self.operation.as_ref().is_some_and(|operation| {
-                                    operation.state.is_some()
-                                        && view.snapshot.operation.state == operation.state
-                                })
-                        });
-                    let selected = self
-                        .view
-                        .selected
-                        .clone()
-                        .filter(|path| {
-                            retain_conflict || snapshot.files.iter().any(|file| &file.path == path)
-                        })
-                        .or_else(|| {
-                            snapshot
-                                .files
-                                .iter()
-                                .find(|file| file.staged.is_some() && file.unstaged.is_some())
-                                .or_else(|| snapshot.files.first())
-                                .map(|file| file.path.clone())
-                        });
-                    if self.settings.recent.first() != Some(&snapshot.root) && self.smoke.is_none()
-                    {
-                        self.settings.recent.retain(|path| path != &snapshot.root);
-                        self.settings.recent.insert(0, snapshot.root.clone());
-                        self.settings.recent.truncate(10);
-                        self.settings_worker.submit(0, self.settings.clone());
-                    }
-                    self.path_filter
-                        .replace(Some(read.paths), self.filter_input.read(cx).buffer.text());
-                    self.view.repository = Some(snapshot);
-                    if let Some(path) = selected {
-                        if self.view.selected.as_ref() != Some(&path) || !self.diff_loading {
-                            self.select(path, cx);
-                        }
-                    } else {
-                        self.view.selected = None;
-                        self.view.diff = None;
-                        self.view.selected_rows.clear();
-                        self.view.line_selection = Default::default();
-                    }
-                }
-                Err(error) => self.error_key = Some(error_key(&error)),
-            }
+        if let Some((generation, result)) = self.status_worker.take() {
+            changed |= self.receive_status(generation, result, cx);
         }
         if let Some((generation, result)) = self.diff_worker.take()
             && generation == self.view.diff_generation
@@ -1637,6 +1719,7 @@ impl Hunkra {
                         NetworkOutcome::Created(created) => {
                             let backend = created.backend;
                             self.open(created.root, cx);
+                            self.opening_backend = Some(backend);
                             self.last_write_backend = Some(backend);
                         }
                         NetworkOutcome::Fetch(fetched) => {
@@ -1900,6 +1983,10 @@ impl Hunkra {
     }
     /// Runs a native scripted render scenario, with a finite timeout and isolated settings.
     fn smoke_tick(&mut self, cx: &mut Context<Self>) {
+        if self.pending_open.is_some() {
+            cx.notify();
+            return;
+        }
         if self
             .smoke
             .as_ref()
@@ -2808,6 +2895,9 @@ impl Hunkra {
     }
     /// Exercises real native input callbacks, Cyrillic composition and editing keys in the smoke window.
     fn smoke_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.pending_open.is_some() {
+            return;
+        }
         self.smoke_network_input(window, cx);
         self.smoke_conflict_input(window, cx);
         if self.smoke.as_ref().is_some_and(|smoke| {

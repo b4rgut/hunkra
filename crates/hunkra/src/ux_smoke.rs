@@ -5,6 +5,8 @@ pub(super) struct UxState {
     original: Arc<DiffSnapshot>,
     root: PathBuf,
     filter: (String, hunkra::text::Selection, u64),
+    opening_stage: u8,
+    opening_message: (hunkra::text::Selection, u64),
 }
 impl Hunkra {
     /// Sends a shortcut through the host handler using GPUI's current key representation and an actual native window.
@@ -76,6 +78,41 @@ impl Hunkra {
         }
         let action = action.to_owned();
         let phase = smoke.phase;
+        if let Some(ux) = &self.ux {
+            if ux.opening_stage == 0 {
+                let target = ux.root.parent().unwrap().join("missing-repository");
+                let editor = self.filter_input.read(cx);
+                self.ux.as_mut().unwrap().filter = (
+                    editor.buffer.text().to_owned(),
+                    editor.buffer.selection,
+                    editor.buffer.revision,
+                );
+                self.ux.as_mut().unwrap().opening_stage = 1;
+                self.open(target, cx);
+                return;
+            } else if ux.opening_stage == 1 {
+                assert!(self.pending_open.is_none() && self.error_key.is_some());
+                assert_eq!(self.root.as_ref(), Some(&ux.root));
+                assert!(Arc::ptr_eq(&ux.original, self.view.diff.as_ref().unwrap()));
+                let editor = self.filter_input.read(cx);
+                assert_eq!(
+                    (
+                        editor.buffer.text().to_owned(),
+                        editor.buffer.selection,
+                        editor.buffer.revision
+                    ),
+                    ux.filter
+                );
+                let message = self.message.read(cx);
+                assert_eq!(
+                    (message.buffer.selection, message.buffer.revision),
+                    ux.opening_message
+                );
+                assert!(self.confirmation.is_none());
+                self.ux_assert_draft(cx);
+                self.ux.as_mut().unwrap().opening_stage = 2;
+            }
+        }
         if phase == 0 {
             assert_eq!(self.settings.recent.len(), 2);
             assert_eq!(
@@ -86,6 +123,11 @@ impl Hunkra {
                 original: self.view.diff.clone().unwrap(),
                 root: self.root.clone().unwrap(),
                 filter: (String::new(), Default::default(), 0),
+                opening_stage: 0,
+                opening_message: (
+                    self.message.read(cx).buffer.selection,
+                    self.message.read(cx).buffer.revision,
+                ),
             });
             self.ux_key("ctrl-f", window, cx);
             assert!(
@@ -135,9 +177,11 @@ impl Hunkra {
                 assert!(self.recent_open);
                 self.ux_key("down", window, cx);
                 self.ux_key("enter", window, cx);
-                assert!(self.confirmation.is_some());
+                assert!(self.pending_open.is_some());
+                assert!(self.confirmation.is_none());
                 assert_eq!(self.root.as_ref(), Some(&self.ux.as_ref().unwrap().root));
             } else if phase == 6 {
+                assert!(self.confirmation.is_some());
                 self.ux_key("escape", window, cx);
                 assert!(self.confirmation.is_none());
                 self.ux_assert_draft(cx);
@@ -274,7 +318,7 @@ impl Hunkra {
     fn finish_ux(&mut self, cx: &mut Context<Self>) {
         assert!(self.last_write_backend.is_none());
         let smoke = self.smoke.as_ref().unwrap();
-        let report = serde_json::json!({"ok":true,"native_display":true,"scenario":smoke.operation,"frames":self.frames,"locales":smoke.locales,"read_only":true,"filter_native":true,"draft_retained":smoke.operation.as_deref()==Some("ux-draft"),"shared_horizontal_native":smoke.operation.as_deref()!=Some("ux-draft"),"measurements":self.measurements.json()});
+        let report = serde_json::json!({"ok":true,"native_display":true,"scenario":smoke.operation,"frames":self.frames,"locales":smoke.locales,"read_only":true,"filter_native":true,"failed_open_retained_workspace":self.ux.as_ref().unwrap().opening_stage==2,"draft_retained":smoke.operation.as_deref()==Some("ux-draft"),"shared_horizontal_native":smoke.operation.as_deref()!=Some("ux-draft"),"measurements":self.measurements.json()});
         std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
         cx.quit();
     }

@@ -45,6 +45,7 @@ def smoke(destination):
             result=subprocess.run([str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))),str(root),"--smoke-test",str(report),"--smoke-operation",action],cwd=fixture,env=dict(environment,HUNKRA_UX_RECENT=str(recent)),capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr.decode(errors="replace")
             evidence=json.loads(report.read_text());assert evidence["ok"] and evidence["native_display"] and evidence["read_only"]
+            assert evidence["failed_open_retained_workspace"]
             assert evidence["locales"]==["Changes","Изменения","Изменения"]
             for item,state in before.items():
                 assert git(item,"rev-parse","HEAD")==state["head"] and (item/".git/index").read_bytes()==state["index"] and git(item,"ls-files","--stage")==state["stages"] and git(item,"status","--porcelain=v1","-z","--untracked-files=all")==state["status"]

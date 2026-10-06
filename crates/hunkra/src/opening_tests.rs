@@ -10,14 +10,144 @@ fn host(cx: &mut Context<Hunkra>) -> Hunkra {
     app
 }
 
+/// Creates an actual independent unborn Git repository with a byte-sensitive working file.
+fn repository(parent: &std::path::Path, name: &str) -> PathBuf {
+    let root = parent.join(name);
+    std::fs::create_dir(&root).unwrap();
+    let result = std::process::Command::new("git")
+        .args(["init", "-b", "main"])
+        .current_dir(&root)
+        .output()
+        .unwrap();
+    assert!(result.status.success());
+    std::fs::write(root.join("f"), b"worktree\r\nEOF").unwrap();
+    root.canonicalize().unwrap()
+}
+/// Delivers a real gix status bundle through the same generation/activation path used by the worker mailbox.
+fn accept_open(app: &mut Hunkra, root: &std::path::Path, cx: &mut Context<Hunkra>) {
+    assert!(app.receive_status(app.scan_generation, read_status(root), cx));
+}
+
+#[gpui::test]
+/// A failed repository request must retain the active Git snapshot, selected diff and unfinished message.
+fn failed_target_preserves_active_workspace(cx: &mut TestAppContext) {
+    let fixture = tempfile::tempdir().unwrap();
+    let root = repository(fixture.path(), "active");
+    let repository = hunkra_core::scan(&root).unwrap();
+    let diff = Arc::new(
+        hunkra_core::read_diff(&root, std::path::Path::new("f"), DiffKind::Unstaged).unwrap(),
+    );
+    let (app, cx) = cx.add_window_view(|_, cx| host(cx));
+    app.update(cx, |app, cx| {
+        app.root = Some(root.clone());
+        app.view.repository = Some(repository);
+        app.view.selected = Some("f".into());
+        app.view.diff = Some(diff.clone());
+        app.message.update(cx, |editor, _| {
+            editor.buffer.reset("Сохранить🦀\r\nEOF".into());
+            editor.buffer.select(0, false);
+            editor.buffer.select(18, true);
+        });
+        let before = {
+            let message = &app.message.read(cx).buffer;
+            (
+                message.text().to_owned(),
+                message.selection,
+                message.revision,
+            )
+        };
+        app.open(fixture.path().join("missing"), cx);
+        assert_eq!(app.root.as_ref(), Some(&root));
+        assert_eq!(
+            app.view.selected.as_deref(),
+            Some(std::path::Path::new("f"))
+        );
+        assert!(Arc::ptr_eq(app.view.diff.as_ref().unwrap(), &diff));
+        let generation = app.scan_generation;
+        for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+            app.set_locale(locale, cx);
+            app.refresh(cx);
+            assert_eq!(app.scan_generation, generation);
+        }
+        assert!(app.receive_status(generation, read_status(&fixture.path().join("missing")), cx));
+        assert!(app.pending_open.is_none() && !app.scanning && app.error_key.is_some());
+        assert_eq!(app.root.as_ref(), Some(&root));
+        assert!(Arc::ptr_eq(app.view.diff.as_ref().unwrap(), &diff));
+        let message = &app.message.read(cx).buffer;
+        assert_eq!(message.text(), before.0);
+        assert_eq!(message.selection, before.1);
+        assert_eq!(message.revision, before.2);
+    });
+}
+
+#[gpui::test]
+/// Latest target wins; locale/refresh cannot replace it, while writes/close/creation retire it and aliases retain text.
+fn target_validation_obeys_newer_intents(cx: &mut TestAppContext) {
+    let fixture = tempfile::tempdir().unwrap();
+    let old = repository(fixture.path(), "old");
+    let first = repository(fixture.path(), "first");
+    let latest = repository(fixture.path(), "latest");
+    let (app, cx) = cx.add_window_view(|_, cx| host(cx));
+    app.update(cx, |app, cx| {
+        app.open(old.clone(), cx);
+        accept_open(app, &old, cx);
+        app.message.update(cx, |editor, _| {
+            editor.buffer.reset("pending text🦀".into());
+        });
+        app.open(first.clone(), cx);
+        let obsolete = app.scan_generation;
+        app.open(latest.clone(), cx);
+        let current = app.scan_generation;
+        assert!(!app.receive_status(obsolete, read_status(&first), cx));
+        assert_eq!(app.root.as_ref(), Some(&old));
+        assert_eq!(app.pending_open.as_ref(), Some(&latest));
+        app.set_locale(Locale::RuDev, cx);
+        app.refresh(cx);
+        assert_eq!(app.scan_generation, current);
+        app.begin_write(cx);
+        assert!(app.pending_open.is_none());
+        assert!(!app.receive_status(current, read_status(&latest), cx));
+        app.writing = false;
+        assert_eq!(app.message.read(cx).buffer.text(), "pending text🦀");
+        app.open(first.clone(), cx);
+        let obsolete = app.scan_generation;
+        assert!(app.request_close(cx));
+        assert!(!app.receive_status(obsolete, Err(CoreError::Stale), cx));
+        assert!(app.error_key.is_none());
+        app.open(first.clone(), cx);
+        let obsolete = app.scan_generation;
+        app.show_creation(NetworkPage::Init, cx);
+        assert!(!app.receive_status(obsolete, read_status(&first), cx));
+        assert!(app.network_tab);
+        assert_eq!(app.root.as_ref(), Some(&old));
+        let alias = old.join("nested");
+        std::fs::create_dir(&alias).unwrap();
+        app.open(alias.clone(), cx);
+        accept_open(app, &alias, cx);
+        assert_eq!(app.root.as_ref(), Some(&old));
+        assert_eq!(app.message.read(cx).buffer.text(), "pending text🦀");
+        app.open(latest.clone(), cx);
+        assert_eq!(app.root.as_ref(), Some(&old));
+        accept_open(app, &latest, cx);
+        assert_eq!(app.root.as_ref(), Some(&latest));
+        assert_eq!(app.view.repository.as_ref().unwrap().root, latest);
+        assert!(app.message.read(cx).buffer.text().is_empty());
+        assert!(app.pending_open.is_none() && app.reviewed_open.is_none());
+    });
+    for root in [&old, &first, &latest] {
+        assert_eq!(std::fs::read(root.join("f")).unwrap(), b"worktree\r\nEOF");
+    }
+}
+
 #[gpui::test]
 /// An async answer survives locales/periodic refresh; choosing the current root preserves text, selection and scan state.
 fn delayed_choice_preserves_current_project(cx: &mut TestAppContext) {
     let fixture = tempfile::tempdir().unwrap();
-    let root = fixture.path().join("current");
+    let root = repository(fixture.path(), "current");
     let (app, cx) = cx.add_window_view(|_, cx| host(cx));
     app.update(cx, |app, cx| {
         app.open(root.clone(), cx);
+        accept_open(app, &root, cx);
         app.message.update(cx, |editor, _| {
             assert!(editor.buffer.reset("Сообщение🦀\r\nEOF".into()));
             editor.buffer.select(0, false);
@@ -72,7 +202,7 @@ fn delayed_choice_preserves_current_project(cx: &mut TestAppContext) {
 fn superseded_cancelled_and_failed_choices(cx: &mut TestAppContext) {
     let fixture = tempfile::tempdir().unwrap();
     let old = fixture.path().join("old");
-    let recent = fixture.path().join("recent");
+    let recent = repository(fixture.path(), "recent");
     let (app, cx) = cx.add_window_view(|_, cx| host(cx));
     app.update(cx, |app, cx| {
         let ticket = app.begin_repository_choice().unwrap();
@@ -86,6 +216,7 @@ fn superseded_cancelled_and_failed_choices(cx: &mut TestAppContext) {
             cx,
         );
         app.open_recent(recent.clone(), cx);
+        accept_open(app, &recent, cx);
         assert!(
             app.begin_repository_choice().is_none(),
             "platform dialog is still outstanding"
@@ -186,9 +317,21 @@ fn choice_obeys_write_and_dirty_result_guards(cx: &mut TestAppContext) {
             editor.buffer.reset("Unsaved🦀\r\nEOF".into());
         });
         let draft = result.read(cx).buffer.text().to_owned();
-        let target = root.join("next");
+        let missing = root.parent().unwrap().join("missing-repository");
+        app.open(missing.clone(), cx);
+        assert!(app.confirmation.is_none());
+        assert!(app.receive_status(app.scan_generation, read_status(&missing), cx));
+        assert!(app.confirmation.is_none());
+        assert_eq!(result.read(cx).buffer.text(), draft);
+        let next_fixture = tempfile::tempdir().unwrap();
+        let target = repository(next_fixture.path(), "next");
         let ticket = app.begin_repository_choice().unwrap();
         app.finish_repository_choice(ticket, Ok(Some(target.clone())), cx);
+        assert!(
+            app.confirmation.is_none(),
+            "target validation precedes the dirty prompt"
+        );
+        accept_open(app, &target, cx);
         assert_eq!(app.root.as_deref(), Some(root));
         let confirmation = app.confirmation.as_ref().unwrap();
         assert!(confirmation.kind == ConfirmationKind::Dirty);
@@ -197,6 +340,14 @@ fn choice_obeys_write_and_dirty_result_guards(cx: &mut TestAppContext) {
         app.cancel_confirmation(cx);
         assert_eq!(result.read(cx).buffer.text(), draft);
         assert_eq!(app.root.as_deref(), Some(root));
+        assert!(app.reviewed_open.is_none());
+        app.open(target.clone(), cx);
+        accept_open(app, &target, cx);
+        app.confirm_intent(cx);
+        assert_eq!(app.root.as_ref(), Some(&target));
+        assert!(
+            app.conflict.is_none() && app.reviewed_open.is_none() && app.pending_open.is_none()
+        );
     });
     assert_eq!(std::fs::read(root.join(".git/index")).unwrap(), index);
     assert_eq!(std::fs::read(root.join("f")).unwrap(), bytes);
