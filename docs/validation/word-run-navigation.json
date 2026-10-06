@@ -1,0 +1,188 @@
+{
+  "before": {
+    "ok": true,
+    "native_display": true,
+    "scenario": "editor-layout",
+    "frames": 32,
+    "locales": [
+      "Changes",
+      "Изменения",
+      "Изменения"
+    ],
+    "giant_line_bytes": 32768,
+    "newline_document_bytes": 2097152,
+    "text_retained": true,
+    "notice_has_no_source_coordinates": true,
+    "replacement_undo_redo": true,
+    "large_result_bytes": 1599833,
+    "stable_result_phases": 16,
+    "marker_summary_before": {
+      "requests": 9,
+      "parser": {
+        "count": 5,
+        "mean_ms": 0.7696892,
+        "max_ms": 1.901177
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "marker_summary": {
+      "requests": 26,
+      "parser": {
+        "count": 6,
+        "mean_ms": 1.7393258333333332,
+        "max_ms": 6.587509
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "grapheme_navigation": {
+      "text_bytes": 1599833,
+      "handler_calls": 32,
+      "total_ms": 0.097897,
+      "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+    },
+    "utf16_queries": {
+      "text_bytes": 1599833,
+      "first_selection_query_ms": 4.660061,
+      "repeated_pairs": 32,
+      "repeated_selection_and_text_ms": 0.17289200000000002,
+      "scope": "actual native UTF-16 input-query callback CPU-code wall time at EOF; first request after text revision and unchanged repeated requests separated; text/selection restored; painting/scheduling/GPU excluded"
+    },
+    "word_run_navigation": {
+      "samples": [
+        {
+          "sample": "regional_flags",
+          "text_bytes": 16000,
+          "handler_calls": 32,
+          "total_ms": 2968.948974
+        },
+        {
+          "sample": "cyrillic_letters",
+          "text_bytes": 16000,
+          "handler_calls": 32,
+          "total_ms": 54.570486
+        }
+      ],
+      "scope": "actual native Ctrl Left/Right handler CPU-code wall time on complete 16k-byte Unicode runs; replacement/painting/scheduling/GPU excluded; temporary samples are replaced before rendering final Result"
+    },
+    "word_navigation_preserves_graphemes_and_revision": true,
+    "multiple_click_selection_preserves_text_revision": true,
+    "wheel_preserves_text_cursor_and_revision": true,
+    "explicit_home_restores_source_coordinates": true,
+    "page_navigation_preserves_text_revision": true,
+    "page_selection_and_source_coordinates": true,
+    "read_only": true,
+    "scope": "actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+    "stable_marker_summary_parses": 1,
+    "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+    "binary_sha256": "ee111068d7c6bab7590e4e17b28117024a191b3d8a145f5d23f1475b54873479"
+  },
+  "after": {
+    "ok": true,
+    "native_display": true,
+    "scenario": "editor-layout",
+    "frames": 32,
+    "locales": [
+      "Changes",
+      "Изменения",
+      "Изменения"
+    ],
+    "giant_line_bytes": 32768,
+    "newline_document_bytes": 2097152,
+    "text_retained": true,
+    "notice_has_no_source_coordinates": true,
+    "replacement_undo_redo": true,
+    "large_result_bytes": 1599833,
+    "stable_result_phases": 16,
+    "marker_summary_before": {
+      "requests": 9,
+      "parser": {
+        "count": 5,
+        "mean_ms": 0.7951604,
+        "max_ms": 2.038882
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "marker_summary": {
+      "requests": 26,
+      "parser": {
+        "count": 6,
+        "mean_ms": 1.7804448333333334,
+        "max_ms": 6.706867
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "grapheme_navigation": {
+      "text_bytes": 1599833,
+      "handler_calls": 32,
+      "total_ms": 0.093983,
+      "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+    },
+    "utf16_queries": {
+      "text_bytes": 1599833,
+      "first_selection_query_ms": 4.422599,
+      "repeated_pairs": 32,
+      "repeated_selection_and_text_ms": 0.175505,
+      "scope": "actual native UTF-16 input-query callback CPU-code wall time at EOF; first request after text revision and unchanged repeated requests separated; text/selection restored; painting/scheduling/GPU excluded"
+    },
+    "word_run_navigation": {
+      "samples": [
+        {
+          "sample": "regional_flags",
+          "text_bytes": 16000,
+          "handler_calls": 32,
+          "total_ms": 23.454045999999998
+        },
+        {
+          "sample": "cyrillic_letters",
+          "text_bytes": 16000,
+          "handler_calls": 32,
+          "total_ms": 45.956108
+        }
+      ],
+      "scope": "actual native Ctrl Left/Right handler CPU-code wall time on complete 16k-byte Unicode runs; replacement/painting/scheduling/GPU excluded; temporary samples are replaced before rendering final Result"
+    },
+    "word_navigation_preserves_graphemes_and_revision": true,
+    "multiple_click_selection_preserves_text_revision": true,
+    "wheel_preserves_text_cursor_and_revision": true,
+    "explicit_home_restores_source_coordinates": true,
+    "page_navigation_preserves_text_revision": true,
+    "page_selection_and_source_coordinates": true,
+    "read_only": true,
+    "scope": "actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+    "stable_marker_summary_parses": 1,
+    "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+    "binary_sha256": "933cdf165aa24da2c1a2fc0fa8cafe7cc42eac1f22289ed345263cbc51430e46"
+  },
+  "source_scope": {
+    "before": "910a8d2 clean production text model plus identical finite/private word-run instrumentation; debug binary saved before context reuse",
+    "after": "910a8d2 plus retained per-direction GraphemeCursor word walks, complete initial-cluster classification and finite/private native acceptance; debug binary"
+  },
+  "measurement_scope": "Two sequential native debug runs after compiler/tests/private package installation finished. Actual owned Ctrl Left/Right callbacks over 16,000-byte complete runs, 32 handlers each. Replacement/painting/scheduling/GPU excluded; desktop load uncontrolled. No optimized/full-frame/cross-host/physical input or universal constant-time claim.",
+  "regressions": [
+    "Scalar-interior combining-cluster Ctrl Right first returned10 instead of complete identifier end15; full-cluster classification now passes combining and Indic identifiers at every scalar position",
+    "Whole-token byte oracle includes combining/Indic letters and an odd regional-indicator run adjoining an emoji ZWJ cluster; source/selection/revision unchanged",
+    "Before and after actual native handlers retain text/revision and restore EOF selection; every private worktree/Git metadata byte is independently unchanged"
+  ],
+  "implementation": "One GraphemeCursor per directional token walk retains regional/Indic context between neighboring boundaries. Initial whole-grapheme classification fixes scalar-interior native carets. No new persistent cache, text copy, worker, dependency or Git writer.",
+  "checks": {
+    "headless": 143,
+    "core": 109,
+    "app": 34,
+    "gpui_library": 48,
+    "gpui_host": 5,
+    "strict_clippy": "headless/gui/gui-tests passed",
+    "fmt_i18n_plan_build": "passed"
+  },
+  "primary_api_sources": [
+    "https://docs.rs/unicode-segmentation/1.13.3/unicode_segmentation/struct.GraphemeCursor.html"
+  ],
+  "native_regressions": {
+    "editor": 1,
+    "conflicts": 17,
+    "staging_commit": 6,
+    "history": 12,
+    "network": 19,
+    "ux": 3,
+    "all_fixture_data": "independently preserved"
+  }
+}

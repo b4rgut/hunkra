@@ -186,10 +186,10 @@ impl TextBuffer {
     }
     /// Seeks the next extended-grapheme boundary from the cursor, supplying complete Unicode context without allocating a prefix index.
     pub fn next(&self, byte: usize) -> usize {
-        GraphemeCursor::new(self.boundary(byte), self.text.len(), true)
-            .next_boundary(&self.text, 0)
-            .expect("complete UTF-8 text supplies grapheme context")
-            .unwrap_or(self.text.len())
+        self.grapheme_step(
+            &mut GraphemeCursor::new(self.boundary(byte), self.text.len(), true),
+            true,
+        )
     }
     /// Seeks the previous extended boundary with global context; an interior scalar offset rounds forward to preserve existing navigation semantics.
     pub fn previous(&self, byte: usize) -> usize {
@@ -197,10 +197,17 @@ impl TextBuffer {
         while !self.text.is_char_boundary(byte) {
             byte += 1;
         }
-        GraphemeCursor::new(byte, self.text.len(), true)
-            .prev_boundary(&self.text, 0)
-            .expect("complete UTF-8 text supplies grapheme context")
-            .unwrap_or(0)
+        self.grapheme_step(&mut GraphemeCursor::new(byte, self.text.len(), true), false)
+    }
+    /// Advances one retained segmenter with full context, preserving its regional/Indic lookback state between consecutive boundaries.
+    fn grapheme_step(&self, cursor: &mut GraphemeCursor, forward: bool) -> usize {
+        let next = if forward {
+            cursor.next_boundary(&self.text, 0)
+        } else {
+            cursor.prev_boundary(&self.text, 0)
+        };
+        next.expect("complete UTF-8 text supplies grapheme context")
+            .unwrap_or(if forward { self.text.len() } else { 0 })
     }
     /// Moves forward over initial whitespace and then one word or punctuation run, retaining complete graphemes.
     pub fn next_word(&self, byte: usize) -> usize {
@@ -216,22 +223,24 @@ impl TextBuffer {
         if self.text.is_empty() {
             return 0..0;
         }
+        let mut forward = GraphemeCursor::new(byte, self.text.len(), true);
         let mut end = if byte == self.text.len() {
             byte
         } else {
-            self.next(byte)
+            self.grapheme_step(&mut forward, true)
         };
-        let mut start = self.previous(end);
+        let mut backward = GraphemeCursor::new(end, self.text.len(), true);
+        let mut start = self.grapheme_step(&mut backward, false);
         let kind = WordClass::for_grapheme(&self.text[start..end]);
         while start > 0 {
-            let previous = self.previous(start);
+            let previous = self.grapheme_step(&mut backward, false);
             if WordClass::for_grapheme(&self.text[previous..start]) != kind {
                 break;
             }
             start = previous;
         }
         while end < self.text.len() {
-            let next = self.next(end);
+            let next = self.grapheme_step(&mut forward, true);
             if WordClass::for_grapheme(&self.text[end..next]) != kind {
                 break;
             }
@@ -242,18 +251,25 @@ impl TextBuffer {
     /// Walks only neighboring graphemes needed by the requested token; no document-wide word index or text copy is retained.
     fn word_boundary(&self, byte: usize, forward: bool) -> usize {
         let mut cursor = self.boundary(byte);
+        let mut navigator = GraphemeCursor::new(cursor, self.text.len(), true);
+        let mut first = true;
         let mut kind = None;
         while if forward {
             cursor < self.text.len()
         } else {
             cursor > 0
         } {
-            let next = if forward {
-                self.next(cursor)
+            let next = self.grapheme_step(&mut navigator, forward);
+            let range = if first {
+                first = false;
+                if forward {
+                    self.previous(next)..next
+                } else {
+                    next..self.next(next)
+                }
             } else {
-                self.previous(cursor)
+                cursor.min(next)..cursor.max(next)
             };
-            let range = cursor.min(next)..cursor.max(next);
             let current = WordClass::for_grapheme(&self.text[range]);
             if let Some(kind) = kind {
                 if current != kind {
@@ -457,9 +473,32 @@ mod tests {
     use super::*;
     use unicode_segmentation::UnicodeSegmentation;
     #[test]
+    /// Word movement from a valid native scalar position inside a combining/Indic cluster classifies that entire cluster, preserving identifier boundaries.
+    fn word_navigation_from_inside_a_grapheme() {
+        for word in ["e\u{301}_name", "क्\u{200d}ष_tail"] {
+            let text = format!("prefix {word} suffix");
+            let start = "prefix ".len();
+            let end = start + word.len();
+            let mut buffer = TextBuffer::new(65536);
+            assert!(buffer.reset(text));
+            for (relative, _) in word.char_indices().skip(1) {
+                assert_eq!(buffer.next_word(start + relative), end);
+                assert_eq!(buffer.previous_word(start + relative), start);
+            }
+        }
+    }
+
+    #[test]
     /// Every clicked byte, including scalar interiors, resolves the same whole Unicode token while preserving original text and selection.
     fn clicked_word_ranges_keep_whole_graphemes() {
-        let tokens = ["Аe\u{301}_β99", "  ", "(::)", " ", "👩🏽\u{200d}💻", "\r\n"];
+        let tokens = [
+            "Аe\u{301}_β99क्\u{200d}ष",
+            "  ",
+            "(::)",
+            " ",
+            "👩🏽\u{200d}💻🇦🇧🇨🇩🇪",
+            "\r\n",
+        ];
         let text = tokens.concat();
         let mut buffer = TextBuffer::new(65536);
         assert!(buffer.reset(text.clone()));

@@ -19,6 +19,46 @@ fn large_marked_text() -> String {
     text
 }
 
+/// Times actual owned word-key handlers on valid byte-sized Unicode runs, leaving text/selection/revision intact within each sample and excluding document replacement/painting.
+fn measure_word_runs(
+    editor: &mut NativeEditor,
+    window: &mut Window,
+    cx: &mut Context<NativeEditor>,
+) -> serde_json::Value {
+    let mut measurements = Vec::new();
+    for (label, text) in [
+        ("regional_flags", "🇦".repeat(4000)),
+        ("cyrillic_letters", "А".repeat(8000)),
+    ] {
+        assert!(editor.buffer.replace_document(&text));
+        let revision = editor.buffer.revision;
+        editor.buffer.select(text.len(), false);
+        let started = std::time::Instant::now();
+        for _ in 0..16 {
+            for key in ["ctrl-left", "ctrl-right"] {
+                editor.key_down(
+                    &KeyDownEvent {
+                        keystroke: Keystroke::parse(key).unwrap(),
+                        is_held: false,
+                    },
+                    window,
+                    cx,
+                );
+                assert_eq!(
+                    editor.buffer.selection.cursor,
+                    if key == "ctrl-left" { 0 } else { text.len() }
+                );
+            }
+        }
+        let elapsed = started.elapsed();
+        assert_eq!(editor.buffer.text(), text);
+        assert_eq!(editor.buffer.revision, revision);
+        assert_eq!(editor.buffer.selection.anchor, text.len());
+        measurements.push(serde_json::json!({"sample":label,"text_bytes":text.len(),"handler_calls":32,"total_ms":elapsed.as_secs_f64()*1000.}));
+    }
+    serde_json::json!({"samples":measurements,"scope":"actual native Ctrl Left/Right handler CPU-code wall time on complete 16k-byte Unicode runs; replacement/painting/scheduling/GPU excluded; temporary samples are replaced before rendering final Result"})
+}
+
 impl Hunkra {
     /// Exercises native Result input, preview refusal, locale retention and full-text undo/redo without touching clipboard or Git writes.
     pub(super) fn smoke_editor_layout_input(
@@ -131,6 +171,8 @@ impl Hunkra {
             assert_eq!(editor.read(cx).buffer.text(), "Снова🦀\r\nEOF");
             self.smoke.as_mut().unwrap().marker_summary_before =
                 Some(conflict.read(cx).chunk_measurements());
+            let word_runs = editor.update(cx, |editor, cx| measure_word_runs(editor, window, cx));
+            self.smoke.as_mut().unwrap().word_run_navigation = Some(word_runs);
             let measurements = editor.update(cx, |editor, cx| {
                 editor.buffer.replace_document(&large_marked_text());
                 let end = editor.buffer.text().len();
@@ -356,7 +398,7 @@ impl Hunkra {
             assert!(conflict.read(cx).dirty(cx));
             assert!(!self.writing);
             let smoke = self.smoke.as_ref().unwrap();
-            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"grapheme_navigation":smoke.grapheme_navigation,"utf16_queries":smoke.utf16_queries,"word_navigation_preserves_graphemes_and_revision":true,"multiple_click_selection_preserves_text_revision":true,"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
+            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"grapheme_navigation":smoke.grapheme_navigation,"utf16_queries":smoke.utf16_queries,"word_run_navigation":smoke.word_run_navigation,"word_navigation_preserves_graphemes_and_revision":true,"multiple_click_selection_preserves_text_revision":true,"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
             std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
             cx.quit();
             return;

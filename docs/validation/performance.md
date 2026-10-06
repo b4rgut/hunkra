@@ -84,3 +84,14 @@ Two sequential native debug runs after compilation/tests/private installation fi
 | Current-text sparse coordinates |4.510487|0.155582|
 
 One lazy OnceLock retains scalar-safe byte/UTF-16 pairs spaced by at least512bytes. The maximum2MiB buffer passes a <=65568pair-byte capacity check (allocator/container overhead excluded); no source copy/word index is retained. Accepted mutations/reset/composition/undo/redo retire points; selection/unmark/locale/rejected writes reuse them. Zero coordinates bypass construction. Full scalar/prefix oracle checks every byte/native unit and surrogate/reversed/EOF/out-of-range/checkpoint edges. GPUI0.2.2 Wayland IME-area handling queries marked text/bounds, X11 queries selected text/bounds; ordinary Wayland arrow repaint is not claimed to run these conversions. Full samples/identities and acceptance: utf16-coordinates.json. The certified3ce8153 package predates this change.
+
+## Native Unicode word navigation
+
+Two sequential native debug runs measure32actual Ctrl Left/Right handlers across complete16,000-byte runs. Builds/tests/private installation had finished; the desktop load was uncontrolled. Document replacement, painting/scheduling/GPU and physical input are excluded. Both runs restore the original EOF selection, preserve text/revision and pass the independent oracle for every private Git/worktree byte.
+
+| Sample | Recreated cursor per grapheme ms | Retained directional cursor ms |
+|---|---:|---:|
+| Regional indicators (4000scalars) |2968.948974|23.454046|
+| Cyrillic letters (8000scalars) |54.570486|45.956108|
+
+The retained GraphemeCursor carries regional/Indic context between consecutive boundaries; the initial contextual lookup can still inspect preceding text. Word selection uses one cursor per direction too. A separate regression corrects native scalar carets inside combining/Indic clusters: classification now includes the complete first grapheme and reaches the identifier boundary. Full samples, exact debug identities and functional checks are in word-run-navigation.json. No universal constant-time, optimized-build, full-frame or cross-host speed claim; the certifiedbd8b459 package predates this slice. The locked [GraphemeCursor API](https://docs.rs/unicode-segmentation/1.13.3/unicode_segmentation/struct.GraphemeCursor.html) and its exact registry source were checked.
