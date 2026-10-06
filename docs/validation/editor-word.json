@@ -1,0 +1,73 @@
+{
+  "ok": true,
+  "native_display": true,
+  "scenario": "editor-layout",
+  "frames": 32,
+  "locales": [
+    "Changes",
+    "Изменения",
+    "Изменения"
+  ],
+  "giant_line_bytes": 32768,
+  "newline_document_bytes": 2097152,
+  "text_retained": true,
+  "notice_has_no_source_coordinates": true,
+  "replacement_undo_redo": true,
+  "large_result_bytes": 1599833,
+  "stable_result_phases": 16,
+  "marker_summary_before": {
+    "requests": 9,
+    "parser": {
+      "count": 5,
+      "mean_ms": 0.755062,
+      "max_ms": 1.929491
+    },
+    "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+  },
+  "marker_summary": {
+    "requests": 26,
+    "parser": {
+      "count": 6,
+      "mean_ms": 1.6907256666666666,
+      "max_ms": 6.369044
+    },
+    "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+  },
+  "grapheme_navigation": {
+    "text_bytes": 1599833,
+    "handler_calls": 32,
+    "total_ms": 0.03334,
+    "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+  },
+  "word_navigation_preserves_graphemes_and_revision": true,
+  "wheel_preserves_text_cursor_and_revision": true,
+  "explicit_home_restores_source_coordinates": true,
+  "page_navigation_preserves_text_revision": true,
+  "page_selection_and_source_coordinates": true,
+  "read_only": true,
+  "scope": "actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+  "stable_marker_summary_parses": 1,
+  "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+  "binary_sha256": "139b29245de206bb33f2f5f805b14bd44e2eb7dda7c843f7a7710ac729c90044",
+  "source_scope": "720e24d plus owned grapheme word navigation/deletion, original-caret deletion undo and registered/native acceptance; debug binary",
+  "regressions": [
+    "Registered Ctrl Right first failed with cursor0 instead of Cyrillic word end12",
+    "After word keys were implemented, undo of Ctrl Delete restored the temporary deletion selection instead of the original collapsed caret; delete_to now records the original selection",
+    "Registered word/shift-word/delete/undo/readonly/single-line keys, pure token/global-grapheme bounds and actual 1.6MiB native Result navigation pass"
+  ],
+  "word_policy": "skip initial Unicode whitespace, then one letters/numbers/underscore or punctuation/emoji run; whole extended graphemes retained; owned policy, exact Zed token semantics are not claimed",
+  "checks": {
+    "headless": 139,
+    "core": 109,
+    "app": 30,
+    "gpui_library": 43,
+    "gpui_host": 5,
+    "strict_clippy": "headless/gui/gui-tests passed",
+    "fmt_i18n_plan": "passed"
+  },
+  "measurement_scope": "functional native acceptance; handler timing is observational only, not a comparison; other native functional cases were running during the final editor case; no physical/pixel/GPU/Zed parity claim",
+  "primary_api_sources": [
+    "https://doc.rust-lang.org/stable/std/primitive.char.html#method.is_alphanumeric",
+    "https://docs.rs/unicode-segmentation/1.13.3/unicode_segmentation/struct.GraphemeCursor.html"
+  ]
+}

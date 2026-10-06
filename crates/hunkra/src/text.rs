@@ -5,6 +5,25 @@ use unicode_segmentation::GraphemeCursor;
 const MAX_UNDO_BYTES: usize = 8 * 1024 * 1024;
 const MAX_UNDO_EDITS: usize = 256;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum WordClass {
+    Space,
+    Word,
+    Punctuation,
+}
+impl WordClass {
+    /// Classifies whole graphemes: whitespace, letters/numbers/identifier underscores, or punctuation/emoji.
+    fn for_grapheme(text: &str) -> Self {
+        if text.chars().all(char::is_whitespace) {
+            Self::Space
+        } else if text.chars().any(|ch| ch.is_alphanumeric() || ch == '_') {
+            Self::Word
+        } else {
+            Self::Punctuation
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Selection {
     pub anchor: usize,
@@ -145,6 +164,41 @@ impl TextBuffer {
             .expect("complete UTF-8 text supplies grapheme context")
             .unwrap_or(0)
     }
+    /// Moves forward over initial whitespace and then one word or punctuation run, retaining complete graphemes.
+    pub fn next_word(&self, byte: usize) -> usize {
+        self.word_boundary(byte, true)
+    }
+    /// Moves backward over initial whitespace and then one word or punctuation run without splitting CRLF or joined emoji.
+    pub fn previous_word(&self, byte: usize) -> usize {
+        self.word_boundary(byte, false)
+    }
+    /// Walks only neighboring graphemes needed by the requested token; no document-wide word index or text copy is retained.
+    fn word_boundary(&self, byte: usize, forward: bool) -> usize {
+        let mut cursor = self.boundary(byte);
+        let mut kind = None;
+        while if forward {
+            cursor < self.text.len()
+        } else {
+            cursor > 0
+        } {
+            let next = if forward {
+                self.next(cursor)
+            } else {
+                self.previous(cursor)
+            };
+            let range = cursor.min(next)..cursor.max(next);
+            let current = WordClass::for_grapheme(&self.text[range]);
+            if let Some(kind) = kind {
+                if current != kind {
+                    break;
+                }
+            } else if current != WordClass::Space {
+                kind = Some(current);
+            }
+            cursor = next;
+        }
+        cursor
+    }
     /// Bounds history by retained edit bytes and count; an oversized edit stays undoable alone.
     fn remember(&mut self, edit: Edit) {
         if edit.removed == edit.inserted {
@@ -198,6 +252,16 @@ impl TextBuffer {
         }
         self.unmark();
         true
+    }
+    /// Deletes the existing selection or bytes toward one boundary, remembering the original caret rather than a temporary deletion selection.
+    pub fn delete_to(&mut self, byte: usize) -> bool {
+        self.unmark();
+        let mut range = self.selection.range();
+        if range.is_empty() {
+            let target = self.boundary(byte);
+            range = self.selection.cursor.min(target)..self.selection.cursor.max(target);
+        }
+        !range.is_empty() && self.replace_bytes(range, "", true)
     }
     /// Replaces a full document with one minimal scalar-safe undo edit, retaining unchanged bytes.
     pub fn replace_document(&mut self, text: &str) -> bool {
@@ -325,6 +389,90 @@ impl TextBuffer {
 mod tests {
     use super::*;
     use unicode_segmentation::UnicodeSegmentation;
+    #[test]
+    /// Word jumps group identifiers and punctuation, skip initial Unicode whitespace and land only on complete global graphemes.
+    fn word_navigation_retains_graphemes_and_token_groups() {
+        let segments = [
+            "  foo_bar42",
+            "::",
+            "кириллица",
+            " e\u{301}",
+            " 👩🏽\u{200d}💻",
+            "\r\n\t尾",
+        ];
+        let text = segments.concat();
+        let mut buffer = TextBuffer::new(65536);
+        assert!(buffer.reset(text.clone()));
+        let mut cursor = 0;
+        for segment in segments {
+            let expected = cursor + segment.len();
+            assert_eq!(buffer.next_word(cursor), expected);
+            cursor = expected;
+        }
+        for segment in [
+            "尾",
+            "\r\n\t👩🏽\u{200d}💻",
+            " e\u{301}",
+            " кириллица",
+            "::",
+            "foo_bar42",
+            "  ",
+        ] {
+            let expected = cursor - segment.len();
+            assert_eq!(buffer.previous_word(cursor), expected);
+            cursor = expected;
+        }
+        assert_eq!(cursor, 0);
+        let mut boundaries = text
+            .grapheme_indices(true)
+            .map(|(byte, _)| byte)
+            .collect::<Vec<_>>();
+        boundaries.push(text.len());
+        let before = (buffer.selection, buffer.revision);
+        for byte in (0..=text.len() + 4).chain(std::iter::once(usize::MAX)) {
+            assert!(boundaries.contains(&buffer.next_word(byte)));
+            assert!(boundaries.contains(&buffer.previous_word(byte)));
+        }
+        assert_eq!((buffer.selection, buffer.revision), before);
+        assert_eq!(buffer.text(), text);
+        assert_eq!(buffer.next_word(usize::MAX), text.len());
+        assert_eq!(buffer.previous_word(0), 0);
+    }
+    #[test]
+    /// Deleting toward a word/grapheme boundary restores the original collapsed caret on undo, while an explicit selection retains its direction.
+    fn deletion_undo_restores_the_original_caret() {
+        let text = "начало e\u{301}👩🏽\u{200d}💻\r\nконец";
+        let cursor = "начало e\u{301}".len();
+        let mut buffer = TextBuffer::new(65536);
+        for target in [
+            "начало ".len(),
+            "начало e\u{301}👩🏽\u{200d}💻".len(),
+            text.len(),
+        ] {
+            assert!(buffer.reset(text.into()));
+            buffer.select(cursor, false);
+            let before = buffer.selection;
+            assert!(buffer.delete_to(target));
+            assert!(buffer.undo());
+            assert_eq!(buffer.text(), text);
+            assert_eq!(buffer.selection, before);
+            assert!(buffer.redo());
+            assert_eq!(buffer.selection.range().len(), 0);
+        }
+        buffer.reset(text.into());
+        buffer.select(text.len(), false);
+        buffer.select(cursor, true);
+        let before = buffer.selection;
+        assert!(buffer.delete_to(0));
+        assert_eq!(buffer.text(), &text[..cursor]);
+        assert!(buffer.undo());
+        assert_eq!(buffer.selection, before);
+        buffer.select(0, false);
+        let revision = buffer.revision;
+        assert!(!buffer.delete_to(0));
+        assert_eq!(buffer.revision, revision);
+    }
+
     #[test]
     /// Minimal document edits stay scalar-safe, bounded and reversible with the original selection.
     fn document_choice_preserves_unicode_context_and_undo() {

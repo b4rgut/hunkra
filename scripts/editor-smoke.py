@@ -49,6 +49,7 @@ def smoke(destination):
         assert evidence["ok"] and evidence["native_display"] and evidence["text_retained"] and evidence["replacement_undo_redo"]
         assert evidence["wheel_preserves_text_cursor_and_revision"] and evidence["explicit_home_restores_source_coordinates"]
         assert evidence["page_navigation_preserves_text_revision"] and evidence["page_selection_and_source_coordinates"]
+        assert evidence["word_navigation_preserves_graphemes_and_revision"]
         navigation=evidence["grapheme_navigation"]
         assert navigation["handler_calls"]==32 and navigation["text_bytes"]==evidence["large_result_bytes"] and navigation["total_ms"]>=0
         assert evidence["locales"] == ["Changes", "Изменения", "Изменения"]

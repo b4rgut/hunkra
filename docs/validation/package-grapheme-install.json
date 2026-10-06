@@ -1,0 +1,12 @@
+{
+  "ok": true,
+  "version": "0.1.0",
+  "image": "quay.io/fedora/fedora:44@sha256:88f7f8b5d1db37df588399fcfc0c71f3258d653706257ecd749b8d60fdc9f4fe",
+  "rpm_sha256": "1604eba03268f55eb31003d608fac2b555b55b62f103b281cf76379657aa5a7f",
+  "installed_binary_sha256": "439e316ec572392b51d4f95f46c046d09dd9fdbd2dae68c263079012218c94b0",
+  "rootless": true,
+  "optional_docs_excluded": true,
+  "rpm_verify": "passed",
+  "mandatory_notices_source_launcher_icon_identity": "passed",
+  "scope": "real fresh Fedora container installation and headless version launch; host RPM database/configuration untouched; display/GPU and independent Rust rebuild not exercised here"
+}

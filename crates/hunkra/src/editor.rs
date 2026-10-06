@@ -327,20 +327,21 @@ impl NativeEditor {
                 }
             }
             (true, "y") if self.enabled => changed = self.buffer.redo(),
-            (false, "backspace" | "delete") if self.enabled => {
+            (_, "backspace" | "delete") if self.enabled && !modifiers.alt => {
                 self.buffer.unmark();
-                if self.buffer.selection.range().is_empty() {
-                    let cursor = self.buffer.selection.cursor;
-                    self.buffer.select(
-                        if key == "backspace" {
-                            self.buffer.previous(cursor)
-                        } else {
-                            self.buffer.next(cursor)
-                        },
-                        true,
-                    );
-                }
-                changed = self.buffer.replace(None, "");
+                let cursor = self.buffer.selection.cursor;
+                let target = if !self.buffer.selection.range().is_empty() {
+                    cursor
+                } else if command && key == "backspace" {
+                    self.buffer.previous_word(cursor)
+                } else if command {
+                    self.buffer.next_word(cursor)
+                } else if key == "backspace" {
+                    self.buffer.previous(cursor)
+                } else {
+                    self.buffer.next(cursor)
+                };
+                changed = self.buffer.delete_to(target);
             }
             (false, "enter") if self.enabled => {
                 if self.single_line {
@@ -354,10 +355,16 @@ impl NativeEditor {
                     changed = self.buffer.replace(None, newline);
                 }
             }
-            (false, "left" | "right") => {
+            (_, "left" | "right") if !command || !modifiers.alt => {
                 self.buffer.unmark();
                 let range = self.buffer.selection.range();
-                let index = if !extend && !range.is_empty() {
+                let index = if command {
+                    if key == "left" {
+                        self.buffer.previous_word(self.buffer.selection.cursor)
+                    } else {
+                        self.buffer.next_word(self.buffer.selection.cursor)
+                    }
+                } else if !extend && !range.is_empty() {
                     if key == "left" {
                         range.start
                     } else {
@@ -838,6 +845,103 @@ mod tests {
         (0..200)
             .map(|number| format!("{number:03} Кириллица🦀 {}\r\n", "long text ".repeat(200)))
             .collect()
+    }
+
+    #[gpui::test]
+    /// Registered Ctrl word keys navigate/select Unicode tokens, delete exact bytes in editable fields and preserve readonly text plus undo selection.
+    fn word_keys_preserve_unicode_and_undo(cx: &mut TestAppContext) {
+        let original = "начало e\u{301}_слово 👩🏽\u{200d}💻\r\nконец";
+        let word_start = "начало ".len();
+        let word_end = "начало e\u{301}_слово".len();
+        let emoji_start = "начало e\u{301}_слово ".len();
+        let emoji_end = "начало e\u{301}_слово 👩🏽\u{200d}💻".len();
+        let final_start = "начало e\u{301}_слово 👩🏽\u{200d}💻\r\n".len();
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let mut editor = NativeEditor::new(65536, "text".into(), "limit".into(), cx);
+            editor.buffer.reset(original.into());
+            editor.buffer.select(0, false);
+            window.focus(&editor.focus);
+            editor
+        });
+        let revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        cx.simulate_keystrokes("ctrl-right");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            "начало".len(),
+            "Ctrl Right did not move to the word end"
+        );
+        cx.simulate_keystrokes("ctrl-shift-right");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            "начало".len()..word_end
+        );
+        cx.simulate_keystrokes("ctrl-left");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            word_start
+        );
+        cx.simulate_keystrokes("ctrl-right ctrl-right");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            emoji_end
+        );
+        cx.simulate_keystrokes("ctrl-shift-left");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            emoji_start..emoji_end
+        );
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.revision),
+            revision
+        );
+        cx.simulate_keystrokes("ctrl-backspace");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            "начало e\u{301}_слово \r\nконец"
+        );
+        cx.simulate_keystrokes("ctrl-z");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.text() == original
+                && editor.buffer.selection.range() == (emoji_start..emoji_end))
+        );
+        editor.update(cx, |editor, _| editor.buffer.select(emoji_end, false));
+        cx.simulate_keystrokes("ctrl-delete");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            &original[..emoji_end]
+        );
+        cx.simulate_keystrokes("ctrl-z");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.text() == original
+                && editor.buffer.selection.cursor == emoji_end)
+        );
+        editor.update(cx, |editor, _| {
+            editor.enabled = false;
+            editor.buffer.select(original.len(), false);
+        });
+        let readonly_revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        cx.simulate_keystrokes("ctrl-left ctrl-backspace ctrl-delete");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor
+                == final_start
+                && editor.buffer.text() == original
+                && editor.buffer.revision == readonly_revision)
+        );
+        editor.update(cx, |editor, _| {
+            editor.enabled = true;
+            editor.single_line = true;
+            editor.buffer.reset("ветка/feature_часть".into());
+        });
+        cx.simulate_keystrokes("ctrl-backspace");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            "ветка/"
+        );
+        cx.simulate_keystrokes("ctrl-z ctrl-shift-left");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            "ветка/".len().."ветка/feature_часть".len()
+        );
     }
 
     #[gpui::test]
