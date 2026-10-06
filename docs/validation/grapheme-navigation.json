@@ -1,0 +1,109 @@
+{
+  "ok": true,
+  "baseline": {
+    "ok": true,
+    "native_display": true,
+    "scenario": "editor-layout",
+    "frames": 32,
+    "locales": [
+      "Changes",
+      "Изменения",
+      "Изменения"
+    ],
+    "giant_line_bytes": 32768,
+    "newline_document_bytes": 2097152,
+    "text_retained": true,
+    "notice_has_no_source_coordinates": true,
+    "replacement_undo_redo": true,
+    "large_result_bytes": 1599833,
+    "stable_result_phases": 16,
+    "marker_summary_before": {
+      "requests": 9,
+      "parser": {
+        "count": 5,
+        "mean_ms": 0.7623638,
+        "max_ms": 1.9089319999999999
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "marker_summary": {
+      "requests": 26,
+      "parser": {
+        "count": 6,
+        "mean_ms": 1.7388153333333332,
+        "max_ms": 6.621073
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "grapheme_navigation": {
+      "text_bytes": 1599833,
+      "handler_calls": 32,
+      "total_ms": 4499.240194,
+      "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+    },
+    "wheel_preserves_text_cursor_and_revision": true,
+    "explicit_home_restores_source_coordinates": true,
+    "page_navigation_preserves_text_revision": true,
+    "page_selection_and_source_coordinates": true,
+    "read_only": true,
+    "scope": "actual native Result input/layout/locale/undo/scroll/page handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+    "stable_marker_summary_parses": 1,
+    "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+    "binary_sha256": "5fe2626bae25903a5974ce7cd894c5f997c39257e2b083a2708ff75b1db2e491",
+    "source_scope": "05c252c plus finite native grapheme handler instrumentation; original full-prefix TextBuffer.next/previous; test-only oracle excluded from runtime"
+  },
+  "cursor": {
+    "ok": true,
+    "native_display": true,
+    "scenario": "editor-layout",
+    "frames": 33,
+    "locales": [
+      "Changes",
+      "Изменения",
+      "Изменения"
+    ],
+    "giant_line_bytes": 32768,
+    "newline_document_bytes": 2097152,
+    "text_retained": true,
+    "notice_has_no_source_coordinates": true,
+    "replacement_undo_redo": true,
+    "large_result_bytes": 1599833,
+    "stable_result_phases": 16,
+    "marker_summary_before": {
+      "requests": 9,
+      "parser": {
+        "count": 5,
+        "mean_ms": 0.8154266,
+        "max_ms": 2.114464
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "marker_summary": {
+      "requests": 26,
+      "parser": {
+        "count": 6,
+        "mean_ms": 1.766843,
+        "max_ms": 6.523925
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "grapheme_navigation": {
+      "text_bytes": 1599833,
+      "handler_calls": 32,
+      "total_ms": 0.096442,
+      "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+    },
+    "wheel_preserves_text_cursor_and_revision": true,
+    "explicit_home_restores_source_coordinates": true,
+    "page_navigation_preserves_text_revision": true,
+    "page_selection_and_source_coordinates": true,
+    "read_only": true,
+    "scope": "actual native Result input/layout/locale/undo/scroll/page handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+    "stable_marker_summary_parses": 1,
+    "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+    "binary_sha256": "9b6dc80ed216efb0e994cec889e5f50c47b9b71fcaf85fbdf60c120052252d31",
+    "source_scope": "05c252c plus finite native instrumentation and full-context GraphemeCursor seeking; test-only boundary oracle excluded from production"
+  },
+  "measurement_scope": "two sequential debug native runs after builds, tests and private installation completed; no simultaneous compiler/container/agent/native run; desktop load uncontrolled; handler CPU-code wall only, no full-frame/GPU/optimized/cross-host speed claim",
+  "unicode_oracle": "global extended-grapheme iterator compared at every byte, including scalar interiors/EOF/out-of-range/usizeMAX; Cyrillic, combining accents, emoji ZWJ/skin tone, odd regional indicators, Indic linkers, Arabic prepend, Hangul and CRLF; immutable model state and native Git/worktree invariants preserved"
+}

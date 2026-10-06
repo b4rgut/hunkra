@@ -1,6 +1,6 @@
 //! Owned Unicode text, selection, IME composition and bounded undo, independent of GPUI.
 use std::ops::Range;
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::GraphemeCursor;
 
 const MAX_UNDO_BYTES: usize = 8 * 1024 * 1024;
 const MAX_UNDO_EDITS: usize = 256;
@@ -127,21 +127,22 @@ impl TextBuffer {
         }
         self.selection.cursor = byte;
     }
-    /// Finds the next whole grapheme, including combining marks and joined emoji.
+    /// Seeks the next extended-grapheme boundary from the cursor, supplying complete Unicode context without allocating a prefix index.
     pub fn next(&self, byte: usize) -> usize {
-        self.text
-            .grapheme_indices(true)
-            .map(|(offset, _)| offset)
-            .find(|offset| *offset > byte)
+        GraphemeCursor::new(self.boundary(byte), self.text.len(), true)
+            .next_boundary(&self.text, 0)
+            .expect("complete UTF-8 text supplies grapheme context")
             .unwrap_or(self.text.len())
     }
-    /// Finds the previous whole grapheme without splitting its constituent scalars.
+    /// Seeks the previous extended boundary with global context; an interior scalar offset rounds forward to preserve existing navigation semantics.
     pub fn previous(&self, byte: usize) -> usize {
-        self.text
-            .grapheme_indices(true)
-            .map(|(offset, _)| offset)
-            .take_while(|offset| *offset < byte)
-            .last()
+        let mut byte = byte.min(self.text.len());
+        while !self.text.is_char_boundary(byte) {
+            byte += 1;
+        }
+        GraphemeCursor::new(byte, self.text.len(), true)
+            .prev_boundary(&self.text, 0)
+            .expect("complete UTF-8 text supplies grapheme context")
             .unwrap_or(0)
     }
     /// Bounds history by retained edit bytes and count; an oversized edit stays undoable alone.
@@ -323,6 +324,7 @@ impl TextBuffer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use unicode_segmentation::UnicodeSegmentation;
     #[test]
     /// Minimal document edits stay scalar-safe, bounded and reversible with the original selection.
     fn document_choice_preserves_unicode_context_and_undo() {
@@ -357,6 +359,47 @@ mod tests {
         assert!(buffer.replace_document(&format!("{context}B{context}")));
         let edit = buffer.undo.last().unwrap();
         assert_eq!((&*edit.removed, &*edit.inserted), ("A", "B"));
+    }
+    #[test]
+    /// Every byte position retains global extended-grapheme boundaries, including scalar interiors, Unicode context and offsets beyond EOF.
+    fn cursor_navigation_matches_extended_grapheme_boundaries() {
+        for text in [
+            "",
+            "AБ\r\nе\u{301}👩\u{200d}💻🧑🏽\u{200d}🚀Z",
+            "🇦🇧🇨🇩🇪🇫🇬",
+            "क्\u{200d}षक्ष\u{600}A각\r\n",
+        ] {
+            let mut buffer = TextBuffer::new(65536);
+            assert!(buffer.reset(text.into()));
+            let starts = text
+                .grapheme_indices(true)
+                .map(|(offset, _)| offset)
+                .collect::<Vec<_>>();
+            let selection = buffer.selection;
+            let revision = buffer.revision;
+            for byte in (0..=text.len() + 4).chain(std::iter::once(usize::MAX)) {
+                let next = starts
+                    .iter()
+                    .copied()
+                    .find(|offset| *offset > byte)
+                    .unwrap_or(text.len());
+                let previous = starts
+                    .iter()
+                    .copied()
+                    .take_while(|offset| *offset < byte)
+                    .last()
+                    .unwrap_or(0);
+                assert_eq!(buffer.next(byte), next, "next at{byte} in{text:?}");
+                assert_eq!(
+                    buffer.previous(byte),
+                    previous,
+                    "previous at{byte} in{text:?}"
+                );
+            }
+            assert_eq!(buffer.text(), text);
+            assert_eq!(buffer.selection, selection);
+            assert_eq!(buffer.revision, revision);
+        }
     }
     #[test]
     /// Cyrillic, combining marks, joined emoji and CRLF survive grapheme edits plus undo/redo.
