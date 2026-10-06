@@ -46,6 +46,11 @@ def release():
     assert packages["hunkra"]["version_group"] == packages["hunkra-core"]["version_group"]
     assert "hunkra-core" in packages["hunkra"]["changelog_include"]
     assert not config["workspace"]["release_always"]
+    artifact = (ROOT / ".github/workflows/artifact.yml").read_text()
+    image = (ROOT / "packaging/fedora-image.txt").read_text().strip()
+    assert image in artifact and "package-rpm" in artifact and "check-package" in artifact
+    assert "artifact-check.py" in artifact and "tsflags=nodocs" in artifact
+    assert "contents: read" in artifact and "HUNKRA_RELEASE_TOKEN" not in artifact
     subprocess.run([str(ROOT / ".tools/bin/release-plz"), "--version"], check=True)
     subprocess.run([sys.executable, str(ROOT / "scripts/release-check.py")], check=True)
     print("Release policy and disposable update tests passed; no real tag, push or release executed")

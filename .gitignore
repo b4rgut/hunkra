@@ -3,3 +3,5 @@
 /.local-sysroot/
 /demo-repositories/
 *.log
+
+/scripts/__pycache__/

@@ -41,7 +41,7 @@ def smoke(destination):
         def native(root, action, target="review/ветка", path="", url="", format="sha1", close=False):
             """Invoke a finite real Wayland window; secret-capable field inputs stay out of its JSON evidence."""
             report_path = fixture / f"report-{len(reports)}.json"
-            args = [str(ROOT / "target/debug/hunkra")]
+            args = [str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra")))]
             if root is not None:
                 args.append(str(root))
             args += ["--smoke-test", str(report_path), "--smoke-operation", action]

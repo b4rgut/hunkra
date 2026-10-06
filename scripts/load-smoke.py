@@ -46,7 +46,7 @@ def smoke(destination):
             index=(root/".git/index").read_bytes();head=git(root,"rev-parse","HEAD");stages=git(root,"ls-files","--stage");f=(root/"f").read_bytes()
             report_path=fixture/(action+".json")
             env=dict(environment,HUNKRA_SMOKE_EXPECT_FILES=str(count))
-            result=subprocess.run([str(ROOT/"target/debug/hunkra"),str(root),"--smoke-test",str(report_path),"--smoke-operation",action],env=env,capture_output=True,timeout=40)
+            result=subprocess.run([str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))),str(root),"--smoke-test",str(report_path),"--smoke-operation",action],env=env,capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr.decode(errors="replace")
             report=json.loads(report_path.read_text());assert report["ok"] and report["native_display"] and report["message_retained"]
             assert report["locales"]==["Changes","Изменения","Изменения"]

@@ -42,7 +42,7 @@ def smoke(destination):
             settings_before=settings.read_bytes()
             before={item:{"head":git(item,"rev-parse","HEAD"),"index":(item/".git/index").read_bytes(),"stages":git(item,"ls-files","--stage"),"status":git(item,"status","--porcelain=v1","-z","--untracked-files=all"),"files":{str(path.relative_to(item)):path.read_bytes() for path in item.rglob("*") if path.is_file() and ".git" not in path.relative_to(item).parts}} for item in (root,recent)}
             report=fixture/(action+".json")
-            result=subprocess.run([str(ROOT/"target/debug/hunkra"),str(root),"--smoke-test",str(report),"--smoke-operation",action],cwd=fixture,env=dict(environment,HUNKRA_UX_RECENT=str(recent)),capture_output=True,timeout=40)
+            result=subprocess.run([str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))),str(root),"--smoke-test",str(report),"--smoke-operation",action],cwd=fixture,env=dict(environment,HUNKRA_UX_RECENT=str(recent)),capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr.decode(errors="replace")
             evidence=json.loads(report.read_text());assert evidence["ok"] and evidence["native_display"] and evidence["read_only"]
             assert evidence["locales"]==["Changes","Изменения","Изменения"]

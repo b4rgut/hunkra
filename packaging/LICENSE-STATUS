@@ -1,0 +1,6 @@
+Hunkra's product license has not been selected by its owner.
+LicenseRef-Hunkra-Unselected records that fact; it does not choose a product license.
+This build is a local review artifact. No publication or additional license grant is assumed.
+Exact locked dependency declarations and available source license/notice files are
+included separately in third-party.json and third-party/. System shared libraries
+remain supplied by their Fedora packages and are not copied into this RPM.

@@ -1,0 +1,2371 @@
+{
+  "ok": true,
+  "version": "0.1.0",
+  "rpm_sha256": "11ab98b36e5057ca09c0fff5e022d66d07b54c21e920b8436c2b4cf39ee29492",
+  "input_binary_sha256": "3c495252d4346cbfcd8acf57320c19261f6e710dd29eff74bda2a33a36214846",
+  "packaged_binary_sha256": "5e59f971f1ea1b4e2a65794ab3de2f93ecea798c87914a8989d7d7f14a1740dd",
+  "rpm_bytes": 12874696,
+  "payload_files_checked": 1057,
+  "reproducible_assembly": true,
+  "reproducibility_scope": "same binary/payload bytes and source epoch; independent complete Rust-build equivalence not claimed",
+  "requirements": [
+    "font(dejavusans)",
+    "font(dejavusansmono)",
+    "git-core",
+    "ld-linux-x86-64.so.2()(64bit)",
+    "ld-linux-x86-64.so.2(GLIBC_2.3)(64bit)",
+    "libc.so.6()(64bit)",
+    "libc.so.6(GLIBC_2.14)(64bit)",
+    "libc.so.6(GLIBC_2.15)(64bit)",
+    "libc.so.6(GLIBC_2.16)(64bit)",
+    "libc.so.6(GLIBC_2.17)(64bit)",
+    "libc.so.6(GLIBC_2.18)(64bit)",
+    "libc.so.6(GLIBC_2.2.5)(64bit)",
+    "libc.so.6(GLIBC_2.25)(64bit)",
+    "libc.so.6(GLIBC_2.28)(64bit)",
+    "libc.so.6(GLIBC_2.29)(64bit)",
+    "libc.so.6(GLIBC_2.3)(64bit)",
+    "libc.so.6(GLIBC_2.3.2)(64bit)",
+    "libc.so.6(GLIBC_2.3.4)(64bit)",
+    "libc.so.6(GLIBC_2.30)(64bit)",
+    "libc.so.6(GLIBC_2.32)(64bit)",
+    "libc.so.6(GLIBC_2.33)(64bit)",
+    "libc.so.6(GLIBC_2.34)(64bit)",
+    "libc.so.6(GLIBC_2.39)(64bit)",
+    "libc.so.6(GLIBC_2.4)(64bit)",
+    "libc.so.6(GLIBC_2.6)(64bit)",
+    "libc.so.6(GLIBC_2.7)(64bit)",
+    "libc.so.6(GLIBC_2.9)(64bit)",
+    "libcrypto.so.3()(64bit)",
+    "libcrypto.so.3(OPENSSL_3.0.0)(64bit)",
+    "libfontconfig.so.1()(64bit)",
+    "libfreetype.so.6()(64bit)",
+    "libgcc_s.so.1()(64bit)",
+    "libgcc_s.so.1(GCC_3.0)(64bit)",
+    "libgcc_s.so.1(GCC_3.3)(64bit)",
+    "libgcc_s.so.1(GCC_4.2.0)(64bit)",
+    "libm.so.6()(64bit)",
+    "libm.so.6(GLIBC_2.2.5)(64bit)",
+    "libm.so.6(GLIBC_2.27)(64bit)",
+    "libm.so.6(GLIBC_2.29)(64bit)",
+    "libm.so.6(GLIBC_2.35)(64bit)",
+    "libm.so.6(GLIBC_2.43)(64bit)",
+    "libssl.so.3()(64bit)",
+    "libssl.so.3(OPENSSL_3.0.0)(64bit)",
+    "libssl.so.3(OPENSSL_3.2.0)(64bit)",
+    "libvulkan.so.1()(64bit)",
+    "libwayland-client.so.0()(64bit)",
+    "libxcb.so.1()(64bit)",
+    "libxkbcommon-x11.so.0()(64bit)",
+    "libxkbcommon-x11.so.0(V_0.5.0)(64bit)",
+    "libxkbcommon.so.0()(64bit)",
+    "libxkbcommon.so.0(V_0.5.0)(64bit)",
+    "libz.so.1()(64bit)",
+    "libz.so.1(ZLIB_1.2.3.4)(64bit)",
+    "openssh-clients",
+    "rpmlib(CompressedFileNames) <= 3.0.4-1",
+    "rpmlib(FileDigests) <= 4.6.0-1",
+    "rpmlib(PayloadFilesHavePrefix) <= 4.0-1",
+    "rtld(GNU_HASH)"
+  ],
+  "installed_providers": {
+    "font(dejavusans)": [
+      "dejavu-sans-fonts-2.37-29.fc44.noarch"
+    ],
+    "font(dejavusansmono)": [
+      "dejavu-sans-mono-fonts-2.37-29.fc44.noarch"
+    ],
+    "git-core": [
+      "git-core-2.55.0-1.fc44.x86_64"
+    ],
+    "ld-linux-x86-64.so.2()(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "ld-linux-x86-64.so.2(GLIBC_2.3)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6()(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.14)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.15)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.16)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.17)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.18)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.2.5)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.25)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.28)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.29)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.3)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.3.2)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.3.4)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.30)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.32)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.33)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.34)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.39)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.4)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.6)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.7)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libc.so.6(GLIBC_2.9)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libcrypto.so.3()(64bit)": [
+      "openssl-libs-3.5.9-1.fc44.x86_64"
+    ],
+    "libcrypto.so.3(OPENSSL_3.0.0)(64bit)": [
+      "openssl-libs-3.5.9-1.fc44.x86_64"
+    ],
+    "libfontconfig.so.1()(64bit)": [
+      "fontconfig-2.17.0-4.fc44.x86_64"
+    ],
+    "libfreetype.so.6()(64bit)": [
+      "freetype-2.14.3-1.fc44.x86_64"
+    ],
+    "libgcc_s.so.1()(64bit)": [
+      "libgcc-16.2.1-2.fc44.x86_64"
+    ],
+    "libgcc_s.so.1(GCC_3.0)(64bit)": [
+      "libgcc-16.2.1-2.fc44.x86_64"
+    ],
+    "libgcc_s.so.1(GCC_3.3)(64bit)": [
+      "libgcc-16.2.1-2.fc44.x86_64"
+    ],
+    "libgcc_s.so.1(GCC_4.2.0)(64bit)": [
+      "libgcc-16.2.1-2.fc44.x86_64"
+    ],
+    "libm.so.6()(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libm.so.6(GLIBC_2.2.5)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libm.so.6(GLIBC_2.27)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libm.so.6(GLIBC_2.29)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libm.so.6(GLIBC_2.35)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libm.so.6(GLIBC_2.43)(64bit)": [
+      "glibc-2.43-9.fc44.x86_64"
+    ],
+    "libssl.so.3()(64bit)": [
+      "openssl-libs-3.5.9-1.fc44.x86_64"
+    ],
+    "libssl.so.3(OPENSSL_3.0.0)(64bit)": [
+      "openssl-libs-3.5.9-1.fc44.x86_64"
+    ],
+    "libssl.so.3(OPENSSL_3.2.0)(64bit)": [
+      "openssl-libs-3.5.9-1.fc44.x86_64"
+    ],
+    "libvulkan.so.1()(64bit)": [
+      "vulkan-loader-1.4.341.0-1.fc44.x86_64"
+    ],
+    "libwayland-client.so.0()(64bit)": [
+      "libwayland-client-1.26.0-1.fc44.x86_64"
+    ],
+    "libxcb.so.1()(64bit)": [
+      "libxcb-1.17.0-7.fc44.x86_64"
+    ],
+    "libxkbcommon-x11.so.0()(64bit)": [
+      "libxkbcommon-x11-1.13.1-2.fc44.x86_64"
+    ],
+    "libxkbcommon-x11.so.0(V_0.5.0)(64bit)": [
+      "libxkbcommon-x11-1.13.1-2.fc44.x86_64"
+    ],
+    "libxkbcommon.so.0()(64bit)": [
+      "libxkbcommon-1.13.1-2.fc44.x86_64"
+    ],
+    "libxkbcommon.so.0(V_0.5.0)(64bit)": [
+      "libxkbcommon-1.13.1-2.fc44.x86_64"
+    ],
+    "libz.so.1()(64bit)": [
+      "zlib-ng-compat-2.3.3-3.fc44.x86_64"
+    ],
+    "libz.so.1(ZLIB_1.2.3.4)(64bit)": [
+      "zlib-ng-compat-2.3.3-3.fc44.x86_64"
+    ],
+    "openssh-clients": [
+      "openssh-clients-10.2p1-14.fc44.x86_64"
+    ]
+  },
+  "notice_packages": 609,
+  "native": {
+    "staging-commit": {
+      "ok": true,
+      "frames": 19,
+      "file": "Изменения с пробелом.bsl",
+      "locales": [
+        "Commit",
+        "Фиксация",
+        "Коммит"
+      ],
+      "rows": 7,
+      "hunks": 2,
+      "mode": "index-to-worktree",
+      "backend": "gix",
+      "native_display": true,
+      "index_written": true,
+      "write_backend": "gix",
+      "write_error": null,
+      "index_versions": [
+        "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 20;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n",
+        "Процедура Пример()\n    A = 10;\n    // Контекст\n    B = 2;\n    // Контекст\n    C = 3;\nКонецПроцедуры\n"
+      ],
+      "files": 5,
+      "elapsed_ms": 1638,
+      "close_during_write": {
+        "ok": true,
+        "close_deferred": true,
+        "writer_finished": true,
+        "write_backend": "gix",
+        "commit_id": null,
+        "message_cleared": true
+      },
+      "lock_refusal": {
+        "ok": true,
+        "selection_preserved": true,
+        "write_error": "error-index-lock",
+        "frames": 14
+      },
+      "commit_hook_refusal": {
+        "ok": true,
+        "frames": 14,
+        "native_display": true,
+        "commit_id": null,
+        "write_backend": null,
+        "write_error": "error-hook-message",
+        "message_cleared": false,
+        "message_retained": true,
+        "input_checked": true,
+        "locales": [
+          "Commit",
+          "Фиксация",
+          "Коммит"
+        ]
+      },
+      "native_commit": {
+        "ok": true,
+        "frames": 14,
+        "native_display": true,
+        "commit_id": "8f9f7296bd1e2cba3ceaefa2e3b2d616f575574b",
+        "write_backend": "gix",
+        "write_error": null,
+        "message_cleared": true,
+        "message_retained": false,
+        "input_checked": true,
+        "locales": [
+          "Commit",
+          "Фиксация",
+          "Коммит"
+        ]
+      },
+      "close_during_commit": {
+        "ok": true,
+        "close_deferred": true,
+        "writer_finished": true,
+        "write_backend": "gix",
+        "commit_id": "f7a04a081ac7375c2106fc108774d4bdb5873a3e",
+        "message_cleared": true
+      },
+      "oracle": "git version 2.55.0",
+      "verified": [
+        "stage B preserves A",
+        "unstage hunk B preserves A",
+        "worktree A+B+C unchanged",
+        "shift range selects changed +/- lines only",
+        "locale selection preserved",
+        "close waits for index transaction",
+        "lock refusal preserves selection and index bytes",
+        "native Unicode/IME and undo/redo callbacks",
+        "native shaped selection/hit-testing",
+        "native message and selection retained across three locales",
+        "commit-msg refusal cancels pending close and preserves message/selection/index/HEAD",
+        "gix commit contains A+B only; C remains in worktree",
+        "successful commit clears message",
+        "close waits for commit transaction"
+      ]
+    },
+    "operations": {
+      "ok": true,
+      "oracle": "git version 2.55.0",
+      "runs": [
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "branch",
+          "write_backend": "gix",
+          "write_error": null,
+          "route": null,
+          "message_retained": true,
+          "branch_retained": false,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "d71ce66fc989e2b68759b84ed38e88afccf50173",
+          "branch": "main",
+          "operation": null,
+          "progress": null,
+          "outcome": null,
+          "branch_created": "задача/интерфейс"
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 10,
+          "action": "branch",
+          "write_backend": "gix",
+          "write_error": null,
+          "route": null,
+          "message_retained": true,
+          "branch_retained": false,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "7de1f2f0697ab50c5088735ba9c5909c9085b2d6bcd34323367c19b191858764",
+          "branch": "main",
+          "operation": null,
+          "progress": null,
+          "outcome": null,
+          "branch_created": "задача/интерфейс"
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "branch-refusal",
+          "write_backend": null,
+          "write_error": "error-branch-exists",
+          "route": null,
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "38a9c831530013ec0cf15a4d9038c66db3a9ec05",
+          "branch": "main",
+          "operation": null,
+          "progress": null,
+          "outcome": null,
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "switch",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "WorktreeSwitchCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "f03024f0569f1ba4cac56189d5b8924aed811133",
+          "branch": "other",
+          "operation": null,
+          "progress": null,
+          "outcome": "Completed",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "close_deferred": true,
+          "writer_finished": true,
+          "write_backend": "git-cli",
+          "commit_id": null,
+          "message_cleared": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "merge",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "MergeRepositoryCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "b4711ae34d6f9e2c90293a0b235009f3e1cbb9ae",
+          "branch": "main",
+          "operation": null,
+          "progress": null,
+          "outcome": "Completed",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "action": "merge-hook",
+          "write_backend": null,
+          "write_error": "error-operation-execution",
+          "route": "MergeRepositoryCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "cb057008654ae564d5ee3546e0b31cc898f29046",
+          "branch": "main",
+          "operation": "Merge",
+          "progress": null,
+          "outcome": null,
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "action": "merge",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "MergeRepositoryCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "f71ea152c50beb5035b07e046ddb44d0aa5eadcf",
+          "branch": "main",
+          "operation": "Merge",
+          "progress": null,
+          "outcome": "StoppedWithConflicts",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "abort",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "MergeRepositoryCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "f71ea152c50beb5035b07e046ddb44d0aa5eadcf",
+          "branch": "main",
+          "operation": null,
+          "progress": null,
+          "outcome": "Completed",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "action": "rebase",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "RebaseSequencerCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "8ba638373776cf224c6895ebd95ef168917e74e1",
+          "branch": null,
+          "operation": "Rebase",
+          "progress": [
+            1,
+            2
+          ],
+          "outcome": "StoppedWithConflicts",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "action": "continue",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "RebaseSequencerCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "2595eb6eb6f86bf8e92f0dc7d9c67e492b7d7f13",
+          "branch": null,
+          "operation": "Rebase",
+          "progress": [
+            2,
+            2
+          ],
+          "outcome": "StoppedWithConflicts",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "continue",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "RebaseSequencerCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "d88ae2cec5c3b29c655752c4b129b17028edffcb",
+          "branch": "topic",
+          "operation": null,
+          "progress": null,
+          "outcome": "Completed",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "skip",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "RebaseSequencerCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "5c38a992cf88bd81a5c5ccdab2962c9cbb890e98",
+          "branch": null,
+          "operation": "Rebase",
+          "progress": [
+            2,
+            2
+          ],
+          "outcome": "StoppedWithConflicts",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "skip",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "RebaseSequencerCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "5c38a992cf88bd81a5c5ccdab2962c9cbb890e98",
+          "branch": "topic",
+          "operation": null,
+          "progress": null,
+          "outcome": "Completed",
+          "branch_created": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "action": "abort",
+          "write_backend": "git-cli",
+          "write_error": null,
+          "route": "RebaseSequencerCoordinator",
+          "message_retained": true,
+          "branch_retained": true,
+          "locales": [
+            "Branches",
+            "Ветки",
+            "Ветки"
+          ],
+          "head": "f84be77b41fdfabeaa398cc3ea41816980554c12",
+          "branch": "topic",
+          "operation": null,
+          "progress": null,
+          "outcome": "Completed",
+          "branch_created": null
+        }
+      ],
+      "verified": [
+        "gix branch creation SHA-1/SHA-256",
+        "native Unicode name and message retention across three locales",
+        "branch refusal preserves input and cancels pending close",
+        "explicit CLI coordinator route/reason",
+        "switch/close waits for writer",
+        "merge two parents and actual tree",
+        "hook failure refreshes actual state without retry",
+        "merge conflict recovery/abort",
+        "two native rebase stops and separate continue",
+        "external rebase recovery/skip/abort"
+      ]
+    },
+    "conflicts": {
+      "ok": true,
+      "fixture_only": true,
+      "physical_input_claim": false,
+      "runs": [
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-save",
+          "writer_backend": "filesystem",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-resolve",
+          "writer_backend": "gix",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": true
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-save",
+          "writer_backend": "filesystem",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-resolve",
+          "writer_backend": "gix",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": true
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-refusal",
+          "writer_backend": null,
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "close_deferred": true,
+          "writer_finished": true,
+          "write_backend": "filesystem",
+          "commit_id": null,
+          "message_cleared": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-stale",
+          "writer_backend": null,
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 13,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-delete-cancel",
+          "writer_backend": null,
+          "dirty_confirmation": true,
+          "delete_confirmation": true,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-save-navigate",
+          "writer_backend": "filesystem",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 28,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-restage-continue",
+          "writer_backend": "git-cli",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-resolve",
+          "writer_backend": "gix",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 13,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-external",
+          "writer_backend": "gix",
+          "dirty_confirmation": false,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 13,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-external",
+          "writer_backend": "gix",
+          "dirty_confirmation": false,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-delete-resolve",
+          "writer_backend": "gix",
+          "dirty_confirmation": true,
+          "delete_confirmation": true,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-delete-resolve",
+          "writer_backend": "gix",
+          "dirty_confirmation": true,
+          "delete_confirmation": true,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 23,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-continue",
+          "writer_backend": "git-cli",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "f кириллица.txt",
+          "second_edit": false
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 22,
+          "locales": [
+            "Result",
+            "Результат",
+            "Result"
+          ],
+          "scenario": "conflict-continue",
+          "writer_backend": "git-cli",
+          "dirty_confirmation": true,
+          "delete_confirmation": false,
+          "draft_retained": true,
+          "close_cancelled": true,
+          "saved_file": "g",
+          "second_edit": false
+        }
+      ]
+    },
+    "history": {
+      "ok": true,
+      "fixture_only": true,
+      "physical_input_claim": false,
+      "runs": [
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "history_frames": 15,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-pages",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "5624f8dac885801bc77529fe7aa23b62c7e05638",
+              "offset": 100,
+              "commit": "6ca89307a42bb3ef010eaea00c742ce60730841d",
+              "base_id": "7c26ea0016933f189e6fb2f9032389f691ecbd02",
+              "parent": "Parent(0)",
+              "file": "файл.txt",
+              "presentation": "Text",
+              "left": "строка 103\r\nбез LF",
+              "right": "строка 104\r\nбез LF",
+              "left_present": true,
+              "right_present": true,
+              "left_mode": 33188,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 17,
+          "history_frames": 14,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-merge",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "18502f852ce5347ec47e6d89b7c90764019d33a7",
+              "offset": 0,
+              "commit": "18502f852ce5347ec47e6d89b7c90764019d33a7",
+              "base_id": "02849f2661be72b97b266dec73327fed9e6c90b0",
+              "parent": "Parent(1)",
+              "file": "a",
+              "presentation": "Text",
+              "left": "",
+              "right": "A\n",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            },
+            {
+              "tip": "18502f852ce5347ec47e6d89b7c90764019d33a7",
+              "offset": 0,
+              "commit": "18502f852ce5347ec47e6d89b7c90764019d33a7",
+              "base_id": "0b65a2f130cfeb741314b9c012788f54299d3185",
+              "parent": "Parent(0)",
+              "file": "b",
+              "presentation": "Text",
+              "left": "",
+              "right": "B\r\nбез LF",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 20,
+          "history_frames": 15,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-pages",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "7b0296e1b343a2573100e7dfd05944623dff5b74254d3634fc4caf7ebb78f3fc",
+              "offset": 100,
+              "commit": "1317569e40cd20f2501029573b19e67c5b5ed9a1e00a31a857c5ad6d19796fa9",
+              "base_id": "7f84b5377ea552e98c9bada814e78593d5bca8af24d8e886292452c1082ff80d",
+              "parent": "Parent(0)",
+              "file": "файл.txt",
+              "presentation": "Text",
+              "left": "строка 103\r\nбез LF",
+              "right": "строка 104\r\nбез LF",
+              "left_present": true,
+              "right_present": true,
+              "left_mode": 33188,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "history_frames": 13,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-merge",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "3dda381160936ddfb8fbc6374bee5c0d2c1cb64ffed74ab82b6202cc19066d40",
+              "offset": 0,
+              "commit": "3dda381160936ddfb8fbc6374bee5c0d2c1cb64ffed74ab82b6202cc19066d40",
+              "base_id": "2b323e924fc6800823804840e3f9db9211e951b0970453bf810a8485a3178bed",
+              "parent": "Parent(1)",
+              "file": "a",
+              "presentation": "Text",
+              "left": "",
+              "right": "A\n",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            },
+            {
+              "tip": "3dda381160936ddfb8fbc6374bee5c0d2c1cb64ffed74ab82b6202cc19066d40",
+              "offset": 0,
+              "commit": "3dda381160936ddfb8fbc6374bee5c0d2c1cb64ffed74ab82b6202cc19066d40",
+              "base_id": "18da6f398c595f793b1cf5ce6b2996f618ccaabf80d53704d70454c7a9503f74",
+              "parent": "Parent(0)",
+              "file": "b",
+              "presentation": "Text",
+              "left": "",
+              "right": "B\r\nбез LF",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 18,
+          "history_frames": 14,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-root",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "01608a67e0a033ca4f1a0ff7e3d355f58552ecbb",
+              "offset": 0,
+              "commit": "0b2ddbc0985d31b00ccf6b782d996be747557674",
+              "base_id": null,
+              "parent": "EmptyTree",
+              "file": "file",
+              "presentation": "Text",
+              "left": "",
+              "right": "﻿root\r\nбез LF",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            },
+            {
+              "tip": "01608a67e0a033ca4f1a0ff7e3d355f58552ecbb",
+              "offset": 0,
+              "commit": "01608a67e0a033ca4f1a0ff7e3d355f58552ecbb",
+              "base_id": "0b2ddbc0985d31b00ccf6b782d996be747557674",
+              "parent": "Parent(0)",
+              "file": "file",
+              "presentation": "Text",
+              "left": "﻿root\r\nбез LF",
+              "right": "second\n",
+              "left_present": true,
+              "right_present": true,
+              "left_mode": 33188,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "history_frames": 11,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-file:binary",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "92a836435b6ca0f9b3d7d16758c2c61306e9b7c6ced29bd47c9e03d269cf406e",
+              "offset": 0,
+              "commit": "92a836435b6ca0f9b3d7d16758c2c61306e9b7c6ced29bd47c9e03d269cf406e",
+              "base_id": "df20d24553570f706232e0606dd55d528e069fcb36ebb71068a21bff32939983",
+              "parent": "Parent(0)",
+              "file": "binary",
+              "presentation": "Binary",
+              "left": "",
+              "right": "binary\u0000file",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 15,
+          "history_frames": 12,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-file:large",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "92a836435b6ca0f9b3d7d16758c2c61306e9b7c6ced29bd47c9e03d269cf406e",
+              "offset": 0,
+              "commit": "92a836435b6ca0f9b3d7d16758c2c61306e9b7c6ced29bd47c9e03d269cf406e",
+              "base_id": "df20d24553570f706232e0606dd55d528e069fcb36ebb71068a21bff32939983",
+              "parent": "Parent(0)",
+              "file": "large",
+              "presentation": "TooLarge",
+              "left": "",
+              "right": "",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 15,
+          "history_frames": 11,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-file:link",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "92a836435b6ca0f9b3d7d16758c2c61306e9b7c6ced29bd47c9e03d269cf406e",
+              "offset": 0,
+              "commit": "92a836435b6ca0f9b3d7d16758c2c61306e9b7c6ced29bd47c9e03d269cf406e",
+              "base_id": "df20d24553570f706232e0606dd55d528e069fcb36ebb71068a21bff32939983",
+              "parent": "Parent(0)",
+              "file": "link",
+              "presentation": "Text",
+              "left": "",
+              "right": "base",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 40960
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "history_frames": 8,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-empty",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": null,
+              "offset": 0,
+              "commit": null,
+              "base_id": null,
+              "parent": null,
+              "file": null,
+              "presentation": null,
+              "left": null,
+              "right": null,
+              "left_present": null,
+              "right_present": null,
+              "left_mode": null,
+              "right_mode": null
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 15,
+          "history_frames": 10,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-encoding",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "2183abda16f8498108276d993bb6a28636a4a86c",
+              "offset": 0,
+              "commit": "2183abda16f8498108276d993bb6a28636a4a86c",
+              "base_id": "898ed912e0b06f5ca814d82988f4af17312895d1",
+              "parent": "Parent(0)",
+              "file": null,
+              "presentation": null,
+              "left": null,
+              "right": null,
+              "left_present": null,
+              "right_present": null,
+              "left_mode": null,
+              "right_mode": null
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 18,
+          "history_frames": 14,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-root",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "2472012a90c739be982d3ff31a9b54b12288f722",
+              "offset": 0,
+              "commit": "2472012a90c739be982d3ff31a9b54b12288f722",
+              "base_id": null,
+              "parent": "EmptyTree",
+              "file": "file",
+              "presentation": "Text",
+              "left": "",
+              "right": "linked root\n",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            },
+            {
+              "tip": "2472012a90c739be982d3ff31a9b54b12288f722",
+              "offset": 0,
+              "commit": "2472012a90c739be982d3ff31a9b54b12288f722",
+              "base_id": null,
+              "parent": "EmptyTree",
+              "file": "file",
+              "presentation": "Text",
+              "left": "",
+              "right": "linked root\n",
+              "left_present": false,
+              "right_present": true,
+              "left_mode": null,
+              "right_mode": 33188
+            }
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 18,
+          "history_frames": 10,
+          "locales": [
+            "History",
+            "История",
+            "История"
+          ],
+          "scenario": "history-draft",
+          "backend": "gix",
+          "read_only": true,
+          "draft_retained": true,
+          "message_retained": true,
+          "reviews": [
+            {
+              "tip": "7a63f6da998476f952a4981f39ef6586b9cc459b",
+              "offset": 0,
+              "commit": "7a63f6da998476f952a4981f39ef6586b9cc459b",
+              "base_id": "e3df5b8466959ad8ae6aa1302ea62f2f1a59997a",
+              "parent": "Parent(0)",
+              "file": "f",
+              "presentation": "Text",
+              "left": "base\n",
+              "right": "current\n",
+              "left_present": true,
+              "right_present": true,
+              "left_mode": 33188,
+              "right_mode": 33188
+            }
+          ]
+        }
+      ]
+    },
+    "network": {
+      "ok": true,
+      "runs": [
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "network_frames": null,
+          "scenario": "network-init",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "network_frames": null,
+          "scenario": "network-clone",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "network_frames": null,
+          "scenario": "network-init",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 11,
+          "network_frames": null,
+          "scenario": "network-clone",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 9,
+          "scenario": "network-fetch",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/main"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 9,
+          "scenario": "network-pull",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "git-cli",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/main"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 9,
+          "scenario": "network-upstream",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/feature/ветка"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 9,
+          "scenario": "network-push",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "git-cli",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/review/ветка"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "network_frames": 9,
+          "scenario": "network-push-refusal",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": "error-network-execution",
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 9,
+          "scenario": "network-pull-refusal",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": "error-network-execution",
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/main"
+          ]
+        },
+        {
+          "ok": true,
+          "close_deferred": true,
+          "writer_finished": true,
+          "write_backend": "git-cli",
+          "commit_id": null,
+          "message_cleared": false
+        },
+        {
+          "ok": true,
+          "close_deferred": true,
+          "writer_finished": true,
+          "write_backend": "gix",
+          "commit_id": null,
+          "message_cleared": true
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "network_frames": 9,
+          "scenario": "network-draft-fetch",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/main"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 7,
+          "scenario": "network-draft-clone-cancel",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/main"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "network_frames": 7,
+          "scenario": "network-draft-pull-cancel",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": null,
+          "close_cancelled": true,
+          "upstream": [
+            "origin",
+            "refs/heads/main"
+          ]
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 15,
+          "network_frames": null,
+          "scenario": "network-draft-clone-save",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": "gix",
+          "error": null,
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 10,
+          "network_frames": 6,
+          "scenario": "network-init-refusal",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": "error-repository-destination",
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 10,
+          "network_frames": 6,
+          "scenario": "network-clone-refusal",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": "error-repository-destination",
+          "close_cancelled": true,
+          "upstream": null
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 12,
+          "network_frames": 8,
+          "scenario": "network-upstream-refusal",
+          "locales": [
+            "Remotes",
+            "Удалённые",
+            "Удалённые"
+          ],
+          "inputs_retained": true,
+          "writer_backend": null,
+          "error": "error-config-lock",
+          "close_cancelled": true,
+          "upstream": null
+        }
+      ],
+      "scope": "isolated native Wayland controls; independent Git oracle; no owner remotes/keys/settings"
+    },
+    "load": {
+      "ok": true,
+      "runs": [
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 15,
+          "scenario": "load-watch",
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "initial_files": 4003,
+          "final_files": 4003,
+          "message_retained": true,
+          "draft_retained": false,
+          "watch_native": true,
+          "measurements": {
+            "status_service": {
+              "count": 3,
+              "mean_ms": 22.822748333333333,
+              "max_ms": 23.864897
+            },
+            "diff_sources": {
+              "count": 3,
+              "mean_ms": 1.0834483333333333,
+              "max_ms": 1.152574
+            },
+            "diff_alignment_prepare": {
+              "count": 3,
+              "mean_ms": 0.006242999999999999,
+              "max_ms": 0.011722
+            },
+            "selected_diff_service": {
+              "count": 3,
+              "mean_ms": 1.0905803333333333,
+              "max_ms": 1.165066
+            },
+            "main_render_prepare_wall": {
+              "count": 15,
+              "mean_ms": 0.0831052,
+              "max_ms": 0.107402
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 36,
+              "mean_ms": 0.0116075,
+              "max_ms": 0.05529
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 30,
+              "mean_ms": 0.016085833333333334,
+              "max_ms": 0.224994
+            },
+            "next_frame_callback_wall": {
+              "count": 15,
+              "mean_ms": 16.6757906,
+              "max_ms": 42.296980999999995
+            },
+            "maximum_file_rows_per_batch": 16,
+            "maximum_diff_rows_per_batch": 1,
+            "watch_hints": 1,
+            "cache": {
+              "entries": 1,
+              "allocated_bytes": 1002,
+              "hits": 1,
+              "misses": 2
+            },
+            "memory": {
+              "rss_kib": 94328,
+              "peak_rss_kib": 94328
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 14,
+          "scenario": "load-mass",
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "initial_files": 4003,
+          "final_files": 5003,
+          "message_retained": true,
+          "draft_retained": false,
+          "watch_native": true,
+          "measurements": {
+            "status_service": {
+              "count": 3,
+              "mean_ms": 22.887516333333334,
+              "max_ms": 24.68467
+            },
+            "diff_sources": {
+              "count": 3,
+              "mean_ms": 1.3116226666666668,
+              "max_ms": 1.441787
+            },
+            "diff_alignment_prepare": {
+              "count": 3,
+              "mean_ms": 0.003051,
+              "max_ms": 0.007911
+            },
+            "selected_diff_service": {
+              "count": 3,
+              "mean_ms": 1.31568,
+              "max_ms": 1.450477
+            },
+            "main_render_prepare_wall": {
+              "count": 14,
+              "mean_ms": 0.08686028571428571,
+              "max_ms": 0.18170799999999998
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 33,
+              "mean_ms": 0.013556151515151516,
+              "max_ms": 0.061328999999999995
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 30,
+              "mean_ms": 0.0163495,
+              "max_ms": 0.205504
+            },
+            "next_frame_callback_wall": {
+              "count": 14,
+              "mean_ms": 17.547637214285714,
+              "max_ms": 40.181438
+            },
+            "maximum_file_rows_per_batch": 16,
+            "maximum_diff_rows_per_batch": 1,
+            "watch_hints": 1,
+            "cache": {
+              "entries": 1,
+              "allocated_bytes": 1001,
+              "hits": 2,
+              "misses": 1
+            },
+            "memory": {
+              "rss_kib": 84064,
+              "peak_rss_kib": 87308
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "scenario": "load-large",
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "initial_files": 4003,
+          "final_files": 4003,
+          "message_retained": true,
+          "draft_retained": false,
+          "watch_native": true,
+          "measurements": {
+            "status_service": {
+              "count": 2,
+              "mean_ms": 30.845162,
+              "max_ms": 39.603136
+            },
+            "diff_sources": {
+              "count": 6,
+              "mean_ms": 1.8087406666666663,
+              "max_ms": 3.722761
+            },
+            "diff_alignment_prepare": {
+              "count": 6,
+              "mean_ms": 0.5170281666666666,
+              "max_ms": 2.946958
+            },
+            "selected_diff_service": {
+              "count": 6,
+              "mean_ms": 2.3268006666666667,
+              "max_ms": 4.878291
+            },
+            "main_render_prepare_wall": {
+              "count": 16,
+              "mean_ms": 0.08463056249999999,
+              "max_ms": 0.11593300000000001
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 36,
+              "mean_ms": 0.01383013888888889,
+              "max_ms": 0.107192
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 24,
+              "mean_ms": 0.039714541666666665,
+              "max_ms": 0.417591
+            },
+            "next_frame_callback_wall": {
+              "count": 16,
+              "mean_ms": 15.730805562499999,
+              "max_ms": 27.638246000000002
+            },
+            "maximum_file_rows_per_batch": 16,
+            "maximum_diff_rows_per_batch": 11,
+            "watch_hints": 0,
+            "cache": {
+              "entries": 3,
+              "allocated_bytes": 9588690,
+              "hits": 3,
+              "misses": 3
+            },
+            "memory": {
+              "rss_kib": 100624,
+              "peak_rss_kib": 101664
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "scenario": "load-periodic",
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "initial_files": 4003,
+          "final_files": 4003,
+          "message_retained": true,
+          "draft_retained": false,
+          "watch_native": false,
+          "measurements": {
+            "status_service": {
+              "count": 3,
+              "mean_ms": 24.27192066666667,
+              "max_ms": 30.689697
+            },
+            "diff_sources": {
+              "count": 3,
+              "mean_ms": 1.050557,
+              "max_ms": 1.1147909999999999
+            },
+            "diff_alignment_prepare": {
+              "count": 3,
+              "mean_ms": 0.004581333333333333,
+              "max_ms": 0.006674
+            },
+            "selected_diff_service": {
+              "count": 3,
+              "mean_ms": 1.0563846666666665,
+              "max_ms": 1.1221180000000002
+            },
+            "main_render_prepare_wall": {
+              "count": 16,
+              "mean_ms": 0.098427875,
+              "max_ms": 0.241871
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 36,
+              "mean_ms": 0.012835416666666667,
+              "max_ms": 0.066082
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 33,
+              "mean_ms": 0.016227090909090906,
+              "max_ms": 0.235487
+            },
+            "next_frame_callback_wall": {
+              "count": 16,
+              "mean_ms": 17.054095937499998,
+              "max_ms": 35.047582
+            },
+            "maximum_file_rows_per_batch": 16,
+            "maximum_diff_rows_per_batch": 1,
+            "watch_hints": 0,
+            "cache": {
+              "entries": 1,
+              "allocated_bytes": 1005,
+              "hits": 1,
+              "misses": 2
+            },
+            "memory": {
+              "rss_kib": 87656,
+              "peak_rss_kib": 87656
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "frames": 16,
+          "scenario": "load-draft",
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "initial_files": 4003,
+          "final_files": 4003,
+          "message_retained": true,
+          "draft_retained": true,
+          "watch_native": true,
+          "measurements": {
+            "status_service": {
+              "count": 3,
+              "mean_ms": 12.171230000000001,
+              "max_ms": 13.791149
+            },
+            "diff_sources": {
+              "count": 3,
+              "mean_ms": 0.9288446666666665,
+              "max_ms": 1.0011919999999999
+            },
+            "diff_alignment_prepare": {
+              "count": 3,
+              "mean_ms": 0.0036346666666666663,
+              "max_ms": 0.005404
+            },
+            "selected_diff_service": {
+              "count": 3,
+              "mean_ms": 3.2524573333333335,
+              "max_ms": 3.329524
+            },
+            "main_render_prepare_wall": {
+              "count": 16,
+              "mean_ms": 0.0739996875,
+              "max_ms": 0.08888700000000001
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 39,
+              "mean_ms": 0.009631282051282051,
+              "max_ms": 0.044953
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 0,
+              "mean_ms": null,
+              "max_ms": null
+            },
+            "next_frame_callback_wall": {
+              "count": 16,
+              "mean_ms": 16.778707375,
+              "max_ms": 31.010874
+            },
+            "maximum_file_rows_per_batch": 14,
+            "maximum_diff_rows_per_batch": 0,
+            "watch_hints": 1,
+            "cache": {
+              "entries": 1,
+              "allocated_bytes": 476,
+              "hits": 1,
+              "misses": 2
+            },
+            "memory": {
+              "rss_kib": 83812,
+              "peak_rss_kib": 85192
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        }
+      ],
+      "scope": "real Wayland handlers/virtual batches; backend/preparation/next-frame wall/RSS; no isolated GPU execution or physical hardware claim"
+    },
+    "ux": {
+      "ok": true,
+      "runs": [
+        {
+          "ok": true,
+          "native_display": true,
+          "scenario": "ux-paths",
+          "frames": 23,
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "read_only": true,
+          "filter_native": true,
+          "draft_retained": false,
+          "shared_horizontal_native": true,
+          "measurements": {
+            "status_service": {
+              "count": 2,
+              "mean_ms": 4.291887,
+              "max_ms": 7.054589
+            },
+            "diff_sources": {
+              "count": 5,
+              "mean_ms": 0.48716979999999993,
+              "max_ms": 0.541737
+            },
+            "diff_alignment_prepare": {
+              "count": 5,
+              "mean_ms": 0.0084192,
+              "max_ms": 0.016028
+            },
+            "selected_diff_service": {
+              "count": 5,
+              "mean_ms": 0.4962404,
+              "max_ms": 0.558314
+            },
+            "main_render_prepare_wall": {
+              "count": 22,
+              "mean_ms": 0.1432803181818182,
+              "max_ms": 0.6086130000000001
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 45,
+              "mean_ms": 0.007278111111111111,
+              "max_ms": 0.0593
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 36,
+              "mean_ms": 0.20656025,
+              "max_ms": 3.69688
+            },
+            "next_frame_callback_wall": {
+              "count": 22,
+              "mean_ms": 16.206668772727273,
+              "max_ms": 36.990508999999996
+            },
+            "maximum_file_rows_per_batch": 16,
+            "maximum_diff_rows_per_batch": 1,
+            "watch_hints": 0,
+            "cache": {
+              "entries": 4,
+              "allocated_bytes": 39899,
+              "hits": 1,
+              "misses": 4
+            },
+            "memory": {
+              "rss_kib": 93184,
+              "peak_rss_kib": 93184
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "scenario": "ux-history",
+          "frames": 26,
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "read_only": true,
+          "filter_native": true,
+          "draft_retained": false,
+          "shared_horizontal_native": true,
+          "measurements": {
+            "status_service": {
+              "count": 1,
+              "mean_ms": 7.137516,
+              "max_ms": 7.137516
+            },
+            "diff_sources": {
+              "count": 4,
+              "mean_ms": 0.502668,
+              "max_ms": 0.54769
+            },
+            "diff_alignment_prepare": {
+              "count": 4,
+              "mean_ms": 0.00867475,
+              "max_ms": 0.015708
+            },
+            "selected_diff_service": {
+              "count": 4,
+              "mean_ms": 0.5121092500000001,
+              "max_ms": 0.5514479999999999
+            },
+            "main_render_prepare_wall": {
+              "count": 25,
+              "mean_ms": 0.14687764,
+              "max_ms": 0.8954390000000001
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 42,
+              "mean_ms": 0.008595309523809522,
+              "max_ms": 0.067913
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 36,
+              "mean_ms": 0.20094758333333335,
+              "max_ms": 3.604101
+            },
+            "next_frame_callback_wall": {
+              "count": 25,
+              "mean_ms": 17.83613296,
+              "max_ms": 41.23001
+            },
+            "maximum_file_rows_per_batch": 16,
+            "maximum_diff_rows_per_batch": 1,
+            "watch_hints": 0,
+            "cache": {
+              "entries": 3,
+              "allocated_bytes": 38910,
+              "hits": 1,
+              "misses": 3
+            },
+            "memory": {
+              "rss_kib": 84716,
+              "peak_rss_kib": 84716
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        },
+        {
+          "ok": true,
+          "native_display": true,
+          "scenario": "ux-draft",
+          "frames": 13,
+          "locales": [
+            "Changes",
+            "Изменения",
+            "Изменения"
+          ],
+          "read_only": true,
+          "filter_native": true,
+          "draft_retained": true,
+          "shared_horizontal_native": false,
+          "measurements": {
+            "status_service": {
+              "count": 1,
+              "mean_ms": 7.257301,
+              "max_ms": 7.257301
+            },
+            "diff_sources": {
+              "count": 1,
+              "mean_ms": 0.419134,
+              "max_ms": 0.419134
+            },
+            "diff_alignment_prepare": {
+              "count": 1,
+              "mean_ms": 0.012665,
+              "max_ms": 0.012665
+            },
+            "selected_diff_service": {
+              "count": 1,
+              "mean_ms": 1.607802,
+              "max_ms": 1.607802
+            },
+            "main_render_prepare_wall": {
+              "count": 12,
+              "mean_ms": 0.17493716666666667,
+              "max_ms": 0.5086090000000001
+            },
+            "visible_file_rows_prepare_wall": {
+              "count": 24,
+              "mean_ms": 0.008337666666666667,
+              "max_ms": 0.071853
+            },
+            "visible_diff_rows_prepare_wall": {
+              "count": 0,
+              "mean_ms": null,
+              "max_ms": null
+            },
+            "next_frame_callback_wall": {
+              "count": 12,
+              "mean_ms": 15.695174083333333,
+              "max_ms": 33.735089
+            },
+            "maximum_file_rows_per_batch": 14,
+            "maximum_diff_rows_per_batch": 0,
+            "watch_hints": 0,
+            "cache": {
+              "entries": 1,
+              "allocated_bytes": 552,
+              "hits": 0,
+              "misses": 1
+            },
+            "memory": {
+              "rss_kib": 81072,
+              "peak_rss_kib": 81072
+            },
+            "gpu_execution_measured": false,
+            "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+          }
+        }
+      ],
+      "oracle": "independent Git HEAD/index/stages/status and every fixture worktree/settings byte invariant"
+    }
+  },
+  "scope": "two actual RPM assemblies, every payload mode/digest/notice, installed provider queries and extracted binary; system package installation, independent clean-host rebuild and remote release chain unverified"
+}

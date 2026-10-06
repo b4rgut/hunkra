@@ -3921,7 +3921,10 @@ fn main() {
     let mut smoke = None;
     let mut smoke_options = SmokeOptions::default();
     while let Some(arg) = args.next() {
-        if arg == "--smoke-test" {
+        if arg == "--version" {
+            println!("Hunkra {}", env!("CARGO_PKG_VERSION"));
+            return;
+        } else if arg == "--smoke-test" {
             smoke = args.next().map(PathBuf::from);
         } else if arg == "--smoke-stage" {
             smoke_options.stage = true;
@@ -3945,6 +3948,7 @@ fn main() {
         let bounds = Bounds::centered(None, size(px(1280.), px(820.)), cx);
         cx.open_window(
             WindowOptions {
+                app_id: Some("hunkra".into()),
                 window_bounds: Some(WindowBounds::Windowed(bounds)),
                 titlebar: Some(TitlebarOptions {
                     title: Some(SharedString::from("Hunkra")),

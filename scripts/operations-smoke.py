@@ -43,7 +43,7 @@ def smoke(destination):
         def native(repository, action, close=False):
             """Wait for the finite app process, then require its real-render and localization evidence."""
             report_path = fixture / f"report-{len(reports)}.json"
-            args = [str(ROOT / "target/debug/hunkra"), str(repository), "--smoke-test", str(report_path), "--smoke-operation", action]
+            args = [str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))), str(repository), "--smoke-test", str(report_path), "--smoke-operation", action]
             if close:
                 args.append("--smoke-close")
             result = subprocess.run(args, env=environment, capture_output=True, timeout=40)

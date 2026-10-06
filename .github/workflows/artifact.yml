@@ -7,15 +7,37 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    container:
+      # Official Fedora 44 manifest inspected 2026-10-06; updates require revalidation.
+      image: quay.io/fedora/fedora:44@sha256:88f7f8b5d1db37df588399fcfc0c71f3258d653706257ecd749b8d60fdc9f4fe
+    timeout-minutes: 45
     steps:
+      - name: Fedora build and packaging dependencies
+        run: dnf -y install git-core gcc gcc-c++ make clang cmake pkgconf-pkg-config fontconfig-devel freetype-devel libxcb-devel libxkbcommon-devel libxkbcommon-x11-devel openssl-devel libcurl-devel perl rustup rpm-build desktop-file-utils python3 cpio openssh-clients openssh-server dejavu-sans-fonts dejavu-sans-mono-fonts vulkan-loader wayland-libs
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - run: sudo apt-get update && sudo apt-get install -y libfontconfig1-dev libfreetype6-dev libxkbcommon-dev libxkbcommon-x11-dev libxcb1-dev libssl-dev libcurl4-openssl-dev openssh-server
+        with:
+          fetch-depth: 0
+          persist-credentials: false
       - run: scripts/dev bootstrap --no-native
+      - name: Validate one product tag against the checked-out workspace
+        env:
+          PRODUCT_TAG: ${{ github.ref_name }}
+        run: python3 scripts/artifact-check.py "$PRODUCT_TAG"
       - run: scripts/dev check
-      - run: scripts/dev build-ui --release
+      - run: scripts/dev check-ui
+      - run: scripts/dev package-rpm "$PWD/target/rpm/product"
+      - name: Inspect actual payload and repeat deterministic assembly
+        run: scripts/dev check-package "$PWD"/target/rpm/product/*.rpm "$PWD/target/rpm/product/check.json"
+      - name: Install in the disposable Fedora job and verify mandatory payload
+        run: |
+          dnf -y --setopt=tsflags=nodocs install target/rpm/product/*.rpm
+          rpm -V hunkra
+          hunkra --version
+          test -s /usr/share/hunkra/build-info.json
+          test -s /usr/share/licenses/hunkra/third-party.json
+          test -s /usr/share/licenses/hunkra/third-party/option-ext-0.2.0/src/lib.rs
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hunkra-linux-x86_64
-          path: target/release/hunkra
+          name: hunkra-fedora44-x86_64
+          path: target/rpm/product/
           if-no-files-found: error

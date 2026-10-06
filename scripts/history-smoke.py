@@ -47,7 +47,7 @@ def smoke(destination):
             index = index_path.read_bytes() if index_path.exists() else None
             before = {str(path.relative_to(repository)): path.read_bytes() for path in repository.rglob("*") if ".git" not in path.relative_to(repository).parts and path.is_file() and not path.is_symlink()}
             report_path = fixture / f"report-{len(reports)}.json"
-            result = subprocess.run([str(ROOT / "target/debug/hunkra"), str(repository), "--smoke-test", str(report_path), "--smoke-operation", action], env=environment, capture_output=True, timeout=40)
+            result = subprocess.run([str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))), str(repository), "--smoke-test", str(report_path), "--smoke-operation", action], env=environment, capture_output=True, timeout=40)
             assert result.returncode == 0, result.stderr.decode(errors="replace")
             report = json.loads(report_path.read_text())
             assert report["ok"] and report["native_display"] and report["frames"] > 0 and report["history_frames"] > 0

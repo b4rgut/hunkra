@@ -1,0 +1,15 @@
+[Desktop Entry]
+Type=Application
+Name=Hunkra
+GenericName=Git Client
+GenericName[ru]=Клиент Git
+Comment=Review changes and resolve Git conflicts
+Comment[ru]=Просмотр изменений и разрешение конфликтов Git
+Exec=hunkra
+Icon=hunkra
+Terminal=false
+Categories=Development;RevisionControl;
+StartupNotify=true
+StartupWMClass=hunkra
+Keywords=Git;Diff;Merge;Rebase;
+Keywords[ru]=Git;Изменения;Слияние;Конфликты;

@@ -2,6 +2,7 @@
 """Exercise the actual release-plz parser/update only in disposable local workspaces."""
 from pathlib import Path
 import os
+import importlib.util
 import shutil
 import subprocess
 import tempfile
@@ -26,7 +27,7 @@ def scenario(changed_package):
 
         def command(*args):
             """Run an isolated fixture command and preserve actionable diagnostics on failure."""
-            result = subprocess.run(args, cwd=fixture, env=environment, capture_output=True, text=True)
+            result = subprocess.run(args, cwd=fixture, env=environment, capture_output=True, text=True, timeout=180)
             if result.returncode:
                 raise RuntimeError(f"{args[0]} failed: {result.stdout}{result.stderr}")
             return result.stdout
@@ -71,7 +72,29 @@ def scenario(changed_package):
         assert "v0.1.0...v0.1.1" in changelog
         assert command("git", "tag", "--list").splitlines() == ["v0.1.0"]
         assert not (fixture / "crates/hunkra-core/CHANGELOG.md").exists()
-        print(f"release-plz: {changed_package}-only change updates product to 0.1.1 and one changelog")
+        # Simulate only the local acceptance/tag boundary, never a GitHub PR,
+        # token permission or release publication. Real update created these bytes.
+        command("git", "switch", "-c", "codex/fixture-release")
+        command("git", "add", "Cargo.toml", "Cargo.lock", "crates/hunkra/Cargo.toml", "CHANGELOG.md")
+        command("git", "commit", "-m", "chore: release v0.1.1")
+        command("git", "switch", "main")
+        command("git", "merge", "--squash", "codex/fixture-release")
+        command("git", "commit", "-m", "chore: release v0.1.1")
+        command("git", "tag", "v0.1.1")
+        specification = importlib.util.spec_from_file_location("hunkra_artifact_check", ROOT / "scripts/artifact-check.py")
+        artifact = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(artifact)
+        artifact.check(fixture, "v0.1.1")
+        for stale in ("v0.1.0", "hunkra-core-v0.1.1", "v9.9.9"):
+            try:
+                artifact.check(fixture, stale)
+            except AssertionError:
+                pass
+            else:
+                raise AssertionError("non-product or stale tag passed artifact gate")
+        assert command("git", "tag", "--list").splitlines() == ["v0.1.0", "v0.1.1"]
+        assert not command("git", "status", "--porcelain").strip()
+        print(f"release-plz: {changed_package}-only update, local squash acceptance and one matching product tag passed; remote PR/token/publication unverified")
 
 
 if __name__ == "__main__":

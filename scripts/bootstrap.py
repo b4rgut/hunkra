@@ -5,6 +5,8 @@ import io
 import os
 from pathlib import Path
 import platform
+import shutil
+import tempfile
 import subprocess
 import sys
 import tarfile
@@ -74,6 +76,39 @@ def native_fedora():
                 library.symlink_to(target)
 
 
+def packaging_fedora():
+    """Extract one signature-verified current Fedora build RPM without system installation."""
+    if platform.system() != "Linux" or 'ID=fedora\n' not in Path("/etc/os-release").read_text():
+        raise RuntimeError("Local packaging bootstrap currently requires Fedora Linux")
+    tools = ROOT / ".tools/rpm-build"
+    builder = shutil.which("rpmbuild")
+    if builder is None and (tools / "usr/bin/rpmbuild").is_file():
+        builder = str(tools / "usr/bin/rpmbuild")
+    if builder is not None:
+        subprocess.run([builder, "--version"], check=True, timeout=30)
+        return
+    packages = ROOT / ".tools/rpms"
+    packages.mkdir(parents=True, exist_ok=True)
+    tools.mkdir(parents=True, exist_ok=True)
+    # A fresh download directory cannot accidentally select an older cached RPM
+    # or the similarly named rpm-build-libs package.
+    with tempfile.TemporaryDirectory(prefix="build-download-", dir=packages) as temporary:
+        subprocess.run([
+            "dnf5", "download", "--arch=x86_64", f"--destdir={temporary}", "rpm-build",
+        ], check=True, timeout=180)
+        candidates = list(Path(temporary).glob("rpm-build-*.x86_64.rpm"))
+        assert len(candidates) == 1, "expected one current Fedora rpm-build package"
+        package = candidates[0]
+        subprocess.run(["rpmkeys", "--checksig", str(package)], check=True, timeout=30)
+        with subprocess.Popen(["rpm2cpio", str(package)], stdout=subprocess.PIPE) as process:
+            subprocess.run(["cpio", "-idmu", "--quiet"], stdin=process.stdout, cwd=tools, check=True, timeout=30)
+            process.stdout.close()
+            if process.wait(timeout=30) != 0:
+                raise RuntimeError("RPM packaging tools extraction failed")
+        shutil.copyfile(package, packages / package.name)
+    subprocess.run([str(tools / "usr/bin/rpmbuild"), "--version"], check=True, timeout=30)
+
+
 if __name__ == "__main__":
     if platform.system() != "Linux" or platform.machine() != "x86_64":
         raise SystemExit("Pinned tool assets currently support Linux x86_64 only")
@@ -82,6 +117,8 @@ if __name__ == "__main__":
         tool(name, url, digest)
     if "--no-native" not in sys.argv:
         native_fedora()
+    if "--packaging" in sys.argv:
+        packaging_fedora()
     subprocess.run(["cargo", "fetch", "--locked"], cwd=ROOT, check=True)
     environment = os.environ | {"PATH": str(ROOT / ".tools/bin") + os.pathsep + os.environ["PATH"]}
     subprocess.run([str(ROOT / ".tools/bin/lefthook"), "install"], cwd=ROOT, env=environment, check=True)

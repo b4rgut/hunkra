@@ -2,7 +2,7 @@
 
 Ветка `codex/bootstrap-mvp`. Проверены staging, index-only Commit, локальные ветки,
 switch/merge/rebase, независимый Result, порционная история и native Init/Clone/Remotes. Полный MVP ещё не готов:
-RPM и общая приёмка остаются в TASKS.md.
+Локальный Fedora RPM проверен; remote release chain и общая приёмка остаются в TASKS.md.
 
 ```sh
 scripts/dev build-ui
@@ -57,7 +57,7 @@ index-selection.json, network.json, load.json, ux.json. Five native load and thr
 smoke-history|smoke-network|smoke-load|smoke-ux принимают абсолютный report path после build-ui. Native smoke
 проверяет render/handlers/input callbacks, не физическую мышь/аппаратный IME.
 Owner clipboard не менялся. Directory picker, physical input, X11, изолированные GPU
-метрики и установленный RPM ещё не сертифицированы. Nested X11 capture был пустым,
+метрики ещё не сертифицированы. RPM установлен и проверен в rootless clean Fedora container; установки на систему владельца не было. Nested X11 capture был пустым,
 временные процессы/failed artifacts удалены.
 
 gix 0.88.0 читает status/diff/filters/history, пишет index/objects/refs/commit и
@@ -81,3 +81,7 @@ Init/Clone открываются верхними кнопками, destination
 Native external refresh: coalesced watcher hints request actual reads, periodic reconciliation survives lost/unavailable events. Linked worktree/common metadata included, symlink targets excluded. Same timestamp/size does not justify content reuse; four-entry/24MiB alignment cache validates actual bytes/attrs/filters/index/HEAD each hit. Five native load fixtures and six backend control/cached scenarios distinguish service/source/alignment, visible preparation, next-frame callback latency and RSS. Evidence docs/validation/performance.md; isolated GPU time is unmeasured. Manual Refresh retries failed watch setup.
 
 Path filter: Ctrl+F, case-insensitive AND terms, arrows navigate visible paths; Enter retains the highlighted document and returns focus to Changes. Query/selection/revision/draft survive locales/refresh; matching uses its own bounded worker with status-prepared paths, no render/Git filtering. Clear restores the list without losing the selected document. Tab/Shift+Tab or F6 cycle native fields/Result/message; Escape returns focus. Ctrl+R opens Recent from an active workspace; arrows/Enter select, Escape closes. Choosing the current project preserves the draft/message and makes no Git request; another project uses dirty Result Save/Discard/Cancel. Changes/History share synchronized horizontal text offsets via Shift+wheel, trackpad horizontal, Alt+Left/Right/Home or visible buttons. Only visible lines are shaped; actual glyph widths bound scroll, resized viewports clamp it, gutters/vertical alignment stay fixed. History Ctrl+Up/Down navigates changed files. Native smoke launches from an arbitrary cwd and preserves every fixture worktree/settings byte; physical input/pixel/X11 certification remains unclaimed.
+
+Fedora44 x86_64 local review artifact: /home/akalsin/Documents/Projects/hunkra/target/rpm/mandatory-6bdd906/hunkra-0.1.0-1.fc44.x86_64.rpm. Это precommit dirty-source artifact; source identity явно записана внутри. Optimized /home/akalsin/Documents/Projects/hunkra/target/release/hunkra также запускается абсолютным путём и имеет --version без display. RPM assembler проверяет версии, automatic ELF/GLIBC/OpenSSL deps и desktop provide, не перезаписывает существующие файлы. Две сборки одного payload/epoch совпали целиком; input/stripped binary hashes различаются и записаны отдельно. Все77 native сценариев проверены из извлечённого stripped binary; every1057payloadfile/609dependency declarations и notices проверены. Rootless clean pinned Fedora44 image установил пакет с tsflags=nodocs; rpm-V/mandatory licenses/MPL source/build info/icon/launcher/version/hash прошли. Reports docs/validation/package.json/package-install.json. Product license не выбрана, RPM unsigned/local review; publication не было. Independent full Rust builds across hosts не сравнивались.
+
+Команды упаковки: scripts/dev bootstrap --packaging; scripts/dev package-rpm /ABS/NEW/OUTPUT; scripts/dev check-package /ABS/FILE.rpm /ABS/REPORT.json --native; scripts/dev check-package-install /ABS/FILE.rpm /ABS/INSTALL.json (Podman). Сведения о сборке /usr/share/hunkra/build-info.json и обязательные лицензии /usr/share/licenses/hunkra сохраняются без optional docs. Подготовленный Fedora artifact workflow и local release-plz update/squash/tag gate проверены раздельно; реальные GitHub PR/token/environment/tag-trigger/job остаются непроверенными и запрещены в этом запуске. HNK-014 implemented, HNK-015 in_progress; продолжение: чистый source-identity artifact после checkpoint, тихие release load измерения, все критерии MVP и границы адаптеров Zed.

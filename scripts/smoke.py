@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def smoke(destination):
     """Require a working display, real renders, both index writes and unchanged working bytes."""
-    binary = ROOT / "target/debug/hunkra"
+    binary = Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))
     assert binary.exists(), "Run scripts/dev build-ui first"
     with tempfile.TemporaryDirectory(prefix="hunkra-native-smoke-") as temporary:
         fixture = Path(temporary)
