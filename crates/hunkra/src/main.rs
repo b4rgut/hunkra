@@ -20,6 +20,7 @@ use hunkra::{
     i18n::{Locale, Translator},
     measurements::Measurements,
     network_action::{self, NetworkCommand, NetworkOutcome},
+    network_source::standalone_reader as standalone_network_reader,
     network_view::{NetworkEvent, NetworkPage, NetworkView},
     path_filter::{PathFilter, PathIndex},
     settings::{self, Settings},
@@ -993,7 +994,9 @@ impl Hunkra {
         self.network_tab = index == 3;
         if self.network_tab && self.network.is_none() {
             let root = self.root.clone();
-            let network = cx.new(|cx| NetworkView::new(root, self.view.locale, cx));
+            let network = cx.new(|cx| {
+                NetworkView::new(root, self.view.locale, standalone_network_reader(), cx)
+            });
             self.network_subscription =
                 Some(cx.subscribe(&network, |app, _, event: &NetworkEvent, cx| {
                     app.perform_network(event.0.clone(), cx);

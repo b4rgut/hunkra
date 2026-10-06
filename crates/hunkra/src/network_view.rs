@@ -3,8 +3,8 @@ use crate::{
     editor::{NativeEditor, TextChanged},
     i18n::{Locale, Translator},
     network_action::NetworkCommand,
+    network_source::NetworkWorker,
     theme,
-    worker::LatestWorker,
 };
 use gpui::{
     App, Context, Entity, EventEmitter, FocusHandle, Focusable, KeyDownEvent, Subscription,
@@ -12,7 +12,7 @@ use gpui::{
 };
 use hunkra_core::{
     CoreError,
-    network::{NetworkSnapshot, ObjectFormat, PushRequest, prepare_network},
+    network::{NetworkSnapshot, ObjectFormat, PushRequest},
 };
 use std::{path::PathBuf, sync::Arc};
 
@@ -26,7 +26,7 @@ pub struct NetworkEvent(pub NetworkCommand);
 pub struct NetworkView {
     root: Option<PathBuf>,
     translator: Translator,
-    worker: LatestWorker<PathBuf, Result<NetworkSnapshot, CoreError>>,
+    worker: NetworkWorker,
     pub snapshot: Option<Arc<NetworkSnapshot>>,
     reviewed: Option<Arc<NetworkSnapshot>>,
     pub selected_remote: Option<String>,
@@ -75,8 +75,13 @@ fn button(
         .child(text)
 }
 impl NetworkView {
-    /// Initializes finite inputs and one latest-only reader without touching credentials or settings.
-    pub fn new(root: Option<PathBuf>, locale: Locale, cx: &mut Context<Self>) -> Self {
+    /// Initializes finite inputs using a host-supplied reader, without selecting a Git service or reading settings.
+    pub fn new(
+        root: Option<PathBuf>,
+        locale: Locale,
+        worker: NetworkWorker,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let translator = Translator::new(locale);
         let branch = cx.new(|cx| {
             NativeEditor::single_line(
@@ -119,7 +124,7 @@ impl NetworkView {
         let mut view = Self {
             root,
             translator,
-            worker: LatestWorker::new("hunkra-remotes", |root: PathBuf| prepare_network(&root)),
+            worker,
             snapshot: None,
             reviewed: None,
             selected_remote: None,
@@ -236,7 +241,7 @@ impl NetworkView {
                         });
                         self.branch_initialized = true;
                     }
-                    self.snapshot = Some(Arc::new(snapshot));
+                    self.snapshot = Some(snapshot);
                     self.error = None;
                 }
                 Err(error) => {
@@ -705,5 +710,184 @@ impl Render for NetworkView {
         } else {
             self.creation(cx)
         })
+    }
+}
+
+#[cfg(all(test, feature = "gui-tests"))]
+mod tests {
+    use super::*;
+    use crate::worker::LatestWorker;
+    use gpui::{TestAppContext, VisualTestContext};
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::{Duration, Instant},
+    };
+
+    /// Delivers the bounded host mailbox through the actual native projection without guessing thread timing.
+    fn finish_read(view: &Entity<NetworkView>, cx: &mut VisualTestContext) {
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            view.update(cx, |view, cx| view.poll(cx));
+            cx.run_until_parked();
+            if view.read_with(cx, |view, _| !view.loading) {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "injected network source deadline"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
+    #[gpui::test]
+    /// An injected source controls reads while fields/locales/errors/busy guards and emitted immutable commands remain owned by the panel.
+    fn host_reader_preserves_inputs_and_commands(cx: &mut TestAppContext) {
+        let fixture = tempfile::tempdir().unwrap();
+        for arguments in [
+            vec!["init", "-b", "main"],
+            vec!["remote", "add", "origin", "../host-fixture-remote.git"],
+        ] {
+            let output = std::process::Command::new("git")
+                .args(arguments)
+                .current_dir(fixture.path())
+                .output()
+                .unwrap();
+            assert!(output.status.success());
+        }
+        let config = std::fs::read(fixture.path().join(".git/config")).unwrap();
+        let snapshot = Arc::new(hunkra_core::network::prepare_network(fixture.path()).unwrap());
+        let supplied = snapshot.clone();
+        let root = PathBuf::from("/host-supplied-project/without-local-repository");
+        assert!(!root.exists());
+        let expected_root = root.clone();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let source_calls = calls.clone();
+        let owner = std::thread::current().id();
+        let reader = LatestWorker::with_state(
+            "host-network-fixture",
+            move || {
+                assert_ne!(std::thread::current().id(), owner);
+                Rc::new(Cell::new(0usize))
+            },
+            move |state, root| {
+                assert_eq!(root, expected_root);
+                state.set(state.get() + 1);
+                source_calls.fetch_add(1, Ordering::SeqCst);
+                if state.get() == 2 {
+                    Err(CoreError::NetworkConfig)
+                } else {
+                    Ok(supplied.clone())
+                }
+            },
+        );
+        let (view, cx) = cx.add_window_view(|window, cx| {
+            let view = NetworkView::new(Some(root), Locale::En, reader, cx);
+            window.focus(&view.branch.read(cx).focus_handle(cx));
+            view
+        });
+        finish_read(&view, cx);
+        assert!(view.read_with(cx, |view, _| Arc::ptr_eq(
+            view.snapshot.as_ref().unwrap(),
+            &snapshot
+        )));
+        let commands = Rc::new(RefCell::new(Vec::new()));
+        let received = commands.clone();
+        let _subscription = cx.update(|_, cx| {
+            cx.subscribe(&view, move |_, event: &NetworkEvent, _| {
+                received.borrow_mut().push(event.0.clone());
+            })
+        });
+        cx.run_until_parked();
+        view.update(cx, |view, cx| {
+            for (editor, text) in [
+                (&view.branch, "пользователь/ветка🦀"),
+                (&view.destination, "/host/destination with spaces"),
+                (&view.url, "https://example.invalid/entered-url"),
+                (&view.initial_branch, "новая/ветка"),
+            ] {
+                editor.update(cx, |editor, _| {
+                    editor.buffer.reset(text.into());
+                    editor.buffer.select(0, false);
+                    editor.buffer.select(text.len(), true);
+                });
+            }
+        });
+        let inputs = view.read_with(cx, |view, _| {
+            [
+                view.branch.clone(),
+                view.destination.clone(),
+                view.url.clone(),
+                view.initial_branch.clone(),
+            ]
+        });
+        let before = inputs.each_ref().map(|editor| {
+            editor.read_with(cx, |editor, _| {
+                (
+                    editor.buffer.text().to_owned(),
+                    editor.buffer.selection,
+                    editor.buffer.revision,
+                )
+            })
+        });
+        for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+            view.update(cx, |view, cx| view.set_locale(locale, cx));
+            assert_eq!(calls.load(Ordering::SeqCst), 1);
+            assert!(view.read_with(cx, |view, _| Arc::ptr_eq(
+                view.snapshot.as_ref().unwrap(),
+                &snapshot
+            )));
+        }
+        cx.update_window_entity(&view, |view, window, cx| {
+            let _ = view.render(window, cx);
+            view.action("network-fetch", cx);
+            view.set_busy(true, cx);
+            view.action("network-fetch", cx);
+            view.reload(cx);
+        });
+        cx.run_until_parked();
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(commands.borrow().len(), 1);
+        assert!(
+            matches!(&commands.borrow()[0], NetworkCommand::Fetch(read, remote) if Arc::ptr_eq(read, &snapshot) && remote == "origin")
+        );
+        view.update(cx, |view, cx| {
+            view.set_busy(false, cx);
+            view.reload(cx);
+        });
+        finish_read(&view, cx);
+        assert!(
+            view.read_with(cx, |view, _| view.error == Some("error-network-config")
+                && view.snapshot.is_none()
+                && view.reviewed.is_none())
+        );
+        view.update(cx, |view, cx| view.action("network-fetch", cx));
+        cx.run_until_parked();
+        assert_eq!(commands.borrow().len(), 1);
+        view.update(cx, |view, cx| view.reload(cx));
+        finish_read(&view, cx);
+        assert_eq!(calls.load(Ordering::SeqCst), 3);
+        assert!(view.read_with(cx, |view, _| Arc::ptr_eq(
+            view.snapshot.as_ref().unwrap(),
+            &snapshot
+        ) && view.error.is_none()));
+        let after = inputs.each_ref().map(|editor| {
+            editor.read_with(cx, |editor, _| {
+                (
+                    editor.buffer.text().to_owned(),
+                    editor.buffer.selection,
+                    editor.buffer.revision,
+                )
+            })
+        });
+        assert_eq!(before, after);
+        assert_eq!(
+            std::fs::read(fixture.path().join(".git/config")).unwrap(),
+            config
+        );
+        assert!(!fixture.path().join(".git/index").exists());
+        assert!(!fixture.path().join(".git/config.lock").exists());
     }
 }

@@ -12,6 +12,7 @@ pub mod horizontal_diff;
 pub mod i18n;
 pub mod measurements;
 pub mod network_action;
+pub mod network_source;
 #[cfg(feature = "gui")]
 pub mod network_view;
 pub mod path_filter;
