@@ -73,3 +73,14 @@ At b9ad499, a Linux regression observed11→779 actual fixture registrations aft
 ## Native neighboring-grapheme navigation
 
 Two sequential debug native runs on the same1,599,833-byte/39,999-row CRLF/Cyrillic/emoji Result, after builds/tests/private installation completed, measure32actual Left/Right handlers at EOF. Original full-prefix iteration:4499.240194ms aggregate. Full-context GraphemeCursor seeking:0.096442ms aggregate. Model text/revision, selection restoration, marker summary reuse and every private Git/worktree byte remain unchanged. The desktop load was uncontrolled; these are handler CPU-code wall times, excluding repaint/scheduling/GPU. No whole-app/optimized/cross-host or universal constant-time claim. Required Unicode contextual lookback remains. Exact binary identities and samples: grapheme-navigation.json.
+
+## Native input-coordinate queries
+
+Two sequential native debug runs after compilation/tests/private installation finished call the actual EntityInputHandler selected_text_range and text_for_range APIs near EOF of the same1,599,833-byte Unicode/CRLF Result. First query after the text revision is separated from32unchanged callback pairs. The whole private fixture Git/worktree byte oracle passes. No other project compiler/native/container/agent competed; desktop load remains uncontrolled. Painting/scheduling/GPU/optimized builds/physical IME/cross-host performance are outside this measurement.
+
+| Native coordinate implementation | First selection query ms |32selection/text callback pairs ms |
+|---|---:|---:|
+| Full prefix conversions |10.311413|1596.467568|
+| Current-text sparse coordinates |4.510487|0.155582|
+
+One lazy OnceLock retains scalar-safe byte/UTF-16 pairs spaced by at least512bytes. The maximum2MiB buffer passes a <=65568pair-byte capacity check (allocator/container overhead excluded); no source copy/word index is retained. Accepted mutations/reset/composition/undo/redo retire points; selection/unmark/locale/rejected writes reuse them. Zero coordinates bypass construction. Full scalar/prefix oracle checks every byte/native unit and surrogate/reversed/EOF/out-of-range/checkpoint edges. GPUI0.2.2 Wayland IME-area handling queries marked text/bounds, X11 queries selected text/bounds; ordinary Wayland arrow repaint is not claimed to run these conversions. Full samples/identities and acceptance: utf16-coordinates.json. The certified3ce8153 package predates this change.

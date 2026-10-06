@@ -131,11 +131,26 @@ impl Hunkra {
             assert_eq!(editor.read(cx).buffer.text(), "Снова🦀\r\nEOF");
             self.smoke.as_mut().unwrap().marker_summary_before =
                 Some(conflict.read(cx).chunk_measurements());
-            editor.update(cx, |editor, cx| {
+            let measurements = editor.update(cx, |editor, cx| {
                 editor.buffer.replace_document(&large_marked_text());
+                let end = editor.buffer.text().len();
+                editor.buffer.select(end, false);
+                let started = std::time::Instant::now();
+                let native_end = editor.selected_text_range(true, window, cx).unwrap().range.end;
+                let first = started.elapsed();
+                let started = std::time::Instant::now();
+                for _ in 0..32 {
+                    assert_eq!(editor.selected_text_range(true, window, cx).unwrap().range, native_end..native_end);
+                    let mut adjusted = None;
+                    assert_eq!(editor.text_for_range(native_end-3..native_end, &mut adjusted, window, cx).as_deref(), Some("B\r\n"));
+                    assert_eq!(adjusted, Some(native_end-3..native_end));
+                }
+                let repeated = started.elapsed();
                 editor.buffer.select(0, false);
                 cx.notify();
+                serde_json::json!({"text_bytes":end,"first_selection_query_ms":first.as_secs_f64()*1000.,"repeated_pairs":32,"repeated_selection_and_text_ms":repeated.as_secs_f64()*1000.,"scope":"actual native UTF-16 input-query callback CPU-code wall time at EOF; first request after text revision and unchanged repeated requests separated; text/selection restored; painting/scheduling/GPU excluded"})
             });
+            self.smoke.as_mut().unwrap().utf16_queries = Some(measurements);
         } else if (10..=25).contains(&phase) {
             let selection = editor.read(cx).buffer.selection;
             let revision = editor.read(cx).buffer.revision;
@@ -297,7 +312,7 @@ impl Hunkra {
             assert!(conflict.read(cx).dirty(cx));
             assert!(!self.writing);
             let smoke = self.smoke.as_ref().unwrap();
-            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"grapheme_navigation":smoke.grapheme_navigation,"word_navigation_preserves_graphemes_and_revision":true,"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
+            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"grapheme_navigation":smoke.grapheme_navigation,"utf16_queries":smoke.utf16_queries,"word_navigation_preserves_graphemes_and_revision":true,"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
             std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
             cx.quit();
             return;
