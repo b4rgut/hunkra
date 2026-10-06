@@ -167,6 +167,14 @@ impl Hunkra {
                     Presentation::TooLarge
                 );
                 assert!(self.view.diff.as_ref().unwrap().rows.is_empty());
+                self.select("dense.txt".into(), cx);
+            } else if phase == 10 {
+                let diff = self.view.diff.as_ref().unwrap();
+                assert_eq!(diff.presentation, Presentation::TooLarge);
+                assert_eq!(diff.left.bytes.len(), hunkra_core::diff::MAX_BYTES);
+                assert!(diff.left.bytes.iter().all(|byte| *byte == b'\n'));
+                assert_eq!(diff.right.bytes, b"dense worktree\r\nEOF");
+                assert!(diff.rows.is_empty() && diff.hunks.is_empty());
                 for path in ["f", "sibling", "large.txt"] {
                     self.select(path.into(), cx);
                 }
@@ -239,7 +247,7 @@ impl Hunkra {
                 && self.measurements.cache.allocated_bytes <= hunkra_core::diff_reader::CACHE_BYTES
         );
         let smoke = self.smoke.as_ref().unwrap();
-        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"scenario":smoke.operation,"locales":smoke.locales,"initial_files":self.load.as_ref().unwrap().initial_files,"final_files":self.view.repository.as_ref().unwrap().files.len(),"message_retained":true,"draft_retained":smoke.operation.as_deref()==Some("load-draft"),"watch_native":self.watch.active(),"measurements":self.measurements.json()});
+        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"scenario":smoke.operation,"locales":smoke.locales,"initial_files":self.load.as_ref().unwrap().initial_files,"final_files":self.view.repository.as_ref().unwrap().files.len(),"message_retained":true,"draft_retained":smoke.operation.as_deref()==Some("load-draft"),"dense_limit_verified":smoke.operation.as_deref()==Some("load-large"),"watch_native":self.watch.active(),"measurements":self.measurements.json()});
         std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
         cx.quit();
     }

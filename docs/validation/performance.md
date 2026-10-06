@@ -50,3 +50,7 @@ All five scenarios also passed on 2026-10-06 from the stripped optimized cfd73e9
 | load-draft | 24.48 | 3.93 | 0.087 | 16.51 | 87388 | 14 / 0 |
 
 Independent HEAD/index/stages/worktree oracle passes in every fixture. No-event fallback still reconciles actual bytes; dirty Result stays intact. GPU execution, physical input, cold-cache startup and cross-host reproducibility remain unmeasured.
+
+## Bounded diff preparation acceptance
+
+The core now validates the shared40,000-line and16KiB raw-line budgets through a streaming iterator before collecting line pointers or interning gix tokens. Previously a2MiB newline-only source could allocate millions of pointers before returning TooLarge. Original documents/bytes and refusal semantics remain intact. Two new tests cover exact combined-side boundaries, Unicode/CRLF/EOF and an independent Git source/index/worktree oracle. Full check passes131headless tests/strictClippy, UI Clippy/build pass; five native load cases plus12history and6staging/Commit regressions pass. Native load-large additionally opens a2MiB newline-only index blob with a short modified worktree, verifies translated refusal/no aligned rows, then rapidly returns to the18k-row diff. Report validation/diff-bounds-load.json; this debug run is acceptance evidence, not a comparison with optimized package timings. The ec25ff5 RPM predates this source change.

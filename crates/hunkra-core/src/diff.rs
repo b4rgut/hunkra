@@ -168,17 +168,19 @@ impl DiffSnapshot {
             snapshot.presentation = Presentation::InvalidEncoding;
             return snapshot;
         };
-        let left_lines: Vec<_> = left.split_inclusive('\n').collect();
-        let right_lines: Vec<_> = right.split_inclusive('\n').collect();
-        if left_lines.len() + right_lines.len() > MAX_LINES
-            || left_lines
-                .iter()
-                .chain(&right_lines)
-                .any(|line| line.len() > 16_384)
+        // Refuse before allocating line pointers or interning tokens; a byte-bounded
+        // newline-only document can otherwise allocate millions of entries.
+        if left
+            .split_inclusive('\n')
+            .chain(right.split_inclusive('\n'))
+            .enumerate()
+            .any(|(index, line)| index >= MAX_LINES || line.len() > 16_384)
         {
             snapshot.presentation = Presentation::TooLarge;
             return snapshot;
         }
+        let left_lines: Vec<_> = left.split_inclusive('\n').collect();
+        let right_lines: Vec<_> = right.split_inclusive('\n').collect();
         let input = InternedInput::new(lines(left), lines(right));
         let diff = diff_with_slider_heuristics(Algorithm::Histogram, &input);
         let (mut old, mut new) = (0, 0);

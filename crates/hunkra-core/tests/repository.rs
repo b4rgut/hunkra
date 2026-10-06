@@ -1,5 +1,7 @@
 //! Independent Git oracles. No test writes to Hunkra or a user repository.
-use hunkra_core::{ChangeKind, DiffKind, DiffSnapshot, Operation, Presentation, read_diff, scan};
+use hunkra_core::{
+    ChangeKind, DiffKind, DiffSnapshot, Document, Operation, Presentation, read_diff, scan,
+};
 use std::{fs, path::Path, process::Command};
 
 mod support;
@@ -171,6 +173,79 @@ fn safe_limits_and_modes() {
         assert!(diff.hunks.is_empty());
         assert_ne!(diff.left.mode, diff.right.mode);
     }
+}
+
+#[test]
+/// Bounds both versions together, counting CRLF/EOF raw bytes without truncating either document.
+fn diff_line_limits_have_exact_boundaries() {
+    for (left, right, expected) in [
+        ("\n".repeat(40_000), String::new(), Presentation::Text),
+        ("\n".repeat(40_001), String::new(), Presentation::TooLarge),
+        (
+            "\r\n".repeat(20_000),
+            "\n".repeat(20_000),
+            Presentation::Text,
+        ),
+        (
+            "\r\n".repeat(20_000),
+            "\n".repeat(20_001),
+            Presentation::TooLarge,
+        ),
+        ("🦀".repeat(4096), String::new(), Presentation::Text),
+        (
+            "🦀".repeat(4096) + "\n",
+            String::new(),
+            Presentation::TooLarge,
+        ),
+        (
+            "x".repeat(16_382) + "\r\n",
+            "EOF".into(),
+            Presentation::Text,
+        ),
+        (
+            "x".repeat(16_383) + "\r\n",
+            "EOF".into(),
+            Presentation::TooLarge,
+        ),
+    ] {
+        let diff = DiffSnapshot::new(
+            "raw".into(),
+            DiffKind::Unstaged,
+            Document::present(left.as_bytes().to_vec(), Some(0o100644)),
+            Document::present(right.as_bytes().to_vec(), Some(0o100644)),
+        );
+        assert_eq!(diff.presentation, expected);
+        assert_eq!(diff.left.bytes, left.as_bytes());
+        assert_eq!(diff.right.bytes, right.as_bytes());
+        if expected == Presentation::Text {
+            assert_eq!(reconstruct(&diff, true), left.as_bytes());
+            assert_eq!(reconstruct(&diff, false), right.as_bytes());
+        } else {
+            assert!(diff.rows.is_empty());
+            assert!(diff.hunks.is_empty());
+        }
+    }
+}
+
+#[test]
+/// A two-MiB newline-only Git blob is refused before alignment while index/worktree bytes remain exact.
+fn newline_dense_diff_preserves_git_sources() {
+    let repo = Repo::new();
+    let before = vec![b'\n'; hunkra_core::diff::MAX_BYTES];
+    let after = b"changed\r\nEOF";
+    repo.write("dense", &before);
+    repo.initial();
+    repo.write("dense", after);
+    let index = fs::read(repo.path().join(".git/index")).unwrap();
+    let diff = repo.diff("dense", DiffKind::Unstaged);
+    assert_eq!(diff.presentation, Presentation::TooLarge);
+    assert_eq!(diff.left.bytes, repo.git(&["show", ":dense"]));
+    assert_eq!(diff.left.bytes, before);
+    assert_eq!(diff.right.bytes, after);
+    assert!(diff.rows.is_empty());
+    assert!(diff.hunks.is_empty());
+    assert_eq!(fs::read(repo.path().join(".git/index")).unwrap(), index);
+    assert_eq!(fs::read(repo.path().join("dense")).unwrap(), after);
 }
 
 #[test]

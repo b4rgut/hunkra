@@ -32,6 +32,8 @@ def smoke(destination):
             for number in range(3000): (files/f"{number:04}.txt").write_bytes(content)
             (root/"f").write_bytes(b"base\n");(root/"sibling").write_bytes(b"sibling\r\nEOF")
             large=b"".join(f"line {number:05} stable\n".encode() for number in range(18000))
+            dense=b"\n"*(2*1024*1024)
+            if action=="load-large": (root/"dense.txt").write_bytes(dense)
             (root/"large.txt").write_bytes(large); git(root,"add",".");git(root,"commit","-m","base")
             if action=="load-draft":
                 git(root,"switch","-c","incoming");(root/"f").write_bytes(b"incoming\n");git(root,"commit","-am","incoming");git(root,"switch","main")
@@ -40,6 +42,7 @@ def smoke(destination):
                 (root/"f").write_bytes(b"staged\n");git(root,"add","f");(root/"f").write_bytes(b"after\n")
             (root/"large.txt").write_bytes(large.replace(b"line 09000 stable",b"line 09000 change"))
             (root/"oversized").write_bytes(b"x"*(2*1024*1024+1))
+            if action=="load-large": (root/"dense.txt").write_bytes(b"dense worktree\r\nEOF")
             untracked=root/"untracked";untracked.mkdir()
             for number in range(4000): (untracked/f"{number:04}.txt").write_bytes(b"untracked\n")
             count=len([item for item in git(root,"status","--porcelain=v1","-z","--untracked-files=all").split(b"\0") if item])
@@ -53,6 +56,10 @@ def smoke(destination):
             assert (root/".git/index").read_bytes()==index and git(root,"rev-parse","HEAD")==head and git(root,"ls-files","--stage")==stages
             assert (root/"sibling").read_bytes()==b"sibling\r\nEOF"
             assert (root/"large.txt").read_bytes()==large.replace(b"line 09000 stable",b"line 09000 change")
+            if action=="load-large":
+                assert report["dense_limit_verified"]
+                assert (root/"dense.txt").read_bytes()==b"dense worktree\r\nEOF"
+                assert git(root,"show",":dense.txt")==dense
             assert all((files/f"{number:04}.txt").read_bytes()==content for number in range(3000))
             assert (root/"f").read_bytes()==(f if action in ("load-mass","load-large") else b"external result\n" if action=="load-draft" else b"other\n")
             after=len([item for item in git(root,"status","--porcelain=v1","-z","--untracked-files=all").split(b"\0") if item]);assert report["final_files"]==after
