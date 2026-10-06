@@ -1,10 +1,10 @@
 # Продолжение
 
-Владелец попросил довести текущую задачу до завершения и закончить выполнение 2026-10-06. Завершить только текущий reveal_range preferred-column fix, сохранить его проверки/локальный commit и обновлённый чистый RPM с acceptance; затем pause goal и остановиться. Не начинать новые slices. Никаких schedules/services/continuation daemons.
+Выполнение остановлено по прямой просьбе владельца 2026-10-06. Текущий reveal_range preferred-column fix завершён, проверен и сохранён; итоговый чистый RPM проверен. Goal поставлен на pause. Новые slices не начинать; возобновление только по новой просьбе владельца. Никаких schedules/services/continuation daemons.
 
 ## Репозиторий и ограничения
 
-- /home/akalsin/Documents/Projects/hunkra, branch codex/bootstrap-mvp, origin https://github.com/b4rgut/hunkra.git. Предыдущий clean checkpointddae4f555040c71dc94e5a69e0d843d41177a7c7 сохраняет Unicode context в word walks и имеет проверенный RPM; текущий завершаемый slice сбрасывает preferred column при reveal_range, точный HEAD проверять через Git.
+- /home/akalsin/Documents/Projects/hunkra, branch codex/bootstrap-mvp, origin https://github.com/b4rgut/hunkra.git. Последний code checkpointbddf7e9b085ab2c50509dabe9a5f179aa9d9ffb7 сбрасывает preferred column при reveal_range; итоговые docs подтверждают его RPM, точный HEAD проверять через Git.
 - Перед edits: pwd/remote/HEAD/status. Только exact task paths, staged diff review и локальные Conventional Commits с существующей Aleksey Kalsin identity. No push/PR/tag/release/global Git/sudo/history rewrite/owner-data mutations. Все текущие изменения относятся к этой задаче.
 - Исходный запрос: /home/akalsin/.codex/attachments/d3ea4ec6-c1e3-4bd2-a405-c12822f2e2cc/Вставленный текст.txt. TASKS.md — источник статусов/истории/evidence. No subagents unless explicitly requested.
 - Соседний Zed read-only /home/akalsin/Documents/Projects/zed SHA0c70487f830b10abde93ef75a0772a4552744f15; проверенный официальный upstreama1b71072e5b43faef437b471e988fbb5f972c99c (2026-10-05). UI/UX похожий на Zed — собственные compact dark panels/tabs/statusbar/keyboard controls, GPL code не копировать. Linux keymap assets/keymaps/default-linux.json.
@@ -46,15 +46,17 @@ Checkpointddae4f5 Unicode word slice: one GraphemeCursor per directional walk re
 
 ## Последний полностью проверенный артефакт
 
-Clean sourceddae4f555040c71dc94e5a69e0d843d41177a7c7:
-/home/akalsin/Documents/Projects/hunkra/target/rpm/word-context/hunkra-0.1.0-1.fc44.x86_64.rpm
-RPM SHA3012473d7f6223ba7569067ea235b8fa5ae0bb4ba54861b31c944a9e3283e432;
-input22df4801edeabfa388f357783b804dc1c9019faf612a0d97f146ff9c79a8406e;
-strippedce33903e659562d92b51df4d19f3e51f3fe2651fdb91c09fd0d37e3804f9f383.
-Includes neighboring grapheme seeking, Ctrl word/deletion, sparse UTF-16 coordinates, multi-click/drag selections and retained directional word context. Predates final reveal_range column reset. Repeat wholeRPM samepayload/epoch,1057payloadfiles/609notices/full MPL option-ext source, requirements/provider/desktop/version/all80native cases pass. Fresh real rootless pinned Fedora44 nodocs install/rpm-V/mandatory source/notices/hash passes. Exact docs/validation/package-word-context-{check,install,build-info}.json. Earlier artifact identities/reports remain valid for their own source.
+Clean sourcebddf7e9b085ab2c50509dabe9a5f179aa9d9ffb7:
+/home/akalsin/Documents/Projects/hunkra/target/rpm/final-review/hunkra-0.1.0-1.fc44.x86_64.rpm
+RPM SHAe43e662de528d50202375a78eeefc10108942060e85e73210872017c7ff565bd;
+inputd9e29e1ca24faff2432367a8f4728cf3eff6aa51bc39389d4b2bdb9988affec4;
+strippedc64c7afaac667cd920993c03886673b6c431f083e651a0a433824ea3b16f9c99.
+Includes neighboring grapheme seeking, Ctrl word/deletion, sparse UTF-16 coordinates, multi-click/drag selections and retained directional word context. Includes final reveal_range column reset. Repeat wholeRPM samepayload/epoch,1057payloadfiles/609notices/full MPL option-ext source, requirements/provider/desktop/version/all80native cases pass. Fresh real rootless pinned Fedora44 nodocs install/rpm-V/mandatory source/notices/hash passes. Exact docs/validation/package-final-{check,install,build-info}.json. Earlier artifact identities/reports remain valid for their own source.
 
 RPM6.0.2 rpmbuild extracted signed Fedora packages into.tools, factory macro overlay; no host install. Rootless Podman private target/vfs uniquecontainers--rm read-onlyRPM; Fedora44 image quay.io/fedora/fedora:44@sha256:88f7f8b5d1db37df588399fcfc0c71f3258d653706257ecd749b8d60fdc9f4fe. Installation is headless version check, not native display/GPU. Product LicenseRef-Hunkra-Unselected; same binary/payload assembly reproducibility only, no independent Rust rebuild equivalence. release-plz0.3.169 disposable update/squash/tag gates pass; real GitHub PR/token/protection/tag chain unverified/forbidden.
 
-## Завершение по просьбе владельца
+## Точка остановки
 
-Current reveal_range acceptance first reproduced101470 instead of101454 after explicit same-document caret/range reveal: the previous vertical goal column remained. Reset only preferred_column in reveal_range; extended existing registered Unicode/CRLF page test verifies actual next ArrowDown position and source/revision preservation.53GPUI/strictgui+gui-tests/build and final native editor+17conflicts pass; every fixture Git/worktree byte unchanged. Save exact final evidence/commit, then clean optimized final RPM/repeat assembly/all80native/real fresh pinned Fedora44 nodocs install, documentation checkpoint and pause goal. Do not start new work. Remaining physical/portal/X11/pixel/remote boundaries stay in mvp-acceptance.md;014implemented/015in_progress/101..104deferred.
+Current reveal_range fix committedbddf7e9 (`fix(editor): reset vertical caret column when revealing a range`). Registered101470vs101454 regression corrected by resetting only preferred_column, preserving exact Unicode/CRLF source/revision.53GPUI/strictgui+gui-tests/build and native editor+17conflicts pass;143headless baseline production unchanged. Final cleanbddf7e9 optimized RPM includes it and every previous slice; repeat whole assembly/1057payloadfiles/609notices/all80native cases and actual fresh pinned rootless Fedora44 nodocs install pass (package-final-*.json). Final documentation checkpoint is later than its code source and changes no production code.
+
+All build/test/native/container commands finished; no active continuation service/automation/subagent. Working tree must be checked after final docs commit. Remaining: full physical keyboard/mouse/IME/portal/pixel acceptance and platform/GPU coverage limits; real GitHub release chain/owner configuration/product license; HNK-101..104 post-MVP adapters/features.014implemented/015in_progress/21tasksdone. Do not declare full MVP completion or resume without a new user request. Detailed matrix: validation/mvp-acceptance.md.
