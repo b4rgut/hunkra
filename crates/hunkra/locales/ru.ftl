@@ -226,3 +226,4 @@ network-fetched = Получено
 network-upstream-set = Отслеживание настроено
 network-pushed = Отправлено
 network-pulled = Обновлено
+watch-periodic = События файлов недоступны · обновление по таймеру

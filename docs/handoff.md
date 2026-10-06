@@ -2,7 +2,7 @@
 
 Ветка `codex/bootstrap-mvp`. Проверены staging, index-only Commit, локальные ветки,
 switch/merge/rebase, независимый Result, порционная история и native Init/Clone/Remotes. Полный MVP ещё не готов:
-watcher/cache/load UX, RPM и общая приёмка остаются в TASKS.md.
+filter/focus/long-line UX, RPM и общая приёмка остаются в TASKS.md.
 
 ```sh
 scripts/dev build-ui
@@ -48,15 +48,15 @@ F7/Shift+F7 hunk, Ctrl+O open, Ctrl+Enter Commit, Ctrl+Shift+Enter Continue.
 Все accepted writes сериализованы; обычное закрытие ждёт writer. Ошибка отменяет
 pending close и сохраняет пользовательский ввод.
 
-Проверено 2026-10-06: fmt/i18n/plan, strict headless/UI Clippy, 119 headless tests
-(102 core + 17 app), 2 isolated GPUI input/clipboard/undo tests, native build.
+Проверено 2026-10-06: fmt/i18n/plan, strict headless/UI Clippy, 128 headless tests
+(107 core + 21 app), 2 isolated GPUI input/clipboard/undo tests, native build.
 12 real Wayland history windows, 17 conflict windows, 15 branch/operation и
 6 staging/Commit и 19 network/creation windows прошли с независимым Git-оракулом в disposable repos.
 Reports: docs/validation/history.json, conflicts.json, operations.json,
-index-selection.json, network.json. scripts/dev smoke|smoke-operations|smoke-conflicts|
-smoke-history|smoke-network принимают абсолютный report path после build-ui. Native smoke
+index-selection.json, network.json, load.json. Five additional real Wayland load windows pass. scripts/dev smoke|smoke-operations|smoke-conflicts|
+smoke-history|smoke-network|smoke-load принимают абсолютный report path после build-ui. Native smoke
 проверяет render/handlers/input callbacks, не физическую мышь/аппаратный IME.
-Owner clipboard не менялся. Directory picker, physical input, X11, нагрузочные
+Owner clipboard не менялся. Directory picker, physical input, X11, изолированные GPU
 метрики и установленный RPM ещё не сертифицированы. Nested X11 capture был пустым,
 временные процессы/failed artifacts удалены.
 
@@ -78,3 +78,5 @@ remote release chain не выполнялась. Push/PR/product tags/releases 
 Zed read-only. Лицензию продукта выбирает владелец.
 
 Init/Clone открываются верхними кнопками, destination вводится полным путём. Init сохраняет existing project files, Clone требует новой папки и сохраняет partial data после ошибки. В Remotes выбираются remote/целевая ветка, отдельно Fetch, Set upstream, Push и ff-only Pull. SSH agent/helpers существующие, OAuth не требуется. Push одной explicit ветки без force/mirror/tags; отслеживание записывается после подтверждённого успеха. Pull сначала gix fetch, затем только fast-forward; dirty/diverged/untracked/ignored/locks дают явный отказ без stash/rebase. Ctrl+Shift+F/P/L — Fetch/Push/Pull, Ctrl+Enter в creation — создать и открыть. Все четыре inputs/selection/undo сохраняются при смене языка и отказе. Dirty Result не теряется; Fetch его сохраняет, смена проекта требует Save/Discard/Cancel. Unsupported remote helpers/ref-transaction fetch hooks/UTF-16 clone checkout/included upstream values — explicit limits; production trace/transport output/URL в reports не сохраняются.
+
+Native external refresh: coalesced watcher hints request actual reads, periodic reconciliation survives lost/unavailable events. Linked worktree/common metadata included, symlink targets excluded. Same timestamp/size does not justify content reuse; four-entry/24MiB alignment cache validates actual bytes/attrs/filters/index/HEAD each hit. Five native load fixtures and six backend control/cached scenarios distinguish service/source/alignment, visible preparation, next-frame callback latency and RSS. Evidence docs/validation/performance.md; isolated GPU time is unmeasured. Manual Refresh retries failed watch setup.

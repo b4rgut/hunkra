@@ -225,3 +225,4 @@ network-fetched = Fetched
 network-upstream-set = Upstream configured
 network-pushed = Pushed
 network-pulled = Updated
+watch-periodic = File events unavailable · refreshing periodically

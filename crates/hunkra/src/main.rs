@@ -1,4 +1,5 @@
 //! Native GPUI shell. Blocking repository reads run in separate bounded workers.
+mod load_smoke;
 mod network_smoke;
 use gpui::{
     App, Application, Bounds, Context, Entity, EntityInputHandler, FocusHandle, Focusable,
@@ -11,11 +12,13 @@ use hunkra::{
     editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
     history_view::HistoryView,
     i18n::{Locale, Translator},
+    measurements::Measurements,
     network_action::{self, NetworkCommand, NetworkOutcome},
     network_view::{NetworkEvent, NetworkPage, NetworkView},
     settings::{self, Settings},
     state::ViewState,
     theme::{ACCENT, BACKGROUND as BG, BORDER as LINE, HOVER, MUTED, PANEL, SELECTED, TEXT},
+    watch::RepositoryWatch,
     worker::LatestWorker,
 };
 use hunkra_core::{
@@ -37,13 +40,19 @@ type DiffQuery = (PathBuf, PathBuf, DiffKind, bool);
 struct DiffRead {
     diff: Arc<DiffSnapshot>,
     conflict: Option<ConflictSnapshot>,
+    source_time: Duration,
+    prepare_time: Duration,
+    service_time: Duration,
+    stats: hunkra_core::DiffCacheStats,
 }
 /// Reads a selected diff and recoverable conflict sources on the existing bounded worker.
 fn read_selected(
     reader: &mut hunkra_core::DiffReader,
     (root, path, kind, active_operation): DiffQuery,
 ) -> Result<DiffRead, CoreError> {
-    let diff = reader.read(&root, &path, kind)?.snapshot;
+    let start = Instant::now();
+    let read = reader.read(&root, &path, kind)?;
+    let diff = read.snapshot;
     let conflict = if !active_operation && diff.presentation != Presentation::Conflict {
         None
     } else {
@@ -53,15 +62,24 @@ fn read_selected(
             Err(error) => return Err(error),
         }
     };
-    Ok(DiffRead { diff, conflict })
+    Ok(DiffRead {
+        diff,
+        conflict,
+        source_time: read.source_time,
+        prepare_time: read.prepare_time,
+        service_time: start.elapsed(),
+        stats: reader.stats(),
+    })
 }
 struct StatusRead {
     repository: RepositorySnapshot,
     branches: BranchSnapshot,
     operation: OperationSnapshot,
+    elapsed: Duration,
 }
 /// Reads a consistent status/branch/operation bundle through the one bounded status worker.
 fn read_status(root: &std::path::Path) -> Result<StatusRead, CoreError> {
+    let start = Instant::now();
     let repository = hunkra_core::scan(root)?;
     let branches = hunkra_core::read_branches(root)?;
     let operation = hunkra_core::prepare_operation(root)?;
@@ -72,6 +90,7 @@ fn read_status(root: &std::path::Path) -> Result<StatusRead, CoreError> {
         repository,
         branches,
         operation,
+        elapsed: start.elapsed(),
     })
 }
 enum WriteQuery {
@@ -160,6 +179,9 @@ struct Hunkra {
     status_worker: LatestWorker<PathBuf, Result<StatusRead, CoreError>>,
     diff_worker: LatestWorker<DiffQuery, Result<DiffRead, CoreError>>,
     settings_worker: LatestWorker<Settings, std::io::Result<()>>,
+    watch: RepositoryWatch,
+    measurements: Measurements,
+    load: Option<load_smoke::LoadState>,
     write_worker: LatestWorker<WriteQuery, Result<WriteResult, CoreError>>,
     message: Entity<NativeEditor>,
     branch_input: Entity<NativeEditor>,
@@ -372,6 +394,9 @@ impl Hunkra {
                 read_selected,
             ),
             settings_worker: LatestWorker::new("hunkra-settings", settings::save),
+            watch: RepositoryWatch::default(),
+            measurements: Measurements::default(),
+            load: None,
             write_worker: LatestWorker::new("hunkra-write", |query: WriteQuery| match query {
                 WriteQuery::Index(root, diff, selection) => {
                     hunkra_core::update_index(&root, &diff, &selection).map(WriteResult::Index)
@@ -777,6 +802,7 @@ impl Hunkra {
             cx.notify();
         });
         self.root = Some(root);
+        self.watch.reset(self.root.clone());
         self.view.repository = None;
         self.view.selected = None;
         self.view.diff = None;
@@ -849,6 +875,9 @@ impl Hunkra {
     }
     /// Manual refresh restarts history at current HEAD; background status polls keep its immutable tip.
     fn refresh_visible(&mut self, cx: &mut Context<Self>) {
+        if self.watch.unavailable() && !self.writing {
+            self.watch.reset(self.root.clone());
+        }
         if self.network_tab
             && let Some(network) = &self.network
         {
@@ -1156,7 +1185,24 @@ impl Hunkra {
     }
     /// Reads completed mailboxes, rejecting obsolete generations before touching UI state.
     fn poll(&mut self, cx: &mut Context<Self>) {
-        let mut changed = false;
+        let mut changed = self.watch.poll();
+        let auto_refresh = self.smoke.as_ref().is_none_or(|smoke| {
+            smoke
+                .operation
+                .as_deref()
+                .is_some_and(|action| action.starts_with("load"))
+        });
+        if auto_refresh && self.watch.take_due() {
+            self.measurements.watch_hints = self.measurements.watch_hints.saturating_add(1);
+            self.refresh_queued = true;
+            if let Some(network) = &self.network {
+                network.update(cx, |view, cx| {
+                    if !view.busy && !view.loading {
+                        view.reload(cx);
+                    }
+                });
+            }
+        }
         if let Some(history) = &self.history {
             history.update(cx, |view, cx| view.poll(cx));
         }
@@ -1170,6 +1216,7 @@ impl Hunkra {
             changed = true;
             match result {
                 Ok(read) => {
+                    self.measurements.status.record(read.elapsed);
                     let snapshot = read.repository;
                     self.selected_branch = self.selected_branch.take().and_then(|selected| {
                         read.branches
@@ -1235,6 +1282,10 @@ impl Hunkra {
             changed = true;
             match result {
                 Ok(read) => {
+                    self.measurements.diff_sources.record(read.source_time);
+                    self.measurements.diff_prepare.record(read.prepare_time);
+                    self.measurements.diff_service.record(read.service_time);
+                    self.measurements.cache = read.stats;
                     let diff = read.diff;
                     match read.conflict {
                         Some(snapshot) => self.show_conflict(std::sync::Arc::new(snapshot), cx),
@@ -1404,12 +1455,14 @@ impl Hunkra {
         }
         if self.smoke.is_some() {
             self.smoke_tick(cx);
-        } else if !self.writing && !self.scanning && self.refresh_queued {
+        }
+        if auto_refresh && !self.writing && !self.scanning && self.refresh_queued {
             self.refresh_queued = false;
             self.refresh(cx);
-        } else if !self.writing
+        } else if auto_refresh
+            && !self.writing
             && self.root.is_some()
-            && self.last_scan.elapsed() > Duration::from_secs(2)
+            && self.last_scan.elapsed() > self.watch.interval()
         {
             if self.scanning {
                 self.refresh_queued = true;
@@ -1546,6 +1599,15 @@ impl Hunkra {
     }
     /// Runs a native scripted render scenario, with a finite timeout and isolated settings.
     fn smoke_tick(&mut self, cx: &mut Context<Self>) {
+        if self.smoke.as_ref().is_some_and(|smoke| {
+            smoke
+                .operation
+                .as_deref()
+                .is_some_and(|action| action.starts_with("load"))
+        }) {
+            self.smoke_load_tick(cx);
+            return;
+        }
         if self.smoke.as_ref().is_some_and(|smoke| {
             smoke
                 .operation
@@ -2100,6 +2162,7 @@ impl Hunkra {
                 action.starts_with("conflict")
                     || action == "history-draft"
                     || action.starts_with("network-draft")
+                    || action == "load-draft"
             }) && !smoke.result_ready
         }) {
             return;
@@ -2743,9 +2806,13 @@ impl Hunkra {
                     "files",
                     repo.files.len(),
                     cx.processor(|app, range: std::ops::Range<usize>, _, cx| {
-                        range
+                        let start = Instant::now();
+                        app.measurements.file_rows = app.measurements.file_rows.max(range.len());
+                        let rows = range
                             .map(|index| app.file_row(index, cx))
-                            .collect::<Vec<_>>()
+                            .collect::<Vec<_>>();
+                        app.measurements.file_rows_prepare.record(start.elapsed());
+                        rows
                     }),
                 )
                 .flex_1()
@@ -3147,9 +3214,13 @@ impl Hunkra {
                     "diff-rows",
                     diff.rows.len(),
                     cx.processor(|app, range: std::ops::Range<usize>, _, cx| {
-                        range
+                        let start = Instant::now();
+                        app.measurements.diff_rows = app.measurements.diff_rows.max(range.len());
+                        let rows = range
                             .map(|index| app.diff_row(index, cx))
-                            .collect::<Vec<_>>()
+                            .collect::<Vec<_>>();
+                        app.measurements.diff_rows_prepare.record(start.elapsed());
+                        rows
                     }),
                 )
                 .flex_1()
@@ -3214,6 +3285,7 @@ impl Hunkra {
 impl Render for Hunkra {
     /// Renders native elements from existing snapshots; no blocking Git work occurs here.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let started = Instant::now();
         self.frames += 1;
         self.smoke_input(window, cx);
         self.reviewed_operation = self.operation.clone();
@@ -3516,7 +3588,18 @@ impl Render for Hunkra {
             }));
         }
         status = status.child(div().flex_1()).child(self.t("view-only"));
-        content.child(status)
+        if self.watch.unavailable() {
+            status = status.child(self.t("watch-periodic"));
+        }
+        let content = content.child(status);
+        self.measurements.ui_prepare.record(started.elapsed());
+        let host = cx.entity();
+        window.on_next_frame(move |_, cx| {
+            host.update(cx, |app, _| {
+                app.measurements.next_frame.record(started.elapsed())
+            })
+        });
+        content
     }
 }
 

@@ -9,7 +9,7 @@
 | HNK-003 | P0 / 0 | done | HNK-001 | Полные Fluent en/ru и ru-dev overlay | Ключи, аргументы, грамматика, числа, офлайн | crates/hunkra/src/i18n.rs, locales/ |
 | HNK-004 | P0 / 1 | done | HNK-002 | gix status, HEAD/index/worktree и diff одного файла | Git-оракул источников/байтов, safe limits, unborn/linked/SHA-256 | crates/hunkra-core/, docs/gix-capabilities.md |
 | HNK-005 | P0 / 1 | done | HNK-003, HNK-004 | GPUI открыть → выбрать → side-by-side → сменить язык | Сборка, запуск, реальный demo; виртуальные строки, независимые обновления | crates/hunkra/, docs/execplans/first-slice.md |
-| HNK-006 | P0 / 1 | in_progress | HNK-005 | Повторный refresh, внешние изменения, быстрый выбор | Epoch/queue/byte-verified alignment cache и backend load metrics есть; watcher/native UX/load ещё нужны | docs/execplans/refresh-performance.md; workers, UI, tests |
+| HNK-006 | P0 / 1 | done | HNK-005 | Повторный refresh, внешние изменения, быстрый выбор | Bounded epoch/queue/cache; native hints + periodic actual reconciliation; пять native load сценариев и Git oracle | docs/execplans/refresh-performance.md; docs/validation/load.json; b4781df cache |
 | HNK-007 | P0 / 2 | done | HNK-016, HNK-017 | Stage/unstage файла, hunk и выбранных строк | A staged, B/C unstaged → A+B index, C worktree; часть замены, stale diff, блокировки, attributes | docs/execplans/index-selection.md |
 | HNK-008 | P0 / 2 | done | HNK-018, HNK-019 | Сообщение и Commit без stage-all | Git-оракул commit/index/worktree; hooks/signing/errors | core, UI, tests |
 | HNK-009 | P0 / 3 | done | HNK-008, HNK-020, HNK-021 | Ветки, merge/rebase, состояние continue/abort/skip | Внешние операции, несколько остановок rebase, восстановление после запуска | core, tests, demos |

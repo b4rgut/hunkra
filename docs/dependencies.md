@@ -1,6 +1,6 @@
 # Проверенные зависимости — 2026-10-05
 
-Версии проверены ответами официального crates.io API `/api/v1/crates/NAME` (max_stable_version), GitHub release API и stable channel manifest Rust. Прямые зависимости закреплены `=version`, транзитивный согласованный граф — Cargo.lock (813 packages, включая targets других платформ). Обязательных `../zed` или плавающих Git-dependencies нет.
+Версии проверены ответами официального crates.io API `/api/v1/crates/NAME` (max_stable_version), GitHub release API и stable channel manifest Rust. Прямые зависимости закреплены `=version`, транзитивный согласованный граф — Cargo.lock (820 packages, включая targets других платформ). Обязательных `../zed` или плавающих Git-dependencies нет.
 
 | Зависимость / инструмент | Назначение | Последняя проверенная / выбрана | Первичный источник |
 |---|---|---|---|
@@ -39,3 +39,5 @@ Developer assets are Linux x86_64, pinned URLs + release SHA-256 in scripts/boot
 Git executable: installed Git 2.55.0 independently verified by fixture oracles. It is now a production runtime dependency only for the explicit switch/merge/rebase/push/ff-only worktree coordinator routes; supported reads/ref creation/staging/ordinary Commit stay gix. Selected command flags are checked against current official manuals and real 2.55 fixtures. No globally installed package/config was changed. Lower Git version coverage and X11 runtime remain unverified; target native Wayland checks pass.
 
 SSH acceptance uses installed OpenSSH 10.2p1 and isolated generated test keys/socket/known_hosts with foreground ssh-agent/loopback sshd. sshd is a test dependency; production uses the existing SSH client/agent. CI declares openssh-server in its setup, but remote CI execution and Ubuntu sshd coverage remain unverified. All local tests ran Fedora 44 without privilege changes.
+
+Filesystem watcher checked 2026-10-06: official notify 8.2.0 (CC0-1.0, declared Rust 1.77), pinned with default features disabled; https://crates.io/api/v1/crates/notify and https://docs.rs/notify/8.2.0/notify/. Seven new lock packages: notify, notify-types, inotify, inotify-sys, kqueue, kqueue-sys, windows-sys 0.60.2. Existing package versions and libc 0.2.189 remain unchanged. Resolver also binds curl/curl-sys Windows edges to existing windows-sys 0.61.2 and adds mio log edge; Windows/macOS are untested. Fedora Linux headless/native checks pass with scripts/dev compiler environment. Native runtime errors/overflow and large recursive setup require the independent periodic safety net.

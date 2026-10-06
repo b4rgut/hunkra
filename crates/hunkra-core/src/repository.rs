@@ -164,6 +164,22 @@ pub struct RepositorySnapshot {
     pub commit: crate::CommitSnapshot,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RepositoryLocations {
+    pub root: PathBuf,
+    pub git_dir: PathBuf,
+    pub common_dir: PathBuf,
+}
+/// Resolves actual worktree/linked/common metadata locations for asynchronous filesystem watching, without interpreting .git files in UI.
+pub fn repository_locations(path: &Path) -> Result<RepositoryLocations, CoreError> {
+    let repo = open(path)?;
+    Ok(RepositoryLocations {
+        root: repo.workdir().ok_or(CoreError::Bare)?.canonicalize()?,
+        git_dir: repo.git_dir().canonicalize()?,
+        common_dir: repo.common_dir().canonicalize()?,
+    })
+}
+
 /// Keeps library diagnostics out of the translatable domain error categories.
 pub(crate) fn git_error(error: impl std::fmt::Display) -> CoreError {
     CoreError::Git(error.to_string())

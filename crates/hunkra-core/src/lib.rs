@@ -16,8 +16,8 @@ pub mod transitions;
 pub use diff::{DiffKind, DiffRow, DiffSnapshot, Document, Line, Presentation};
 pub use diff_reader::{CachedDiff, DiffCacheStats, DiffReader};
 pub use repository::{
-    ChangeKind, CoreError, FileStatus, IndexLimitation, Operation, RepositorySnapshot, read_diff,
-    scan,
+    ChangeKind, CoreError, FileStatus, IndexLimitation, Operation, RepositoryLocations,
+    RepositorySnapshot, read_diff, repository_locations, scan,
 };
 
 pub use branches::{Branch, BranchSnapshot, BranchWrite, create_branch, read_branches};

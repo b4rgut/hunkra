@@ -4,40 +4,6 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
-      "network_frames": null,
-      "scenario": "network-init",
-      "locales": [
-        "Remotes",
-        "Удалённые",
-        "Удалённые"
-      ],
-      "inputs_retained": true,
-      "writer_backend": "gix",
-      "error": null,
-      "close_cancelled": true,
-      "upstream": null
-    },
-    {
-      "ok": true,
-      "native_display": true,
-      "frames": 11,
-      "network_frames": null,
-      "scenario": "network-clone",
-      "locales": [
-        "Remotes",
-        "Удалённые",
-        "Удалённые"
-      ],
-      "inputs_retained": true,
-      "writer_backend": "gix",
-      "error": null,
-      "close_cancelled": true,
-      "upstream": null
-    },
-    {
-      "ok": true,
-      "native_display": true,
       "frames": 10,
       "network_frames": null,
       "scenario": "network-init",
@@ -55,7 +21,41 @@
     {
       "ok": true,
       "native_display": true,
+      "frames": 10,
+      "network_frames": null,
+      "scenario": "network-clone",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
       "frames": 11,
+      "network_frames": null,
+      "scenario": "network-init",
+      "locales": [
+        "Remotes",
+        "Удалённые",
+        "Удалённые"
+      ],
+      "inputs_retained": true,
+      "writer_backend": "gix",
+      "error": null,
+      "close_cancelled": true,
+      "upstream": null
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 10,
       "network_frames": null,
       "scenario": "network-clone",
       "locales": [
@@ -265,7 +265,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 15,
+      "frames": 16,
       "network_frames": null,
       "scenario": "network-draft-clone-save",
       "locales": [
@@ -299,8 +299,8 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
-      "network_frames": 7,
+      "frames": 9,
+      "network_frames": 6,
       "scenario": "network-clone-refusal",
       "locales": [
         "Remotes",

@@ -42,7 +42,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 15,
+      "frames": 14,
       "locales": [
         "Result",
         "Результат",
@@ -194,7 +194,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 13,
+      "frames": 12,
       "locales": [
         "Result",
         "Результат",

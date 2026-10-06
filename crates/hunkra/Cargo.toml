@@ -19,6 +19,7 @@ unic-langid.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 unicode-segmentation.workspace = true
+notify.workspace = true
 gpui = { workspace = true, optional = true }
 
 [dev-dependencies]

@@ -7,6 +7,7 @@ pub mod history_state;
 #[cfg(feature = "gui")]
 pub mod history_view;
 pub mod i18n;
+pub mod measurements;
 pub mod network_action;
 #[cfg(feature = "gui")]
 pub mod network_view;
@@ -16,4 +17,5 @@ pub mod state;
 pub mod text;
 #[cfg(feature = "gui")]
 pub mod theme;
+pub mod watch;
 pub mod worker;
