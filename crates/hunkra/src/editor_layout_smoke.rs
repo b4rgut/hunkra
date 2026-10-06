@@ -188,8 +188,64 @@ impl Hunkra {
                         "explicit Home did not restore Result source coordinates"
                     );
                 });
+            } else if phase == 15 || phase == 16 {
+                editor.update(cx, |editor, cx| {
+                    if phase == 16 {
+                        let cursor = editor.buffer.selected_utf16().0.end;
+                        assert!(
+                            editor
+                                .bounds_for_range(cursor..cursor, Bounds::default(), window, cx)
+                                .is_some()
+                        );
+                        assert!(
+                            editor
+                                .bounds_for_range(0..0, Bounds::default(), window, cx)
+                                .is_none()
+                        );
+                    }
+                    editor.key_down(
+                        &KeyDownEvent {
+                            keystroke: Keystroke::parse(if phase == 15 {
+                                "pagedown"
+                            } else {
+                                "pageup"
+                            })
+                            .unwrap(),
+                            is_held: false,
+                        },
+                        window,
+                        cx,
+                    );
+                    assert!(editor.buffer.selection.range().is_empty());
+                    assert_eq!(editor.buffer.selection.cursor > 0, phase == 15);
+                });
+            } else if phase == 17 {
+                editor.update(cx, |editor, cx| {
+                    assert!(
+                        editor
+                            .bounds_for_range(0..0, Bounds::default(), window, cx)
+                            .is_some()
+                    );
+                    for key in ["shift-pagedown", "shift-pageup"] {
+                        editor.key_down(
+                            &KeyDownEvent {
+                                keystroke: Keystroke::parse(key).unwrap(),
+                                is_held: false,
+                            },
+                            window,
+                            cx,
+                        );
+                        assert_eq!(
+                            !editor.buffer.selection.range().is_empty(),
+                            key == "shift-pagedown"
+                        );
+                        assert_eq!(editor.buffer.selection.anchor, 0);
+                    }
+                });
             }
-            assert_eq!(editor.read(cx).buffer.selection, selection);
+            if phase != 15 && phase != 16 {
+                assert_eq!(editor.read(cx).buffer.selection, selection);
+            }
             assert_eq!(editor.read(cx).buffer.revision, revision);
             assert!(editor.read(cx).buffer.text().ends_with(">>>>>>> B\r\n"));
         } else {
@@ -197,7 +253,7 @@ impl Hunkra {
             assert!(conflict.read(cx).dirty(cx));
             assert!(!self.writing);
             let smoke = self.smoke.as_ref().unwrap();
-            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll handler callbacks; registered wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
+            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
             std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
             cx.quit();
             return;

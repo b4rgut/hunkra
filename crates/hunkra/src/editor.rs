@@ -120,6 +120,7 @@ impl NativeEditor {
     /// Shares one bounded line index per text revision; an unsupported layout never truncates or changes the model.
     fn lines(&mut self) -> Option<Arc<[Range<usize>]>> {
         if self.line_revision != self.buffer.revision {
+            self.preferred_column = None;
             self.line_ranges = Self::index_lines(self.buffer.text());
             self.line_revision = self.buffer.revision;
         }
@@ -241,8 +242,8 @@ impl NativeEditor {
             cx.notify();
         }
     }
-    /// Moves vertically by a retained grapheme column, clamping only in the target line.
-    fn vertical(&mut self, down: bool, extend: bool) {
+    /// Moves by a bounded row distance and retained grapheme column, clamping only in the target line.
+    fn vertical(&mut self, rows: usize, down: bool, extend: bool) {
         let Some(lines) = self.lines() else {
             return;
         };
@@ -256,9 +257,9 @@ impl NativeEditor {
                 .count()
         });
         let target = if down {
-            (current + 1).min(lines.len() - 1)
+            current.saturating_add(rows).min(lines.len() - 1)
         } else {
-            current.saturating_sub(1)
+            current.saturating_sub(rows)
         };
         let line = &lines[target];
         let index = self.buffer.text()[line.clone()]
@@ -267,17 +268,25 @@ impl NativeEditor {
             .map_or(line.end, |(offset, _)| line.start + offset);
         self.buffer.select(index, extend);
     }
+    /// Derives a page from the painted viewport with one row of overlap; unavailable or tiny layouts move at least one row.
+    fn page_rows(&self) -> usize {
+        self.bounds.map_or(1, |bounds| {
+            ((bounds.size.height / px(LINE_HEIGHT)).floor() as usize)
+                .saturating_sub(1)
+                .max(1)
+        })
+    }
     /// Handles editing keys locally while ordinary characters remain platform/IME input.
     pub fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
-        if self.single_line && matches!(key, "up" | "down") {
+        if self.single_line && matches!(key, "up" | "down" | "pageup" | "pagedown") {
             return;
         }
         let modifiers = event.keystroke.modifiers;
         let command = modifiers.control || modifiers.platform;
         let extend = modifiers.shift;
         let mut changed = false;
-        if !matches!(key, "up" | "down") {
+        if !matches!(key, "up" | "down" | "pageup" | "pagedown") {
             self.preferred_column = None;
         }
         match (command, key) {
@@ -363,7 +372,18 @@ impl NativeEditor {
             }
             (false, "up" | "down") => {
                 self.buffer.unmark();
-                self.vertical(key == "down", extend);
+                self.vertical(1, key == "down", extend);
+            }
+            (false, "pageup" | "pagedown") => {
+                self.buffer.unmark();
+                let Some(lines) = self.lines() else { return };
+                let rows = self.page_rows();
+                self.vertical(rows, key == "pagedown", extend);
+                self.scroll_row = if key == "pagedown" {
+                    self.scroll_row.saturating_add(rows).min(lines.len() - 1)
+                } else {
+                    self.scroll_row.saturating_sub(rows)
+                };
             }
             (_, "home" | "end") => {
                 self.buffer.unmark();
@@ -821,6 +841,109 @@ mod tests {
     }
 
     #[gpui::test]
+    /// Registered page keys navigate immutable Unicode/CRLF sources by the actual viewport, retain columns and extend selection without text mutations.
+    fn page_keys_follow_the_native_viewport(cx: &mut TestAppContext) {
+        let text = scrolling_document();
+        let lines = NativeEditor::index_lines(&text).unwrap();
+        let column = text[lines[0].clone()]
+            .grapheme_indices(true)
+            .nth(12)
+            .unwrap()
+            .0;
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let mut editor = NativeEditor::new(2 * 1024 * 1024, "text".into(), "limit".into(), cx);
+            editor.buffer.reset(text.clone());
+            editor.buffer.select(column, false);
+            editor.enabled = false;
+            window.focus(&editor.focus);
+            editor
+        });
+        let page = editor.read_with(cx, |editor, _| {
+            ((editor.bounds.unwrap().size.height / px(LINE_HEIGHT)).floor() as usize)
+                .saturating_sub(1)
+                .max(1)
+        });
+        let revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        cx.simulate_keystrokes("pagedown");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            lines[page].start + column,
+            "Page Down did not follow the native viewport"
+        );
+        cx.simulate_keystrokes("shift-pagedown");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.anchor
+                == lines[page].start + column
+                && editor.buffer.selection.cursor == lines[page * 2].start + column)
+        );
+        cx.simulate_keystrokes("shift-pageup");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range().is_empty()
+                && editor.buffer.selection.cursor == lines[page].start + column)
+        );
+        cx.simulate_keystrokes("pageup");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor == column
+                && editor.scroll_row == 0
+                && editor.buffer.revision == revision
+                && editor.buffer.text() == text)
+        );
+        let replacement = (0..200)
+            .map(|row| {
+                if row == page {
+                    "x\r\n"
+                } else {
+                    "А🦀e\u{301}bcдежзийклмнопрсту\r\n"
+                }
+            })
+            .collect::<String>();
+        let replacement_lines = NativeEditor::index_lines(&replacement).unwrap();
+        let new_column = replacement[replacement_lines[0].clone()]
+            .grapheme_indices(true)
+            .nth(4)
+            .unwrap()
+            .0;
+        editor.update(cx, |editor, cx| {
+            editor.buffer.reset(replacement.clone());
+            editor.buffer.select(new_column, false);
+            cx.notify();
+        });
+        cx.simulate_keystrokes("pagedown pagedown");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            replacement_lines[page * 2].start + new_column,
+            "new source retained a previous document's preferred column"
+        );
+        editor.update(cx, |editor, _| editor.enabled = true);
+        cx.simulate_input("Ж🦀");
+        let entered = editor.read_with(cx, |editor, _| editor.buffer.text().to_owned());
+        let entered_lines = NativeEditor::index_lines(&entered).unwrap();
+        let entered_column = entered[entered_lines[page * 3].clone()]
+            .grapheme_indices(true)
+            .nth(6)
+            .unwrap()
+            .0;
+        cx.simulate_keystrokes("pagedown");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor),
+            entered_lines[page * 3].start + entered_column,
+            "native input did not update the preferred grapheme column"
+        );
+        cx.simulate_keystrokes("pagedown pagedown pagedown pagedown pagedown");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor
+                == entered.len())
+        );
+        cx.simulate_keystrokes("pageup pageup pageup pageup pageup pageup pageup");
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.cursor
+                == entered_column
+                && editor.scroll_row == 0
+                && editor.buffer.text() == entered)
+        );
+    }
+
+    #[gpui::test]
     /// Wheel navigation of immutable Unicode/CRLF sources preserves input/cursor through repaint and still reveals explicit keyboard navigation.
     fn wheel_scroll_preserves_read_only_source_and_cursor(cx: &mut TestAppContext) {
         let text = scrolling_document();
@@ -1062,6 +1185,7 @@ mod tests {
         for text in ["🦀".repeat(8192), "\n".repeat(2 * 1024 * 1024)] {
             cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
             cx.simulate_keystrokes("ctrl-a ctrl-v");
+            cx.simulate_keystrokes("pagedown shift-pageup");
             assert!(
                 editor.read_with(cx, |editor, _| editor.buffer.text() == text
                     && editor.rows.is_empty())
@@ -1104,7 +1228,7 @@ mod tests {
     }
     struct NavigationHost {
         input: Entity<NativeEditor>,
-        arrows: usize,
+        navigation_keys: usize,
     }
     impl Render for NavigationHost {
         /// Embeds the real field in a parent that owns list navigation, exercising GPUI bubbling rather than direct handler calls.
@@ -1113,21 +1237,27 @@ mod tests {
                 .size_full()
                 .child(self.input.clone())
                 .on_key_down(cx.listener(|host, event: &KeyDownEvent, _, cx| {
-                    if matches!(event.keystroke.key.as_str(), "up" | "down") {
-                        host.arrows += 1;
+                    if matches!(
+                        event.keystroke.key.as_str(),
+                        "up" | "down" | "pageup" | "pagedown"
+                    ) {
+                        host.navigation_keys += 1;
                         cx.stop_propagation();
                     }
                 }))
         }
     }
     #[gpui::test]
-    /// Single-line arrows bubble to the visible list without changing native field text, selection or revision.
-    fn single_line_arrows_reach_parent(cx: &mut TestAppContext) {
+    /// Single-line arrow/page keys bubble to the visible list without changing native field text, selection or revision.
+    fn single_line_navigation_reaches_parent(cx: &mut TestAppContext) {
         let (host, cx) = cx.add_window_view(|window, cx| {
             let input =
                 cx.new(|cx| NativeEditor::single_line(4096, "filter".into(), "limit".into(), cx));
             window.focus(&input.read(cx).focus_handle(cx));
-            NavigationHost { input, arrows: 0 }
+            NavigationHost {
+                input,
+                navigation_keys: 0,
+            }
         });
         cx.simulate_input("src Ядро");
         let input = host.read_with(cx, |host, _| host.input.clone());
@@ -1138,8 +1268,8 @@ mod tests {
                 editor.buffer.revision,
             )
         });
-        cx.simulate_keystrokes("up down");
-        assert_eq!(host.read_with(cx, |host, _| host.arrows), 2);
+        cx.simulate_keystrokes("up down pageup pagedown");
+        assert_eq!(host.read_with(cx, |host, _| host.navigation_keys), 4);
         assert_eq!(
             before,
             input.read_with(cx, |editor, _| (
