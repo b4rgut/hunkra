@@ -25,7 +25,7 @@ def smoke(destination):
                 assert result.returncode==0,result.stderr.decode(errors="replace")
             return result.stdout
 
-        for action in ("load-watch","load-root","load-mass","load-large","load-periodic","load-draft"):
+        for action in ("load-watch","load-root","load-budget","load-mass","load-large","load-periodic","load-draft"):
             root=fixture/action; root.mkdir(); git(root,"init","-b","main")
             content=b"\xef\xbb\xbffixture\r\nno EOF newline"
             files=root/"files";files.mkdir()
@@ -49,12 +49,13 @@ def smoke(destination):
             index=(root/".git/index").read_bytes();head=git(root,"rev-parse","HEAD");stages=git(root,"ls-files","--stage");f=(root/"f").read_bytes()
             report_path=fixture/(action+".json")
             env=dict(environment,HUNKRA_SMOKE_EXPECT_FILES=str(count))
-            if action=="load-root": env["HUNKRA_SMOKE_FIXTURE_ROOT"]=str(root.resolve())
+            if action in ("load-root","load-budget"): env["HUNKRA_SMOKE_FIXTURE_ROOT"]=str(root.resolve())
             result=subprocess.run([str(Path(os.environ.get("HUNKRA_TEST_BINARY", ROOT / "target/debug/hunkra"))),str(root),"--smoke-test",str(report_path),"--smoke-operation",action],env=env,capture_output=True,timeout=40)
             assert result.returncode==0,result.stderr.decode(errors="replace")
             report=json.loads(report_path.read_text());assert report["ok"] and report["native_display"] and report["message_retained"]
             assert report["locales"]==["Changes","Изменения","Изменения"]
             if action=="load-root": assert report["root_rearmed"] and report["watch_native"]
+            if action=="load-budget": assert report["budget_recovered"] and report["watch_native"] and not (root/"watch-budget").exists()
             assert (root/".git/index").read_bytes()==index and git(root,"rev-parse","HEAD")==head and git(root,"ls-files","--stage")==stages
             assert (root/"sibling").read_bytes()==b"sibling\r\nEOF"
             assert (root/"large.txt").read_bytes()==large.replace(b"line 09000 stable",b"line 09000 change")

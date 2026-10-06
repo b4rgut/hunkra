@@ -8,6 +8,7 @@ pub(super) struct LoadState {
     initial_files: usize,
     external_done: Arc<AtomicBool>,
     root_rearmed: bool,
+    budget_recovered: bool,
     rearm_hints: u64,
 }
 impl Hunkra {
@@ -40,16 +41,28 @@ impl Hunkra {
         let mass = action == "load-mass";
         let draft = action == "load-draft";
         let root_move = action == "load-root";
+        let budget_grow = action == "load-budget";
+        let budget_recover = action == "load-budget-recover";
         std::thread::spawn(move || {
-            if root_move {
+            if root_move || budget_grow || budget_recover {
                 assert_eq!(
                     Some(root.clone()),
                     std::env::var_os("HUNKRA_SMOKE_FIXTURE_ROOT").map(PathBuf::from)
                 );
-                let displaced = root.with_file_name("load-root-displaced");
-                assert!(!displaced.exists());
-                std::fs::rename(&root, &displaced).unwrap();
-                std::fs::rename(&displaced, &root).unwrap();
+                if root_move {
+                    let displaced = root.with_file_name("load-root-displaced");
+                    assert!(!displaced.exists());
+                    std::fs::rename(&root, &displaced).unwrap();
+                    std::fs::rename(&displaced, &root).unwrap();
+                } else if budget_grow {
+                    let budget = root.join("watch-budget");
+                    std::fs::create_dir(&budget).unwrap();
+                    for number in 0..8300 {
+                        std::fs::create_dir(budget.join(number.to_string())).unwrap();
+                    }
+                } else {
+                    std::fs::remove_dir_all(root.join("watch-budget")).unwrap();
+                }
             } else if mass {
                 for number in 0..3000 {
                     let path = root.join(format!("files/{number:04}.txt"));
@@ -142,6 +155,7 @@ impl Hunkra {
                 initial_files: files,
                 external_done: Arc::new(AtomicBool::new(false)),
                 root_rearmed: false,
+                budget_recovered: false,
                 rearm_hints: 0,
             });
         } else if phase <= 3 {
@@ -206,20 +220,33 @@ impl Hunkra {
             if !load.external_done.load(Ordering::Acquire) {
                 return;
             }
-            if action == "load-root" && phase == 7 {
+            if matches!(action.as_str(), "load-root" | "load-budget") && phase == 7 {
                 if !self.watch.unavailable() {
                     return;
                 }
                 assert_eq!(self.watch.interval(), Duration::from_secs(2));
                 self.assert_load_retention(cx);
+                if action == "load-budget" {
+                    self.load
+                        .as_ref()
+                        .unwrap()
+                        .external_done
+                        .store(false, Ordering::Release);
+                    self.start_load_changes("load-budget-recover");
+                } else {
+                    self.refresh_visible(cx);
+                }
+            } else if action == "load-budget" && phase == 8 {
+                self.assert_load_retention(cx);
                 self.refresh_visible(cx);
-            } else if action == "load-root" && phase == 8 {
+            } else if action == "load-root" && phase == 8 || action == "load-budget" && phase == 9 {
                 if !self.watch.active() {
                     return;
                 }
                 self.assert_load_retention(cx);
                 let load = self.load.as_mut().unwrap();
-                load.root_rearmed = true;
+                load.root_rearmed = action == "load-root";
+                load.budget_recovered = action == "load-budget";
                 load.rearm_hints = self.measurements.watch_hints;
                 load.external_done.store(false, Ordering::Release);
                 self.start_load_changes("load-watch");
@@ -263,8 +290,8 @@ impl Hunkra {
                 } else {
                     assert!(self.measurements.watch_hints > 0);
                 }
-                if action == "load-root" {
-                    assert!(load.root_rearmed && self.watch.active());
+                if matches!(action.as_str(), "load-root" | "load-budget") {
+                    assert!((load.root_rearmed || load.budget_recovered) && self.watch.active());
                     assert!(self.measurements.watch_hints > load.rearm_hints);
                 }
                 self.finish_load_smoke(cx);
@@ -286,7 +313,7 @@ impl Hunkra {
                 && self.measurements.cache.allocated_bytes <= hunkra_core::diff_reader::CACHE_BYTES
         );
         let smoke = self.smoke.as_ref().unwrap();
-        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"scenario":smoke.operation,"locales":smoke.locales,"initial_files":self.load.as_ref().unwrap().initial_files,"final_files":self.view.repository.as_ref().unwrap().files.len(),"message_retained":true,"draft_retained":smoke.operation.as_deref()==Some("load-draft"),"dense_limit_verified":smoke.operation.as_deref()==Some("load-large"),"root_rearmed":self.load.as_ref().unwrap().root_rearmed,"watch_native":self.watch.active(),"measurements":self.measurements.json()});
+        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"scenario":smoke.operation,"locales":smoke.locales,"initial_files":self.load.as_ref().unwrap().initial_files,"final_files":self.view.repository.as_ref().unwrap().files.len(),"message_retained":true,"draft_retained":smoke.operation.as_deref()==Some("load-draft"),"dense_limit_verified":smoke.operation.as_deref()==Some("load-large"),"root_rearmed":self.load.as_ref().unwrap().root_rearmed,"budget_recovered":self.load.as_ref().unwrap().budget_recovered,"watch_native":self.watch.active(),"measurements":self.measurements.json()});
         std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
         cx.quit();
     }

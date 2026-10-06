@@ -2,7 +2,7 @@
 use crate::worker::LatestWorker;
 use notify::{
     Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
-    event::{AccessKind, AccessMode, ModifyKind},
+    event::{AccessKind, AccessMode, CreateKind, ModifyKind, RemoveKind},
 };
 use std::{
     path::PathBuf,
@@ -22,6 +22,7 @@ const DIRECTORY_BYTES: usize = 16 * 1024 * 1024;
 struct Signal {
     pending: Mutex<Option<(Instant, Instant)>>,
     failed: AtomicBool,
+    topology: AtomicBool,
 }
 impl Signal {
     /// Coalesces arbitrarily many notifications into first/last timestamps, retaining no paths or diagnostics.
@@ -67,14 +68,23 @@ impl Signal {
         {
             self.failed.store(true, Ordering::Release);
         }
+        let relevant = event.paths.is_empty()
+            || event
+                .paths
+                .iter()
+                .any(|path| roots.iter().any(|root| path.starts_with(root)));
         if event.need_rescan()
-            || !access_only
-                && (event.paths.is_empty()
-                    || event
-                        .paths
-                        .iter()
-                        .any(|path| roots.iter().any(|root| path.starts_with(root))))
+            || relevant
+                && matches!(
+                    event.kind,
+                    EventKind::Create(CreateKind::Folder)
+                        | EventKind::Remove(RemoveKind::Folder)
+                        | EventKind::Modify(ModifyKind::Name(_))
+                )
         {
+            self.topology.store(true, Ordering::Release);
+        }
+        if event.need_rescan() || !access_only && relevant {
             self.mark(Instant::now());
         }
     }
@@ -87,34 +97,35 @@ struct Ready {
     native: bool,
 }
 
-/// Checks initial recursive setup costs on the worker; symlinks are never followed into unrelated projects.
-fn bounded_directories(roots: &[PathBuf]) -> bool {
-    let mut pending = roots.to_vec();
-    let mut count = pending.len();
-    let mut bytes = pending.iter().map(PathBuf::capacity).sum::<usize>();
-    while let Some(path) = pending.pop() {
+/// Enumerates one bounded directory set on the worker; nonrecursive registrations cannot expand it inside notify.
+fn bounded_directories(roots: &[PathBuf]) -> Option<Vec<PathBuf>> {
+    let mut paths = roots.to_vec();
+    let mut bytes = paths.iter().map(PathBuf::capacity).sum::<usize>();
+    let mut next = 0;
+    while next < paths.len() {
+        let path = &paths[next];
+        next += 1;
         let Ok(entries) = std::fs::read_dir(path) else {
-            return false;
+            return None;
         };
         for entry in entries {
             let Ok(entry) = entry else {
-                return false;
+                return None;
             };
             let Ok(kind) = entry.file_type() else {
-                return false;
+                return None;
             };
             if kind.is_dir() && !kind.is_symlink() {
                 let path = entry.path();
-                count += 1;
                 bytes += path.capacity();
-                if count > DIRECTORY_LIMIT || bytes > DIRECTORY_BYTES {
-                    return false;
+                if paths.len() >= DIRECTORY_LIMIT || bytes > DIRECTORY_BYTES {
+                    return None;
                 }
-                pending.push(path);
+                paths.push(path);
             }
         }
     }
-    true
+    Some(paths)
 }
 
 /// Builds the native watcher only on its worker; all metadata locations come from core's actual gix repository context.
@@ -136,9 +147,21 @@ fn install(state: &mut Option<LiveWatch>, root: Option<PathBuf>) -> Option<Ready
                 recursive.push(path.clone());
             }
         }
-        if !bounded_directories(&recursive) {
+        let mut directories = bounded_directories(&recursive)?;
+        let tree_count = directories.len();
+        for path in &recursive {
+            if let Some(parent) = path.parent()
+                && !directories.iter().any(|path| path == parent)
+            {
+                directories.push(parent.to_path_buf());
+            }
+        }
+        if directories.len() > DIRECTORY_LIMIT
+            || directories.iter().map(PathBuf::capacity).sum::<usize>() > DIRECTORY_BYTES
+        {
             return None;
         }
+        directories.sort();
         let callback_signal = signal.clone();
         let callback_roots = roots.clone();
         let mut watcher = RecommendedWatcher::new(
@@ -146,18 +169,18 @@ fn install(state: &mut Option<LiveWatch>, root: Option<PathBuf>) -> Option<Ready
             Config::default().with_follow_symlinks(false),
         )
         .ok()?;
-        for path in &recursive {
-            watcher.watch(path, RecursiveMode::Recursive).ok()?;
+        for path in &directories {
+            watcher.watch(path, RecursiveMode::NonRecursive).ok()?;
         }
-        let mut parents = Vec::<PathBuf>::new();
-        for path in &recursive {
-            if let Some(parent) = path.parent()
-                && !recursive.iter().any(|root| parent.starts_with(root))
-                && !parents.iter().any(|path| path == parent)
-            {
-                watcher.watch(parent, RecursiveMode::NonRecursive).ok()?;
-                parents.push(parent.to_path_buf());
-            }
+        // Close the census-to-registration gap: later structural changes are already watched, while earlier ones require another bounded setup.
+        let verified = bounded_directories(&recursive)?;
+        if verified.len() != tree_count
+            || verified
+                .iter()
+                .any(|path| directories.binary_search(path).is_err())
+        {
+            signal.topology.store(true, Ordering::Release);
+            signal.mark(Instant::now());
         }
         Some(watcher)
     };
@@ -175,6 +198,7 @@ pub struct RepositoryWatch {
     generation: u64,
     ready: Option<Ready>,
     requested: bool,
+    root: Option<PathBuf>,
 }
 impl Default for RepositoryWatch {
     /// Creates one bounded setup worker; recursive discovery and watcher drop never block the UI thread.
@@ -184,6 +208,7 @@ impl Default for RepositoryWatch {
             generation: 0,
             ready: None,
             requested: false,
+            root: None,
         }
     }
 }
@@ -193,6 +218,7 @@ impl RepositoryWatch {
         self.generation += 1;
         self.ready = None;
         self.requested = root.is_some();
+        self.root = root.clone();
         self.worker.submit(self.generation, root);
     }
     /// Applies only the latest setup result; native failures retain periodic reconciliation as an independent path.
@@ -215,11 +241,25 @@ impl RepositoryWatch {
     pub fn unavailable(&self) -> bool {
         self.requested && self.ready.is_some() && !self.active()
     }
-    /// Consumes a debounced bounded hint; this is never a status/content cache or proof of unchanged files.
-    pub fn take_due(&self) -> bool {
-        self.ready
+    /// Consumes a bounded hint and coalesces directory recensus on the existing worker; replaced roots still require explicit Refresh.
+    pub fn take_due(&mut self) -> bool {
+        let due = self
+            .ready
             .as_ref()
-            .is_some_and(|ready| ready.signal.take_due(Instant::now()))
+            .is_some_and(|ready| ready.signal.take_due(Instant::now()));
+        if due
+            && self.active()
+            && self
+                .ready
+                .as_ref()
+                .unwrap()
+                .signal
+                .topology
+                .swap(false, Ordering::AcqRel)
+        {
+            self.reset(self.root.clone());
+        }
+        due
     }
     /// Preserves a periodic safety net for event loss/native limits without running a second library polling scanner.
     pub fn interval(&self) -> Duration {
@@ -232,6 +272,113 @@ mod tests {
     use super::*;
     use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
     use std::{fs, path::Path, process::Command};
+
+    #[cfg(target_os = "linux")]
+    /// Counts the actual inotify registrations belonging to this fixture inode, excluding concurrent tests and platform watchers.
+    fn native_registrations(root: &Path) -> usize {
+        use std::os::unix::fs::MetadataExt;
+        let inode = format!("ino:{:x}", root.metadata().unwrap().ino());
+        fs::read_dir("/proc/self/fdinfo")
+            .unwrap()
+            .filter_map(|entry| fs::read_to_string(entry.ok()?.path()).ok())
+            .filter(|data| {
+                data.lines()
+                    .any(|line| line.split_whitespace().any(|part| part == inode))
+            })
+            .map(|data| {
+                data.lines()
+                    .filter(|line| line.starts_with("inotify wd:"))
+                    .count()
+            })
+            .sum()
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    /// New subtrees cannot make notify grow its private kernel watch map beyond the explicitly installed directory set.
+    fn native_maps_do_not_expand_outside_the_directory_budget() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("repo");
+        fs::create_dir(&root).unwrap();
+        git(&root, &["init", "-b", "main"]);
+        let mut state = None;
+        let ready = install(&mut state, Some(root.clone())).unwrap();
+        assert!(ready.native);
+        let before = native_registrations(&root);
+        assert!(before > 0);
+        for number in 0..128 {
+            fs::create_dir_all(root.join(format!("new-{number}/a/b/c/d/e"))).unwrap();
+        }
+        wait(|| ready.signal.take_due(Instant::now()));
+        let after = native_registrations(&root);
+        assert!(
+            after <= before,
+            "native map expanded outside our budget: {before} -> {after}"
+        );
+    }
+
+    #[test]
+    /// New and renamed directory trees are re-enumerated on the existing worker before observing later child writes.
+    fn changed_directory_topology_rearms_without_git_writes() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("repo");
+        fs::create_dir(&root).unwrap();
+        git(&root, &["init", "-b", "main"]);
+        let head = fs::read(root.join(".git/HEAD")).unwrap();
+        let mut watch = RepositoryWatch::default();
+        watch.reset(Some(root.clone()));
+        wait(|| watch.poll());
+        assert!(watch.active());
+        let nested = root.join("new/a/b");
+        fs::create_dir_all(&nested).unwrap();
+        wait(|| watch.take_due());
+        wait(|| watch.poll());
+        assert!(watch.active());
+        fs::write(nested.join("f"), b"descendant\r\nEOF").unwrap();
+        wait(|| watch.take_due());
+        assert!(watch.active());
+        fs::rename(root.join("new"), root.join("moved")).unwrap();
+        wait(|| watch.take_due());
+        wait(|| watch.poll());
+        assert!(watch.active());
+        fs::write(root.join("moved/a/b/f"), b"renamed descendant\n").unwrap();
+        wait(|| watch.take_due());
+        assert!(watch.active());
+        assert_eq!(fs::read(root.join(".git/HEAD")).unwrap(), head);
+        assert!(!root.join(".git/index").exists());
+    }
+
+    #[test]
+    /// Exceeding the directory budget retires native registrations while actual reads and explicit recovery remain available.
+    fn runtime_directory_budget_degrades_and_recovers() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("repo");
+        fs::create_dir(&root).unwrap();
+        git(&root, &["init", "-b", "main"]);
+        let mut watch = RepositoryWatch::default();
+        watch.reset(Some(root.clone()));
+        wait(|| watch.poll());
+        assert!(watch.active());
+        let budget = root.join("budget");
+        fs::create_dir(&budget).unwrap();
+        for number in 0..DIRECTORY_LIMIT {
+            fs::create_dir(budget.join(number.to_string())).unwrap();
+        }
+        wait(|| watch.take_due());
+        wait(|| watch.poll());
+        assert!(watch.unavailable() && !watch.active());
+        assert_eq!(watch.interval(), Duration::from_secs(2));
+        assert!(hunkra_core::scan(&root).unwrap().files.is_empty());
+        #[cfg(target_os = "linux")]
+        wait(|| native_registrations(&root) == 0);
+        fs::remove_dir_all(&budget).unwrap();
+        watch.reset(Some(root.clone()));
+        wait(|| watch.poll());
+        assert!(watch.active() && !watch.unavailable());
+        fs::write(root.join("f"), b"recovered\n").unwrap();
+        wait(|| watch.take_due());
+        assert_eq!(hunkra_core::scan(&root).unwrap().files.len(), 1);
+    }
 
     /// Waits with a finite deadline for a real event/setup; tests never spin indefinitely.
     fn wait(mut predicate: impl FnMut() -> bool) {
