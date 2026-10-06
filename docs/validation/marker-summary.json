@@ -1,0 +1,99 @@
+{
+  "ok": true,
+  "uncached": {
+    "ok": true,
+    "native_display": true,
+    "scenario": "editor-layout",
+    "frames": 32,
+    "locales": [
+      "Changes",
+      "Изменения",
+      "Изменения"
+    ],
+    "giant_line_bytes": 32768,
+    "newline_document_bytes": 2097152,
+    "text_retained": true,
+    "notice_has_no_source_coordinates": true,
+    "replacement_undo_redo": true,
+    "large_result_bytes": 1599833,
+    "stable_result_phases": 16,
+    "marker_summary_before": {
+      "requests": 9,
+      "parser": {
+        "count": 9,
+        "mean_ms": 0.6517403333333334,
+        "max_ms": 1.9092390000000001
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "marker_summary": {
+      "requests": 26,
+      "parser": {
+        "count": 26,
+        "mean_ms": 4.849130038461538,
+        "max_ms": 9.878098999999999
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "read_only": true,
+    "scope": "actual native Result input/layout/locale/undo callbacks; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+    "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+    "binary_sha256": "12890ea0f310f196ce993249b738b2700937605c5e0588db9da08fead118e2f7",
+    "source_scope": "b742b1a plus finite native marker counters/large Result scenario, before the revision cache; debug build"
+  },
+  "cached": {
+    "ok": true,
+    "native_display": true,
+    "scenario": "editor-layout",
+    "frames": 33,
+    "locales": [
+      "Changes",
+      "Изменения",
+      "Изменения"
+    ],
+    "giant_line_bytes": 32768,
+    "newline_document_bytes": 2097152,
+    "text_retained": true,
+    "notice_has_no_source_coordinates": true,
+    "replacement_undo_redo": true,
+    "large_result_bytes": 1599833,
+    "stable_result_phases": 16,
+    "marker_summary_before": {
+      "requests": 9,
+      "parser": {
+        "count": 5,
+        "mean_ms": 0.8285107999999999,
+        "max_ms": 2.15592
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "marker_summary": {
+      "requests": 26,
+      "parser": {
+        "count": 6,
+        "mean_ms": 1.8760643333333336,
+        "max_ms": 7.1138319999999995
+      },
+      "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+    },
+    "read_only": true,
+    "scope": "actual native Result input/layout/locale/undo callbacks; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+    "stable_marker_summary_parses": 1,
+    "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+    "binary_sha256": "c0beafe63e5b79d6a6aef753b99acb7463c3ee9915df0a26ad8d70bb80053df5",
+    "source_scope": "b742b1a plus finite native marker counters/scenario and Result revision cache; debug build"
+  },
+  "stable_uncached": {
+    "requests": 17,
+    "parser_calls": 17,
+    "parser_total_ms": 120.21171799999998,
+    "parser_mean_ms": 7.071277529411764
+  },
+  "stable_cached": {
+    "requests": 17,
+    "parser_calls": 1,
+    "parser_total_ms": 7.113832000000001,
+    "parser_mean_ms": 7.113832000000001
+  },
+  "scope": "Two sequential native Wayland debug runs after compilation completed; no agent compile/container/other native run competed. Warm private fixtures; system load uncontrolled. Same 1599833-byte CRLF/Unicode Result, sixteen stable phases plus initial accepted text. Parser CPU-code wall time only, not whole frame/GPU/physical input. Data/metadata oracle passes in both runs."
+}

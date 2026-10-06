@@ -54,3 +54,14 @@ Independent HEAD/index/stages/worktree oracle passes in every fixture. No-event 
 ## Bounded diff preparation acceptance
 
 The core now validates the shared40,000-line and16KiB raw-line budgets through a streaming iterator before collecting line pointers or interning gix tokens. Previously a2MiB newline-only source could allocate millions of pointers before returning TooLarge. Original documents/bytes and refusal semantics remain intact. Two new tests cover exact combined-side boundaries, Unicode/CRLF/EOF and an independent Git source/index/worktree oracle. Full check passes131headless tests/strictClippy, UI Clippy/build pass; five native load cases plus12history and6staging/Commit regressions pass. Native load-large additionally opens a2MiB newline-only index blob with a short modified worktree, verifies translated refusal/no aligned rows, then rapidly returns to the18k-row diff. Report validation/diff-bounds-load.json; this debug run is acceptance evidence, not a comparison with optimized package timings. The ec25ff5 RPM predates this source change.
+
+## Result marker summary measurement
+
+Two sequential finite native Wayland debug runs on the same host, after compilation finished; no agent build/container/other native run competed. The private Result has1,599,833 UTF-8 bytes and39,999 CRLF rows with Cyrillic/emoji and one marker block. Sixteen stable phases plus the initial changed-text presentation produced17 summary requests. Filesystem cache is warm and system/desktop load is uncontrolled. This measures only CPU-code wall time spent in the bounded core marker parser, not complete frames/GPU execution or optimized package performance.
+
+| Presentation | Requests | Parser calls | Aggregate parser wall ms | Wall ms per parse |
+|---|---:|---:|---:|---:|
+| Before revision reuse |17|17|120.212|7.071|
+| Exact Result revision reuse |17|1|7.114|7.114|
+
+The parser itself is unchanged; avoiding repeated work accounts for the observed reduction. The cache retains only count/error and one revision, including malformed/oversized refusals. Selection/locale/Base/busy frames retain it; text changes/reset/undo/redo trigger a new parse. Actual chunk selection/choice still validates the current text and captured revision separately. Two new GPUI tests cover these state/data invariants; the native editor-layout case now asserts one parse across the stable phases while preserving all private Git/worktree bytes. Full samples and debug binary/source scope: validation/marker-summary.json. Existing optimized RPM/load reports keep their older source identity and do not certify this change.

@@ -1,5 +1,6 @@
 //! Finite real Wayland text-layout acceptance; only an explicit isolated editor-layout scenario enters this path.
 use super::*;
+use hunkra_core::diff::MAX_BYTES;
 
 /// Produces the exact byte-bounded document requested by this finite test phase.
 fn oversized_text(phase: usize) -> String {
@@ -8,6 +9,14 @@ fn oversized_text(phase: usize) -> String {
     } else {
         "\n".repeat(2 * 1024 * 1024)
     }
+}
+
+/// Fits the supported native/core row and byte budgets while requiring a substantial unchanged Result scan.
+fn large_marked_text() -> String {
+    let mut text = "unchanged text Кириллица 🦀\r\n".repeat(39_994);
+    text.push_str("<<<<<<< A\r\nТекущая🦀\r\n=======\r\nВходящая🦀\r\n>>>>>>> B\r\n");
+    assert!(text.len() < MAX_BYTES);
+    text
 }
 
 impl Hunkra {
@@ -118,12 +127,30 @@ impl Hunkra {
                     cx,
                 );
             });
-        } else {
+        } else if phase == 9 {
             assert_eq!(editor.read(cx).buffer.text(), "Снова🦀\r\nEOF");
+            self.smoke.as_mut().unwrap().marker_summary_before =
+                Some(conflict.read(cx).chunk_measurements());
+            editor.update(cx, |editor, cx| {
+                editor.buffer.replace_document(&large_marked_text());
+                editor.buffer.select(0, false);
+                cx.notify();
+            });
+        } else if (10..=25).contains(&phase) {
+            let selection = editor.read(cx).buffer.selection;
+            let revision = editor.read(cx).buffer.revision;
+            if phase <= 12 {
+                self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 10], cx);
+            }
+            assert_eq!(editor.read(cx).buffer.selection, selection);
+            assert_eq!(editor.read(cx).buffer.revision, revision);
+            assert!(editor.read(cx).buffer.text().ends_with(">>>>>>> B\r\n"));
+        } else {
+            assert_eq!(editor.read(cx).buffer.text(), large_marked_text());
             assert!(conflict.read(cx).dirty(cx));
             assert!(!self.writing);
             let smoke = self.smoke.as_ref().unwrap();
-            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo callbacks; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
+            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"read_only":true,"scope":"actual native Result input/layout/locale/undo callbacks; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
             std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
             cx.quit();
             return;

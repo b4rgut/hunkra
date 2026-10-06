@@ -2,6 +2,7 @@
 use crate::{
     editor::{NativeEditor, TextChanged, TextRejected},
     i18n::{Locale, Translator},
+    measurements::Timing,
     result_draft::{DraftRefresh, ResultDraft},
     theme,
 };
@@ -15,7 +16,7 @@ use hunkra_core::{
     conflict_chunks::{ChunkChoice, chunks},
     diff::MAX_BYTES,
 };
-use std::sync::Arc;
+use std::{sync::Arc, time::Instant};
 
 pub enum ConflictEvent {
     Save(Arc<ConflictSnapshot>, Document),
@@ -37,6 +38,10 @@ pub struct ConflictView {
     busy: bool,
     chunk: usize,
     chunk_scroll: UniformListScrollHandle,
+    chunk_requests: u64,
+    chunk_parse: Timing,
+    chunk_revision: Option<u64>,
+    chunk_count: Result<usize, ()>,
     subscriptions: Vec<Subscription>,
 }
 impl EventEmitter<ConflictEvent> for ConflictView {}
@@ -132,12 +137,34 @@ impl ConflictView {
             busy: false,
             chunk: 0,
             chunk_scroll: UniformListScrollHandle::new(),
+            chunk_requests: 0,
+            chunk_parse: Timing::default(),
+            chunk_revision: None,
+            chunk_count: Ok(0),
             subscriptions: vec![changed, rejected],
         }
     }
     /// Formats owned labels without issuing Git work or mutating editor buffers.
     fn t(&self, key: &str) -> String {
         self.translator.text(key, None)
+    }
+    /// Reuses the marker count/error for the current Result revision without retaining source bytes or block ranges.
+    fn chunk_summary(&mut self, cx: &App) -> Result<usize, ()> {
+        self.chunk_requests = self.chunk_requests.saturating_add(1);
+        let editor = self.result.read(cx);
+        if self.chunk_revision != Some(editor.buffer.revision) {
+            let start = Instant::now();
+            self.chunk_count = chunks(editor.buffer.text().as_bytes())
+                .map(|blocks| blocks.len())
+                .map_err(|_| ());
+            self.chunk_parse.record(start.elapsed());
+            self.chunk_revision = Some(editor.buffer.revision);
+        }
+        self.chunk_count
+    }
+    /// Exposes bounded CPU wall-time counters for finite native acceptance, excluding action-time source validation and GPU execution.
+    pub fn chunk_measurements(&self) -> serde_json::Value {
+        serde_json::json!({"requests":self.chunk_requests,"parser":self.chunk_parse.json(),"scope":"Result render marker summary only; CPU wall time; action validation and GPU execution excluded"})
     }
     /// Toggles only the read-only Base pane, leaving Result input and history untouched.
     pub fn toggle_base(&mut self, cx: &mut Context<Self>) {
@@ -420,10 +447,9 @@ impl Render for ConflictView {
         let _ = &self.subscriptions;
         let ready = self.ready();
         let dirty = self.dirty(cx);
-        let text = self.result.read(cx).buffer.text();
         let revision = self.result.read(cx).buffer.revision;
-        let blocks = chunks(text.as_bytes());
-        let count = blocks.as_ref().map_or(0, Vec::len);
+        let blocks = self.chunk_summary(cx);
+        let count = blocks.unwrap_or(0);
         self.chunk = self.chunk.min(count.saturating_sub(1));
         let chunk = self.chunk;
         let editable = self.snapshot.presentation == Presentation::Text && !self.busy;
@@ -700,5 +726,187 @@ impl Render for ConflictView {
                     })),
                 ),
         )
+    }
+}
+
+#[cfg(all(test, feature = "gui-tests"))]
+mod tests {
+    use super::*;
+    use gpui::{TestAppContext, VisualTestContext};
+    use std::{fs, path::Path, process::Command};
+
+    /// Builds real guarded SHA-256 stages while all subsequent native checks remain read-only for the fixture.
+    fn fixture() -> (tempfile::TempDir, Arc<ConflictSnapshot>) {
+        let fixture = tempfile::tempdir().unwrap();
+        let git = |arguments: &[&str]| {
+            Command::new("git")
+                .args([
+                    "--no-optional-locks",
+                    "-c",
+                    "user.name=Marker Fixture",
+                    "-c",
+                    "user.email=fixture@example.invalid",
+                    "-c",
+                    "core.autocrlf=false",
+                ])
+                .args(arguments)
+                .current_dir(fixture.path())
+                .output()
+                .unwrap()
+        };
+        assert!(
+            git(&["init", "-b", "main", "--object-format=sha256"])
+                .status
+                .success()
+        );
+        fs::write(fixture.path().join("f"), "base\r\n").unwrap();
+        for arguments in [
+            &["add", "f"][..],
+            &["commit", "-m", "base"],
+            &["switch", "-c", "incoming"],
+        ] {
+            assert!(git(arguments).status.success());
+        }
+        fs::write(fixture.path().join("f"), "Входящая🦀\r\n").unwrap();
+        assert!(git(&["commit", "-am", "incoming"]).status.success());
+        assert!(git(&["switch", "main"]).status.success());
+        fs::write(fixture.path().join("f"), "Текущая🦀\r\n").unwrap();
+        assert!(git(&["commit", "-am", "current"]).status.success());
+        assert_eq!(
+            git(&["merge", "--no-edit", "incoming"]).status.code(),
+            Some(1)
+        );
+        let snapshot =
+            Arc::new(hunkra_core::read_conflict(fixture.path(), Path::new("f")).unwrap());
+        (fixture, snapshot)
+    }
+
+    /// Reads parser work independently from render requests; action validation is deliberately measured separately.
+    fn parser_calls(view: &Entity<ConflictView>, cx: &mut VisualTestContext) -> u64 {
+        view.read_with(cx, |view, _| {
+            view.chunk_measurements()["parser"]["count"]
+                .as_u64()
+                .unwrap()
+        })
+    }
+
+    #[gpui::test]
+    /// Stable selection/locale/Base/busy frames reuse the summary, while actual edits/undo/redo and stale action guards retain exact Unicode/CRLF bytes.
+    fn marker_summary_tracks_result_revisions_and_action_guards(cx: &mut TestAppContext) {
+        let (fixture, snapshot) = fixture();
+        let index = fs::read(fixture.path().join(".git/index")).unwrap();
+        let worktree = fs::read(fixture.path().join("f")).unwrap();
+        let supplied = snapshot.clone();
+        let (view, cx) = cx.add_window_view(|_, cx| ConflictView::new(supplied, Locale::En, cx));
+        let editor = view.read_with(cx, |view, _| view.result.clone());
+        assert_eq!(view.update(cx, |view, cx| view.chunk_summary(cx)), Ok(1));
+        let original_calls = parser_calls(&view, cx);
+        let original_revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+            view.update(cx, |view, cx| {
+                view.set_locale(locale, cx);
+                view.toggle_base(cx);
+                view.set_busy(true, cx);
+                assert_eq!(view.chunk_summary(cx), Ok(1));
+                view.take_chunk(0, original_revision, ChunkChoice::A, cx);
+                view.set_busy(false, cx);
+            });
+            cx.run_until_parked();
+        }
+        view.update(cx, |view, cx| view.refresh(snapshot.clone(), cx));
+        assert_eq!(parser_calls(&view, cx), original_calls);
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().as_bytes().to_vec()),
+            worktree
+        );
+        let marked =
+            "prefix\r\n<<<<<<< A\r\nТекущая🦀\r\n=======\r\nВходящая🦀\r\n>>>>>>> B\r\nsuffix";
+        editor.update(cx, |editor, cx| {
+            assert!(editor.buffer.replace_document(marked));
+            editor.buffer.select(0, false);
+            cx.notify();
+        });
+        let revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        cx.update_window_entity(&view, |view, window, cx| {
+            let _ = view.render(window, cx);
+            view.take_chunk(0, original_revision, ChunkChoice::B, cx);
+            view.select_chunk(0, original_revision, window, cx);
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            marked
+        );
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            0..0
+        );
+        cx.update_window_entity(&view, |view, window, cx| {
+            view.select_chunk(0, revision, window, cx)
+        });
+        let expected_range = chunks(marked.as_bytes()).unwrap()[0].range.clone();
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            expected_range
+        );
+        assert_eq!(parser_calls(&view, cx), original_calls + 1);
+        view.update(cx, |view, cx| {
+            view.take_chunk(0, revision, ChunkChoice::A, cx)
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            "prefix\r\nТекущая🦀\r\nsuffix"
+        );
+        assert_eq!(view.update(cx, |view, cx| view.chunk_summary(cx)), Ok(0));
+        assert_eq!(parser_calls(&view, cx), original_calls + 2);
+        editor.update(cx, |editor, _| assert!(editor.buffer.undo()));
+        assert_eq!(view.update(cx, |view, cx| view.chunk_summary(cx)), Ok(1));
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            marked
+        );
+        editor.update(cx, |editor, _| assert!(editor.buffer.redo()));
+        assert_eq!(view.update(cx, |view, cx| view.chunk_summary(cx)), Ok(0));
+        assert_eq!(parser_calls(&view, cx), original_calls + 4);
+        assert_eq!(fs::read(fixture.path().join(".git/index")).unwrap(), index);
+        assert_eq!(fs::read(fixture.path().join("f")).unwrap(), worktree);
+    }
+
+    #[gpui::test]
+    /// Malformed and oversized summaries are cached without enabling an old chunk choice or truncating the editable Result.
+    fn marker_errors_remain_manual_until_a_new_revision(cx: &mut TestAppContext) {
+        let (fixture, snapshot) = fixture();
+        let index = fs::read(fixture.path().join(".git/index")).unwrap();
+        let worktree = fs::read(fixture.path().join("f")).unwrap();
+        let (view, cx) = cx.add_window_view(|_, cx| ConflictView::new(snapshot, Locale::En, cx));
+        let editor = view.read_with(cx, |view, _| view.result.clone());
+        for text in [
+            "<<<<<<< A\r\nне закрыт🦀".into(),
+            "🦀".repeat(8192),
+            "\n".repeat(MAX_BYTES),
+        ] {
+            editor.update(cx, |editor, _| assert!(editor.buffer.reset(text.clone())));
+            assert_eq!(view.update(cx, |view, cx| view.chunk_summary(cx)), Err(()));
+            let calls = parser_calls(&view, cx);
+            let revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+            for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+                view.update(cx, |view, cx| {
+                    view.set_locale(locale, cx);
+                    assert_eq!(view.chunk_summary(cx), Err(()));
+                    view.take_chunk(0, revision, ChunkChoice::A, cx);
+                });
+                cx.run_until_parked();
+                assert_eq!(parser_calls(&view, cx), calls);
+                assert_eq!(
+                    editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+                    text
+                );
+            }
+        }
+        editor.update(cx, |editor, _| {
+            assert!(editor.buffer.reset("Восстановлено🦀\r\nEOF".into()))
+        });
+        assert_eq!(view.update(cx, |view, cx| view.chunk_summary(cx)), Ok(0));
+        assert_eq!(fs::read(fixture.path().join(".git/index")).unwrap(), index);
+        assert_eq!(fs::read(fixture.path().join("f")).unwrap(), worktree);
     }
 }

@@ -15,7 +15,7 @@ impl Timing {
         self.maximum = self.maximum.max(duration);
     }
     /// Distinguishes an unmeasured phase from a measured zero and exposes aggregate milliseconds with explicit sample count.
-    fn json(&self) -> serde_json::Value {
+    pub fn json(&self) -> serde_json::Value {
         serde_json::json!({"count":self.count,"mean_ms":(self.count>0).then(||self.total.as_secs_f64()*1000./self.count as f64),"max_ms":(self.count>0).then_some(self.maximum.as_secs_f64()*1000.)})
     }
 }

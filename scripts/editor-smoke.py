@@ -48,6 +48,11 @@ def smoke(destination):
         evidence = json.loads(report.read_text())
         assert evidence["ok"] and evidence["native_display"] and evidence["text_retained"] and evidence["replacement_undo_redo"]
         assert evidence["locales"] == ["Changes", "Изменения", "Изменения"]
+        before_summary = evidence["marker_summary_before"]
+        after_summary = evidence["marker_summary"]
+        assert after_summary["requests"] - before_summary["requests"] >= evidence["stable_result_phases"]
+        assert after_summary["parser"]["count"] - before_summary["parser"]["count"] == 1
+        evidence["stable_marker_summary_parses"] = 1
         assert (root / ".git/index").read_bytes() == index and git("rev-parse", "HEAD") == head and git("ls-files", "--stage") == stages
         report.unlink()
         assert git("status", "--porcelain=v1", "-z") == status
