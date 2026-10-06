@@ -11,6 +11,7 @@ use gpui::{
 use hunkra::{
     conflict_view::{ConflictEvent, ConflictView},
     editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
+    history_source::standalone_reader,
     history_view::HistoryView,
     horizontal_diff::HorizontalDiff,
     i18n::{Locale, Translator},
@@ -920,7 +921,9 @@ impl Hunkra {
             && self.history.is_none()
             && let Some(root) = self.root.clone()
         {
-            self.history = Some(cx.new(|cx| HistoryView::new(root, self.view.locale, cx)));
+            self.history = Some(
+                cx.new(|cx| HistoryView::new(root, self.view.locale, standalone_reader(), cx)),
+            );
         }
         cx.notify();
     }

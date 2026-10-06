@@ -1,0 +1,382 @@
+{
+  "ok": true,
+  "runs": [
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 14,
+      "scenario": "load-watch",
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "initial_files": 4003,
+      "final_files": 4003,
+      "message_retained": true,
+      "draft_retained": false,
+      "watch_native": true,
+      "measurements": {
+        "status_service": {
+          "count": 3,
+          "mean_ms": 22.599203999999997,
+          "max_ms": 24.226574
+        },
+        "diff_sources": {
+          "count": 3,
+          "mean_ms": 1.2357090000000002,
+          "max_ms": 1.457284
+        },
+        "diff_alignment_prepare": {
+          "count": 3,
+          "mean_ms": 0.006124666666666667,
+          "max_ms": 0.010694
+        },
+        "selected_diff_service": {
+          "count": 3,
+          "mean_ms": 1.2426746666666666,
+          "max_ms": 1.468776
+        },
+        "main_render_prepare_wall": {
+          "count": 14,
+          "mean_ms": 0.1002747857142857,
+          "max_ms": 0.175796
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 33,
+          "mean_ms": 0.013434848484848485,
+          "max_ms": 0.058662
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 30,
+          "mean_ms": 0.017967666666666667,
+          "max_ms": 0.23514400000000002
+        },
+        "next_frame_callback_wall": {
+          "count": 14,
+          "mean_ms": 18.176770571428573,
+          "max_ms": 60.968033
+        },
+        "maximum_file_rows_per_batch": 16,
+        "maximum_diff_rows_per_batch": 1,
+        "watch_hints": 1,
+        "cache": {
+          "entries": 1,
+          "allocated_bytes": 1002,
+          "hits": 1,
+          "misses": 2
+        },
+        "memory": {
+          "rss_kib": 94764,
+          "peak_rss_kib": 94764
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 15,
+      "scenario": "load-mass",
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "initial_files": 4003,
+      "final_files": 5003,
+      "message_retained": true,
+      "draft_retained": false,
+      "watch_native": true,
+      "measurements": {
+        "status_service": {
+          "count": 3,
+          "mean_ms": 24.615032666666664,
+          "max_ms": 27.078883
+        },
+        "diff_sources": {
+          "count": 3,
+          "mean_ms": 1.0657733333333332,
+          "max_ms": 1.136899
+        },
+        "diff_alignment_prepare": {
+          "count": 3,
+          "mean_ms": 0.0037126666666666666,
+          "max_ms": 0.009948
+        },
+        "selected_diff_service": {
+          "count": 3,
+          "mean_ms": 1.070373,
+          "max_ms": 1.1386020000000001
+        },
+        "main_render_prepare_wall": {
+          "count": 15,
+          "mean_ms": 0.08905753333333334,
+          "max_ms": 0.115191
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 33,
+          "mean_ms": 0.012990606060606062,
+          "max_ms": 0.066547
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 30,
+          "mean_ms": 0.016776000000000003,
+          "max_ms": 0.21457900000000002
+        },
+        "next_frame_callback_wall": {
+          "count": 15,
+          "mean_ms": 15.513658999999999,
+          "max_ms": 23.541984
+        },
+        "maximum_file_rows_per_batch": 16,
+        "maximum_diff_rows_per_batch": 1,
+        "watch_hints": 1,
+        "cache": {
+          "entries": 1,
+          "allocated_bytes": 1001,
+          "hits": 2,
+          "misses": 1
+        },
+        "memory": {
+          "rss_kib": 84592,
+          "peak_rss_kib": 87712
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "scenario": "load-large",
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "initial_files": 4003,
+      "final_files": 4003,
+      "message_retained": true,
+      "draft_retained": false,
+      "watch_native": true,
+      "measurements": {
+        "status_service": {
+          "count": 2,
+          "mean_ms": 23.034524,
+          "max_ms": 23.613437
+        },
+        "diff_sources": {
+          "count": 6,
+          "mean_ms": 2.0491705000000002,
+          "max_ms": 4.5683169999999995
+        },
+        "diff_alignment_prepare": {
+          "count": 6,
+          "mean_ms": 0.5939303333333333,
+          "max_ms": 3.394971
+        },
+        "selected_diff_service": {
+          "count": 6,
+          "mean_ms": 2.644008,
+          "max_ms": 5.572329
+        },
+        "main_render_prepare_wall": {
+          "count": 16,
+          "mean_ms": 0.06924762500000001,
+          "max_ms": 0.093366
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 39,
+          "mean_ms": 0.010801923076923075,
+          "max_ms": 0.052851
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 24,
+          "mean_ms": 0.036315291666666666,
+          "max_ms": 0.40248900000000004
+        },
+        "next_frame_callback_wall": {
+          "count": 16,
+          "mean_ms": 15.580210625,
+          "max_ms": 39.518392
+        },
+        "maximum_file_rows_per_batch": 16,
+        "maximum_diff_rows_per_batch": 11,
+        "watch_hints": 0,
+        "cache": {
+          "entries": 3,
+          "allocated_bytes": 9588690,
+          "hits": 3,
+          "misses": 3
+        },
+        "memory": {
+          "rss_kib": 98848,
+          "peak_rss_kib": 99748
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 16,
+      "scenario": "load-periodic",
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "initial_files": 4003,
+      "final_files": 4003,
+      "message_retained": true,
+      "draft_retained": false,
+      "watch_native": false,
+      "measurements": {
+        "status_service": {
+          "count": 3,
+          "mean_ms": 23.50896966666667,
+          "max_ms": 27.041033
+        },
+        "diff_sources": {
+          "count": 3,
+          "mean_ms": 1.013871,
+          "max_ms": 1.1438780000000002
+        },
+        "diff_alignment_prepare": {
+          "count": 3,
+          "mean_ms": 0.004192666666666667,
+          "max_ms": 0.006324
+        },
+        "selected_diff_service": {
+          "count": 3,
+          "mean_ms": 1.0188353333333333,
+          "max_ms": 1.15085
+        },
+        "main_render_prepare_wall": {
+          "count": 16,
+          "mean_ms": 0.0890571875,
+          "max_ms": 0.128022
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 36,
+          "mean_ms": 0.013050333333333334,
+          "max_ms": 0.066576
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 33,
+          "mean_ms": 0.01707172727272727,
+          "max_ms": 0.256366
+        },
+        "next_frame_callback_wall": {
+          "count": 16,
+          "mean_ms": 17.274219,
+          "max_ms": 38.115522
+        },
+        "maximum_file_rows_per_batch": 16,
+        "maximum_diff_rows_per_batch": 1,
+        "watch_hints": 0,
+        "cache": {
+          "entries": 1,
+          "allocated_bytes": 1005,
+          "hits": 1,
+          "misses": 2
+        },
+        "memory": {
+          "rss_kib": 87584,
+          "peak_rss_kib": 87584
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "frames": 17,
+      "scenario": "load-draft",
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "initial_files": 4003,
+      "final_files": 4003,
+      "message_retained": true,
+      "draft_retained": true,
+      "watch_native": true,
+      "measurements": {
+        "status_service": {
+          "count": 3,
+          "mean_ms": 24.477324333333332,
+          "max_ms": 26.536686
+        },
+        "diff_sources": {
+          "count": 3,
+          "mean_ms": 1.1014419999999998,
+          "max_ms": 1.4280840000000001
+        },
+        "diff_alignment_prepare": {
+          "count": 3,
+          "mean_ms": 0.006795333333333334,
+          "max_ms": 0.013454
+        },
+        "selected_diff_service": {
+          "count": 3,
+          "mean_ms": 3.9295566666666666,
+          "max_ms": 5.17952
+        },
+        "main_render_prepare_wall": {
+          "count": 17,
+          "mean_ms": 0.08730494117647059,
+          "max_ms": 0.127558
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 39,
+          "mean_ms": 0.01202776923076923,
+          "max_ms": 0.09091300000000001
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 0,
+          "mean_ms": null,
+          "max_ms": null
+        },
+        "next_frame_callback_wall": {
+          "count": 17,
+          "mean_ms": 16.51163382352941,
+          "max_ms": 35.517502
+        },
+        "maximum_file_rows_per_batch": 14,
+        "maximum_diff_rows_per_batch": 0,
+        "watch_hints": 1,
+        "cache": {
+          "entries": 1,
+          "allocated_bytes": 476,
+          "hits": 1,
+          "misses": 2
+        },
+        "memory": {
+          "rss_kib": 87388,
+          "peak_rss_kib": 87388
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    }
+  ],
+  "scope": "real Wayland handlers/virtual batches; backend/preparation/next-frame wall/RSS; no isolated GPU execution or physical hardware claim",
+  "provenance": {
+    "source_revision": "cfd73e9574f103025dc99300a541178a5cc66ee5",
+    "source_dirty": false,
+    "binary_sha256": "5e59f971f1ea1b4e2a65794ab3de2f93ecea798c87914a8989d7d7f14a1740dd",
+    "build": "optimized stripped RPM binary",
+    "host": "Fedora44 x86_64 Wayland",
+    "date": "2026-10-06",
+    "agent_compilation_or_other_test_running": false,
+    "filesystem_cache": "warm after synthetic fixture creation and independent Git oracle",
+    "scope": "five finite windows, local observations; no controlled comparative benchmark or isolated GPU measurement"
+  }
+}

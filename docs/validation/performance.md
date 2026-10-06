@@ -36,3 +36,17 @@ Five finite debug-build windows, each with 3000 tracked BOM/CRLF/EOF files and i
 Main/visible-row values measure wall time spent in CPU preparation code; next-frame callback includes scheduling/vsync, not isolated GPU/paint execution. No physical input/X11/GPU performance claim. load-periodic intentionally has no native hints and still observes actual changed bytes through periodic reads. load-draft retains unsaved Result/selection while refusing stale external writes. Cache-hit alignment remains shared; changed content invalidates old row coordinates. Initial watch setup budgets do not promise a global bound on future library/OS directory maps.
 
 Current native report regenerated with the final UX graph; a separate two-job release compilation was active during the load runs. Latencies include that host load and are not a before/after speed comparison. Quiet native remeasurement remains part of final packaging/acceptance.
+
+## Quiet optimized RPM measurement
+
+All five scenarios also passed on 2026-10-06 from the stripped optimized cfd73e9 RPM binary, SHA256 `5e59f971f1ea1b4e2a65794ab3de2f93ecea798c87914a8989d7d7f14a1740dd`. No agent compilation, packaging/container operation or other native acceptance run competed with this run. Fixture creation and Git oracle warm the filesystem cache; desktop/system load is not controlled. These are observations from one finite run, not a controlled comparison with the earlier debug measurements. Full samples and source identity: validation/load-release.json.
+
+| Scenario | Status service mean ms | Selected diff mean ms | Main preparation mean ms | Next-frame callback mean ms | Peak RSS KiB | Visible files / diff rows |
+|---|---:|---:|---:|---:|---:|---:|
+| load-watch | 22.60 | 1.24 | 0.100 | 18.18 | 94764 | 16 / 1 |
+| load-mass | 24.62 | 1.07 | 0.089 | 15.51 | 87712 | 16 / 1 |
+| load-large | 23.03 | 2.64 | 0.069 | 15.58 | 99748 | 16 / 11 |
+| load-periodic | 23.51 | 1.02 | 0.089 | 17.27 | 87584 | 16 / 1 |
+| load-draft | 24.48 | 3.93 | 0.087 | 16.51 | 87388 | 14 / 0 |
+
+Independent HEAD/index/stages/worktree oracle passes in every fixture. No-event fallback still reconciles actual bytes; dirty Result stays intact. GPU execution, physical input, cold-cache startup and cross-host reproducibility remain unmeasured.

@@ -1,11 +1,11 @@
 //! Native immutable history panels; one bounded worker owns traversal, commit and selected diff reads.
 use crate::{
     editor::NativeEditor,
-    history_state::{HistoryCache, HistoryService},
+    history_source::{HistoryQuery as Query, HistoryRead as Read, HistoryWorker},
+    history_state::HistoryCache,
     horizontal_diff::HorizontalDiff,
     i18n::{Locale, Translator},
     theme,
-    worker::LatestWorker,
 };
 use fluent_bundle::FluentArgs;
 use gpui::{
@@ -13,34 +13,14 @@ use gpui::{
     UniformListScrollHandle, Window, div, prelude::*, px, rgb, uniform_list,
 };
 use hunkra_core::{
-    CommitBase, CommitDetails, CommitSummary, CoreError, DiffRow, DiffSnapshot, HistoryPage, Line,
-    Presentation,
+    CommitBase, CommitDetails, CommitSummary, CoreError, DiffRow, DiffSnapshot, Line, Presentation,
 };
 use std::{path::PathBuf, sync::Arc};
-
-enum Query {
-    Page {
-        root: PathBuf,
-        session: u64,
-        offset: usize,
-    },
-    Commit {
-        root: PathBuf,
-        id: String,
-        base: CommitBase,
-    },
-    Diff(Arc<CommitDetails>, PathBuf),
-}
-enum Read {
-    Page(Arc<HistoryPage>),
-    Commit(Arc<CommitDetails>),
-    Diff(Arc<DiffSnapshot>),
-}
 
 pub struct HistoryView {
     root: PathBuf,
     translator: Translator,
-    worker: LatestWorker<Query, Result<Read, CoreError>>,
+    worker: HistoryWorker,
     session: u64,
     pub generation: u64,
     pub cache: HistoryCache,
@@ -96,8 +76,13 @@ fn error_key(error: &CoreError) -> &'static str {
 }
 
 impl HistoryView {
-    /// Creates its thread-confined gix service inside the bounded worker, then requests only the first page.
-    pub fn new(root: PathBuf, locale: Locale, cx: &mut Context<Self>) -> Self {
+    /// Uses the host-supplied source and requests the first page without opening a repository or standalone settings.
+    pub fn new(
+        root: PathBuf,
+        locale: Locale,
+        worker: HistoryWorker,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let translator = Translator::new(locale);
         let message = cx.new(|cx| {
             let mut editor =
@@ -105,21 +90,6 @@ impl HistoryView {
             editor.enabled = false;
             editor
         });
-        let worker = LatestWorker::with_state(
-            "hunkra-history",
-            HistoryService::default,
-            |service, query| match query {
-                Query::Page {
-                    root,
-                    session,
-                    offset,
-                } => service.page(&root, session, offset).map(Read::Page),
-                Query::Commit { root, id, base } => hunkra_core::read_commit(&root, &id, base)
-                    .map(|detail| Read::Commit(Arc::new(detail))),
-                Query::Diff(detail, path) => hunkra_core::read_commit_diff(&detail, &path)
-                    .map(|diff| Read::Diff(Arc::new(diff))),
-            },
-        );
         let mut view = Self {
             root,
             translator,
@@ -961,5 +931,143 @@ impl Focusable for HistoryView {
     /// Gives native keyboard navigation to the owned history panel without an independent window.
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus.clone()
+    }
+}
+
+#[cfg(all(test, feature = "gui-tests"))]
+mod tests {
+    use super::*;
+    use crate::worker::LatestWorker;
+    use gpui::TestAppContext;
+    use hunkra_core::{ChangeKind, CommitFile, DiffKind, Document, HistoryPage};
+    use std::{
+        cell::Cell,
+        rc::Rc,
+        sync::atomic::{AtomicUsize, Ordering},
+        time::{Duration, Instant},
+    };
+
+    /// Supplies immutable host-owned history without an on-disk repository or a second Git service.
+    fn host_summary() -> CommitSummary {
+        CommitSummary {
+            id: "1111111111111111111111111111111111111111".into(),
+            parents: Vec::new(),
+            subject: Some("Фиксация хоста".into()),
+            author: Some("Host".into()),
+            commit_seconds: 0,
+        }
+    }
+
+    #[gpui::test]
+    /// A native view consumes an injected host source and preserves read-only message/diff/locale state without local Git access.
+    fn host_supplied_reader_reaches_native_history(cx: &mut TestAppContext) {
+        let root = PathBuf::from("/host-managed-remote-project/without-local-repository");
+        let expected_root = root.clone();
+        let reads = Arc::new(AtomicUsize::new(0));
+        let source_reads = reads.clone();
+        let owner = std::thread::current().id();
+        let reader = LatestWorker::with_state(
+            "host-history-fixture",
+            move || {
+                assert_ne!(std::thread::current().id(), owner);
+                Rc::new(Cell::new(0usize))
+            },
+            move |state, request| {
+                state.set(state.get() + 1);
+                source_reads.fetch_add(1, Ordering::SeqCst);
+                Ok(match request {
+                    Query::Page {
+                        root,
+                        session,
+                        offset,
+                    } => {
+                        assert_eq!(root, expected_root);
+                        assert_eq!((session, offset), (1, 0));
+                        Read::Page(Arc::new(HistoryPage {
+                            root,
+                            tip: Some(host_summary().id),
+                            offset,
+                            commits: vec![host_summary()],
+                            has_more: false,
+                        }))
+                    }
+                    Query::Commit { root, id, base } => {
+                        assert_eq!(root, expected_root);
+                        assert_eq!(id, host_summary().id);
+                        assert_eq!(base, CommitBase::EmptyTree);
+                        Read::Commit(Arc::new(CommitDetails {
+                            root,
+                            summary: host_summary(),
+                            message: Some("Фиксация🦀\r\nСообщение хоста".into()),
+                            encoding: None,
+                            base,
+                            base_id: None,
+                            files: vec![CommitFile {
+                                path: "Ядро.bsl".into(),
+                                change: ChangeKind::Modified,
+                                old_mode: Some(0o100644),
+                                mode: Some(0o100644),
+                            }],
+                        }))
+                    }
+                    Query::Diff(details, path) => {
+                        assert_eq!(details.root, expected_root);
+                        assert_eq!(path, PathBuf::from("Ядро.bsl"));
+                        Read::Diff(Arc::new(DiffSnapshot::new(
+                            path,
+                            DiffKind::Staged,
+                            Document::present(b"old\r\nEOF".to_vec(), Some(0o100644)),
+                            Document::present("новое🦀\r\nEOF".as_bytes().to_vec(), Some(0o100644)),
+                        )))
+                    }
+                })
+            },
+        );
+        let (view, cx) = cx.add_window_view(|window, cx| {
+            let view = HistoryView::new(root, Locale::En, reader, cx);
+            window.focus(&view.message.read(cx).focus_handle(cx));
+            view
+        });
+        let deadline = Instant::now() + Duration::from_secs(2);
+        loop {
+            view.update(cx, |view, cx| view.poll(cx));
+            if view.read_with(cx, |view, _| view.diff.is_some() && !view.loading) {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "injected history source deadline"
+            );
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert_eq!(reads.load(Ordering::SeqCst), 3);
+        let message = view.read_with(cx, |view, _| view.message.clone());
+        cx.simulate_keystrokes("ctrl-a");
+        cx.simulate_input("read-only");
+        let before = message.read_with(cx, |editor, _| {
+            (
+                editor.buffer.text().to_owned(),
+                editor.buffer.selection,
+                editor.buffer.revision,
+            )
+        });
+        assert_eq!(before.0, "Фиксация🦀\r\nСообщение хоста");
+        let diff = view.read_with(cx, |view, _| view.diff.clone().unwrap());
+        for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+            view.update(cx, |view, cx| view.set_locale(locale, cx));
+            assert!(view.read_with(cx, |view, _| {
+                Arc::ptr_eq(&diff, view.diff.as_ref().unwrap())
+                    && view.details.as_ref().unwrap().base == CommitBase::EmptyTree
+            }));
+            assert_eq!(
+                before,
+                message.read_with(cx, |editor, _| (
+                    editor.buffer.text().to_owned(),
+                    editor.buffer.selection,
+                    editor.buffer.revision
+                ))
+            );
+        }
+        assert_eq!(reads.load(Ordering::SeqCst), 3);
     }
 }
