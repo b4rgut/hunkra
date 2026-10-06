@@ -2,7 +2,7 @@
 use crate::worker::LatestWorker;
 use notify::{
     Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher,
-    event::{AccessKind, AccessMode},
+    event::{AccessKind, AccessMode, ModifyKind},
 };
 use std::{
     path::PathBuf,
@@ -45,7 +45,7 @@ impl Signal {
             false
         }
     }
-    /// Ignores read/open access and unrelated parent events; errors/overflow request actual reconciliation without leaking diagnostics.
+    /// Ignores reads/siblings; replaced roots invalidate native health, while errors/overflow retain bounded actual reconciliation hints.
     fn event(&self, event: notify::Result<Event>, roots: &[PathBuf]) {
         let event = match event {
             Ok(event) => event,
@@ -60,6 +60,13 @@ impl Signal {
                 event.kind,
                 EventKind::Access(AccessKind::Close(AccessMode::Write | AccessMode::Any))
             );
+        if matches!(
+            event.kind,
+            EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(ModifyKind::Name(_))
+        ) && event.paths.iter().any(|path| roots.contains(path))
+        {
+            self.failed.store(true, Ordering::Release);
+        }
         if event.need_rescan()
             || !access_only
                 && (event.paths.is_empty()
@@ -223,6 +230,7 @@ impl RepositoryWatch {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use notify::event::{CreateKind, ModifyKind, RemoveKind, RenameMode};
     use std::{fs, path::Path, process::Command};
 
     /// Waits with a finite deadline for a real event/setup; tests never spin indefinitely.
@@ -370,5 +378,71 @@ mod tests {
         wait(|| watch.poll());
         assert!(watch.unavailable() && !watch.active());
         assert_eq!(watch.interval(), Duration::from_secs(2));
+    }
+
+    #[test]
+    /// Structural changes of an exact watched root invalidate native health while ordinary descendant writes remain hints.
+    fn replaced_roots_require_a_new_native_setup() {
+        let roots = vec![
+            PathBuf::from("/fixture/repo"),
+            PathBuf::from("/fixture/common"),
+        ];
+        for kind in [
+            EventKind::Create(CreateKind::Folder),
+            EventKind::Remove(RemoveKind::Folder),
+            EventKind::Modify(ModifyKind::Name(RenameMode::From)),
+            EventKind::Modify(ModifyKind::Name(RenameMode::To)),
+            EventKind::Modify(ModifyKind::Name(RenameMode::Both)),
+        ] {
+            let signal = Signal::default();
+            signal.event(
+                Ok(Event::new(kind).add_path(roots[0].join("inside"))),
+                &roots,
+            );
+            assert!(!signal.failed.load(Ordering::Acquire));
+            signal.event(Ok(Event::new(kind).add_path(roots[1].clone())), &roots);
+            assert!(
+                signal.failed.load(Ordering::Acquire),
+                "replaced root still reported healthy: {kind:?}"
+            );
+            assert!(signal.take_due(Instant::now() + Duration::from_secs(2)));
+        }
+    }
+
+    #[test]
+    /// A real root directory swap preserves actual reconciliation and manual rearming observes new descendants without modifying index bytes.
+    fn native_root_replacement_can_be_rearmed() {
+        let temporary = tempfile::tempdir().unwrap();
+        let root = temporary.path().join("repo");
+        fs::create_dir(&root).unwrap();
+        git(&root, &["init", "-b", "main"]);
+        fs::write(root.join("f"), b"original\n").unwrap();
+        git(&root, &["add", "f"]);
+        git(&root, &["commit", "-m", "original"]);
+        let mut watch = RepositoryWatch::default();
+        watch.reset(Some(root.clone()));
+        wait(|| watch.poll());
+        assert!(watch.active());
+        fs::rename(&root, temporary.path().join("displaced")).unwrap();
+        fs::create_dir(&root).unwrap();
+        git(&root, &["init", "-b", "main"]);
+        fs::write(root.join("f"), b"replacement\n").unwrap();
+        git(&root, &["add", "f"]);
+        git(&root, &["commit", "-m", "replacement"]);
+        let index = fs::read(root.join(".git/index")).unwrap();
+        wait(|| watch.take_due());
+        assert!(
+            watch.unavailable() && !watch.active(),
+            "obsolete root watches stayed healthy"
+        );
+        assert_eq!(watch.interval(), Duration::from_secs(2));
+        assert!(hunkra_core::scan(&root).unwrap().files.is_empty());
+        watch.reset(Some(root.clone()));
+        wait(|| watch.poll());
+        assert!(watch.active() && !watch.unavailable());
+        fs::write(root.join("f"), b"new descendant change\n").unwrap();
+        wait(|| watch.take_due());
+        assert_eq!(hunkra_core::scan(&root).unwrap().files.len(), 1);
+        assert_eq!(fs::read(root.join(".git/index")).unwrap(), index);
     }
 }

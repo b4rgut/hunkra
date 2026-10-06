@@ -7,6 +7,8 @@ pub(super) struct LoadState {
     selection: LineSelection,
     initial_files: usize,
     external_done: Arc<AtomicBool>,
+    root_rearmed: bool,
+    rearm_hints: u64,
 }
 impl Hunkra {
     /// Checks actual shared alignment/coordinates and independently dirty Result after repeat reads and locale changes.
@@ -37,8 +39,18 @@ impl Hunkra {
         let done = self.load.as_ref().unwrap().external_done.clone();
         let mass = action == "load-mass";
         let draft = action == "load-draft";
+        let root_move = action == "load-root";
         std::thread::spawn(move || {
-            if mass {
+            if root_move {
+                assert_eq!(
+                    Some(root.clone()),
+                    std::env::var_os("HUNKRA_SMOKE_FIXTURE_ROOT").map(PathBuf::from)
+                );
+                let displaced = root.with_file_name("load-root-displaced");
+                assert!(!displaced.exists());
+                std::fs::rename(&root, &displaced).unwrap();
+                std::fs::rename(&displaced, &root).unwrap();
+            } else if mass {
                 for number in 0..3000 {
                     let path = root.join(format!("files/{number:04}.txt"));
                     let bytes = std::fs::read(&path).unwrap();
@@ -129,6 +141,8 @@ impl Hunkra {
                 selection: self.view.line_selection.clone(),
                 initial_files: files,
                 external_done: Arc::new(AtomicBool::new(false)),
+                root_rearmed: false,
+                rearm_hints: 0,
             });
         } else if phase <= 3 {
             let generation = self.scan_generation;
@@ -192,45 +206,70 @@ impl Hunkra {
             if !load.external_done.load(Ordering::Acquire) {
                 return;
             }
-            if action == "load-mass" {
-                if self.view.repository.as_ref().unwrap().files.len() != load.initial_files + 1000 {
+            if action == "load-root" && phase == 7 {
+                if !self.watch.unavailable() {
+                    return;
+                }
+                assert_eq!(self.watch.interval(), Duration::from_secs(2));
+                self.assert_load_retention(cx);
+                self.refresh_visible(cx);
+            } else if action == "load-root" && phase == 8 {
+                if !self.watch.active() {
                     return;
                 }
                 self.assert_load_retention(cx);
-            } else if action == "load-draft" {
-                let view = self.conflict.as_ref().unwrap().read(cx);
-                if !view.draft.stale {
-                    return;
-                }
-                assert!(view.dirty(cx));
-                assert_eq!(
-                    view.result.read(cx).buffer.text(),
-                    self.smoke.as_ref().unwrap().result_text.as_deref().unwrap()
-                );
-                assert_eq!(
-                    Some(view.result.read(cx).buffer.selection),
-                    self.smoke.as_ref().unwrap().result_selection
-                );
+                let load = self.load.as_mut().unwrap();
+                load.root_rearmed = true;
+                load.rearm_hints = self.measurements.watch_hints;
+                load.external_done.store(false, Ordering::Release);
+                self.start_load_changes("load-watch");
             } else {
-                if self.view.diff.as_ref().unwrap().right.bytes != b"other\n" {
-                    return;
+                if action == "load-mass" {
+                    if self.view.repository.as_ref().unwrap().files.len()
+                        != load.initial_files + 1000
+                    {
+                        return;
+                    }
+                    self.assert_load_retention(cx);
+                } else if action == "load-draft" {
+                    let view = self.conflict.as_ref().unwrap().read(cx);
+                    if !view.draft.stale {
+                        return;
+                    }
+                    assert!(view.dirty(cx));
+                    assert_eq!(
+                        view.result.read(cx).buffer.text(),
+                        self.smoke.as_ref().unwrap().result_text.as_deref().unwrap()
+                    );
+                    assert_eq!(
+                        Some(view.result.read(cx).buffer.selection),
+                        self.smoke.as_ref().unwrap().result_selection
+                    );
+                } else {
+                    if self.view.diff.as_ref().unwrap().right.bytes != b"other\n" {
+                        return;
+                    }
+                    assert!(!Arc::ptr_eq(
+                        &load.original,
+                        self.view.diff.as_ref().unwrap()
+                    ));
+                    assert!(
+                        self.view.line_selection.added.is_empty()
+                            && self.view.line_selection.removed.is_empty()
+                    );
                 }
-                assert!(!Arc::ptr_eq(
-                    &load.original,
-                    self.view.diff.as_ref().unwrap()
-                ));
-                assert!(
-                    self.view.line_selection.added.is_empty()
-                        && self.view.line_selection.removed.is_empty()
-                );
+                if action == "load-periodic" {
+                    assert!(self.watch.unavailable() && self.measurements.watch_hints == 0);
+                } else {
+                    assert!(self.measurements.watch_hints > 0);
+                }
+                if action == "load-root" {
+                    assert!(load.root_rearmed && self.watch.active());
+                    assert!(self.measurements.watch_hints > load.rearm_hints);
+                }
+                self.finish_load_smoke(cx);
+                return;
             }
-            if action == "load-periodic" {
-                assert!(self.watch.unavailable() && self.measurements.watch_hints == 0);
-            } else {
-                assert!(self.measurements.watch_hints > 0);
-            }
-            self.finish_load_smoke(cx);
-            return;
         }
         let smoke = self.smoke.as_mut().unwrap();
         smoke.phase += 1;
@@ -247,7 +286,7 @@ impl Hunkra {
                 && self.measurements.cache.allocated_bytes <= hunkra_core::diff_reader::CACHE_BYTES
         );
         let smoke = self.smoke.as_ref().unwrap();
-        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"scenario":smoke.operation,"locales":smoke.locales,"initial_files":self.load.as_ref().unwrap().initial_files,"final_files":self.view.repository.as_ref().unwrap().files.len(),"message_retained":true,"draft_retained":smoke.operation.as_deref()==Some("load-draft"),"dense_limit_verified":smoke.operation.as_deref()==Some("load-large"),"watch_native":self.watch.active(),"measurements":self.measurements.json()});
+        let report = serde_json::json!({"ok":true,"native_display":true,"frames":self.frames,"scenario":smoke.operation,"locales":smoke.locales,"initial_files":self.load.as_ref().unwrap().initial_files,"final_files":self.view.repository.as_ref().unwrap().files.len(),"message_retained":true,"draft_retained":smoke.operation.as_deref()==Some("load-draft"),"dense_limit_verified":smoke.operation.as_deref()==Some("load-large"),"root_rearmed":self.load.as_ref().unwrap().root_rearmed,"watch_native":self.watch.active(),"measurements":self.measurements.json()});
         std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
         cx.quit();
     }
