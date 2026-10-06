@@ -142,6 +142,53 @@ impl Hunkra {
             if phase <= 12 {
                 self.set_locale([Locale::En, Locale::Ru, Locale::RuDev][phase - 10], cx);
             }
+            if phase == 11 {
+                let bounds = editor.update(cx, |editor, cx| {
+                    editor
+                        .bounds_for_range(0..0, Bounds::default(), window, cx)
+                        .unwrap()
+                });
+                editor.update(cx, |editor, cx| {
+                    editor.scroll_wheel(
+                        &gpui::ScrollWheelEvent {
+                            position: bounds.origin + gpui::point(px(1.), px(1.)),
+                            delta: gpui::ScrollDelta::Lines(gpui::point(0., -5.)),
+                            ..Default::default()
+                        },
+                        window,
+                        cx,
+                    );
+                });
+            } else if phase == 12 {
+                editor.update(cx, |editor, cx| {
+                    assert!(
+                        editor
+                            .bounds_for_range(0..0, Bounds::default(), window, cx)
+                            .is_none(),
+                        "wheel left the initial Result row visible"
+                    );
+                });
+            } else if phase == 13 {
+                editor.update(cx, |editor, cx| {
+                    editor.key_down(
+                        &KeyDownEvent {
+                            keystroke: Keystroke::parse("ctrl-home").unwrap(),
+                            is_held: false,
+                        },
+                        window,
+                        cx,
+                    );
+                });
+            } else if phase == 14 {
+                editor.update(cx, |editor, cx| {
+                    assert!(
+                        editor
+                            .bounds_for_range(0..0, Bounds::default(), window, cx)
+                            .is_some(),
+                        "explicit Home did not restore Result source coordinates"
+                    );
+                });
+            }
             assert_eq!(editor.read(cx).buffer.selection, selection);
             assert_eq!(editor.read(cx).buffer.revision, revision);
             assert!(editor.read(cx).buffer.text().ends_with(">>>>>>> B\r\n"));
@@ -150,7 +197,7 @@ impl Hunkra {
             assert!(conflict.read(cx).dirty(cx));
             assert!(!self.writing);
             let smoke = self.smoke.as_ref().unwrap();
-            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"read_only":true,"scope":"actual native Result input/layout/locale/undo callbacks; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
+            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll handler callbacks; registered wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
             std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
             cx.quit();
             return;

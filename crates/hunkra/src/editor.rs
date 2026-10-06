@@ -4,8 +4,8 @@ use gpui::{
     App, Bounds, ClipboardItem, ContentMask, Context, CursorStyle, Element, ElementId,
     ElementInputHandler, Entity, EntityInputHandler, EventEmitter, FocusHandle, Focusable,
     GlobalElementId, KeyDownEvent, LayoutId, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, Pixels, Point, ShapedLine, SharedString, Style, TextRun, UTF16Selection, Window,
-    div, fill, point, prelude::*, px, relative, rgb, rgba, size,
+    MouseUpEvent, Pixels, Point, ScrollWheelEvent, ShapedLine, SharedString, Style, TextRun,
+    UTF16Selection, Window, div, fill, point, prelude::*, px, relative, rgb, rgba, size,
 };
 use std::{ops::Range, sync::Arc};
 use unicode_segmentation::UnicodeSegmentation;
@@ -37,6 +37,10 @@ pub struct NativeEditor {
     preferred_column: Option<usize>,
     scroll_row: usize,
     horizontal: Pixels,
+    horizontal_maximum: Pixels,
+    wheel_remainder: Pixels,
+    reveal_caret: bool,
+    painted_cursor: Option<usize>,
     line_revision: u64,
     line_ranges: Option<Arc<[Range<usize>]>>,
 }
@@ -71,6 +75,10 @@ impl NativeEditor {
             preferred_column: None,
             scroll_row: 0,
             horizontal: px(0.),
+            horizontal_maximum: px(0.),
+            wheel_remainder: px(0.),
+            reveal_caret: true,
+            painted_cursor: None,
             line_revision: u64::MAX,
             line_ranges: None,
         }
@@ -95,6 +103,8 @@ impl NativeEditor {
             .filter(|byte| *byte == b'\n')
             .count();
         self.horizontal = px(0.);
+        self.wheel_remainder = px(0.);
+        self.reveal_caret = true;
         cx.notify();
     }
     /// Keeps single-line values exact by refusing newline input rather than silently rewriting it.
@@ -103,6 +113,7 @@ impl NativeEditor {
     }
     /// Notifies both the editor and its owning shell after an accepted text mutation.
     fn changed(&mut self, cx: &mut Context<Self>) {
+        self.reveal_caret = true;
         cx.emit(TextChanged);
         cx.notify();
     }
@@ -180,6 +191,53 @@ impl NativeEditor {
             && let Some(index) = self.index_at(event.position)
         {
             self.buffer.select(index, true);
+            cx.notify();
+        }
+    }
+    /// Scrolls the actual supported viewport without changing text/selection; small trackpad deltas accumulate to whole rows.
+    pub fn scroll_wheel(
+        &mut self,
+        event: &ScrollWheelEvent,
+        _: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(bounds) = self
+            .bounds
+            .filter(|bounds| bounds.contains(&event.position))
+        else {
+            return;
+        };
+        let Some(lines) = self.lines() else {
+            return;
+        };
+        let delta = event.delta.pixel_delta(px(LINE_HEIGHT));
+        let (horizontal, vertical) = if event.modifiers.shift {
+            (if delta.x == px(0.) { delta.y } else { delta.x }, px(0.))
+        } else {
+            (delta.x, if self.single_line { px(0.) } else { delta.y })
+        };
+        if horizontal == px(0.) && vertical == px(0.) {
+            return;
+        }
+        let previous = (self.scroll_row, self.horizontal);
+        let visible = ((bounds.size.height / px(LINE_HEIGHT)).floor() as usize).max(1);
+        let maximum = lines.len().saturating_sub(visible);
+        let rows = (self.wheel_remainder - vertical) / px(LINE_HEIGHT);
+        let whole_rows = rows.trunc() as isize;
+        self.scroll_row = self
+            .scroll_row
+            .saturating_add_signed(whole_rows)
+            .min(maximum);
+        self.wheel_remainder =
+            if (self.scroll_row == 0 && rows < 0.) || (self.scroll_row == maximum && rows > 0.) {
+                px(0.)
+            } else {
+                px((rows - whole_rows as f32) * LINE_HEIGHT)
+            };
+        self.horizontal = (self.horizontal - horizontal).clamp(px(0.), self.horizontal_maximum);
+        self.reveal_caret = false;
+        cx.stop_propagation();
+        if previous != (self.scroll_row, self.horizontal) {
             cx.notify();
         }
     }
@@ -331,6 +389,10 @@ impl NativeEditor {
         }
         window.prevent_default();
         cx.stop_propagation();
+        if key != "c" {
+            self.reveal_caret = true;
+            self.wheel_remainder = px(0.);
+        }
         if changed {
             self.changed(cx);
         } else {
@@ -467,6 +529,7 @@ impl Render for NativeEditor {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_mouse_move(cx.listener(Self::mouse_move))
+            .on_scroll_wheel(cx.listener(Self::scroll_wheel))
             .child(TextSurface {
                 editor: cx.entity(),
             })
@@ -482,6 +545,7 @@ struct PaintState {
     caret: Option<Bounds<Pixels>>,
     marked: Vec<Bounds<Pixels>>,
     revision: u64,
+    cursor: usize,
     source_mapped: bool,
 }
 impl IntoElement for TextSurface {
@@ -564,18 +628,25 @@ impl Element for TextSurface {
                     caret: None,
                     marked: Vec::new(),
                     revision: editor.buffer.revision,
+                    cursor: editor.buffer.selection.cursor,
                     source_mapped: false,
                 };
             };
             let cursor = editor.buffer.selection.cursor;
+            let reveal = editor.reveal_caret
+                || editor.layout_revision != editor.buffer.revision
+                || editor.painted_cursor != Some(cursor);
+            if reveal {
+                editor.wheel_remainder = px(0.);
+            }
             let cursor_row = lines
                 .partition_point(|line| line.start <= cursor)
                 .saturating_sub(1);
             let visible = ((bounds.size.height / px(LINE_HEIGHT)).floor() as usize).max(1);
-            if cursor_row < editor.scroll_row {
+            if reveal && cursor_row < editor.scroll_row {
                 editor.scroll_row = cursor_row;
             }
-            if cursor_row >= editor.scroll_row + visible {
+            if reveal && cursor_row >= editor.scroll_row + visible {
                 editor.scroll_row = cursor_row + 1 - visible;
             }
             editor.scroll_row = editor.scroll_row.min(lines.len().saturating_sub(visible));
@@ -614,9 +685,16 @@ impl Element for TextSurface {
                     }
                 })
                 .collect();
-            if let Some(row) = rows
+            editor.horizontal_maximum = rows
                 .iter()
-                .find(|row| cursor >= row.start && cursor <= row.end)
+                .map(|row| (row.line.width - bounds.size.width + px(4.)).max(px(0.)))
+                .max()
+                .unwrap_or(px(0.));
+            editor.horizontal = editor.horizontal.min(editor.horizontal_maximum);
+            if reveal
+                && let Some(row) = rows
+                    .iter()
+                    .find(|row| cursor >= row.start && cursor <= row.end)
             {
                 let x = row.line.x_for_index(cursor - row.start);
                 let width = bounds.size.width.max(px(1.));
@@ -634,6 +712,7 @@ impl Element for TextSurface {
                 caret: None,
                 marked: Vec::new(),
                 revision: editor.buffer.revision,
+                cursor,
                 source_mapped: true,
             };
             for row in &mut rows {
@@ -722,6 +801,8 @@ impl Element for TextSurface {
             };
             editor.bounds = Some(bounds);
             editor.layout_revision = state.revision;
+            editor.painted_cursor = Some(state.cursor);
+            editor.reveal_caret = false;
         });
     }
 }
@@ -731,6 +812,201 @@ mod tests {
     use super::*;
     use crate::i18n::{Locale, Translator};
     use gpui::TestAppContext;
+
+    /// Supplies supported long Unicode/CRLF rows for real viewport and source-coordinate checks.
+    fn scrolling_document() -> String {
+        (0..200)
+            .map(|number| format!("{number:03} Кириллица🦀 {}\r\n", "long text ".repeat(200)))
+            .collect()
+    }
+
+    #[gpui::test]
+    /// Wheel navigation of immutable Unicode/CRLF sources preserves input/cursor through repaint and still reveals explicit keyboard navigation.
+    fn wheel_scroll_preserves_read_only_source_and_cursor(cx: &mut TestAppContext) {
+        let text = scrolling_document();
+        let original = text.clone();
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let mut editor =
+                NativeEditor::new(2 * 1024 * 1024, "source".into(), "limit".into(), cx);
+            editor.enabled = false;
+            assert!(editor.buffer.reset(text));
+            editor.buffer.select(0, false);
+            window.focus(&editor.focus);
+            editor
+        });
+        cx.simulate_resize(size(px(500.), px(220.)));
+        cx.run_until_parked();
+        let before = editor.read_with(cx, |editor, _| {
+            (editor.buffer.selection, editor.buffer.revision)
+        });
+        let position = editor.read_with(cx, |editor, _| {
+            editor.bounds.unwrap().origin + point(px(5.), px(5.))
+        });
+        cx.simulate_event(gpui::ScrollWheelEvent {
+            position,
+            delta: gpui::ScrollDelta::Lines(point(0., -5.)),
+            ..Default::default()
+        });
+        assert!(
+            editor.read_with(cx, |editor, _| editor.scroll_row > 0),
+            "wheel did not scroll the native source"
+        );
+        let row = editor.read_with(cx, |editor, _| editor.scroll_row);
+        for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+            editor.update(cx, |editor, cx| {
+                editor.preview_notice = Translator::new(locale)
+                    .text("editor-preview-limit", None)
+                    .into();
+                cx.notify();
+            });
+            cx.run_until_parked();
+            assert_eq!(editor.read_with(cx, |editor, _| editor.scroll_row), row);
+        }
+        cx.simulate_event(gpui::ScrollWheelEvent {
+            position,
+            delta: gpui::ScrollDelta::Lines(point(0., -4.)),
+            modifiers: gpui::Modifiers {
+                shift: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+        assert!(editor.read_with(cx, |editor, _| editor.horizontal > px(0.)));
+        assert_eq!(editor.read_with(cx, |editor, _| editor.scroll_row), row);
+        assert_eq!(
+            editor.read_with(cx, |editor, _| (
+                editor.buffer.selection,
+                editor.buffer.revision
+            )),
+            before
+        );
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            original
+        );
+        cx.simulate_keystrokes("ctrl-home");
+        assert_eq!(editor.read_with(cx, |editor, _| editor.scroll_row), 0);
+        assert_eq!(editor.read_with(cx, |editor, _| editor.horizontal), px(0.));
+        for _ in 0..6 {
+            cx.simulate_event(gpui::ScrollWheelEvent {
+                position,
+                delta: gpui::ScrollDelta::Pixels(point(px(0.), px(-4.))),
+                ..Default::default()
+            });
+        }
+        assert_eq!(editor.read_with(cx, |editor, _| editor.scroll_row), 1);
+        cx.simulate_keystrokes("ctrl-end");
+        assert!(editor.read_with(cx, |editor, _| editor.scroll_row > 1));
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            original
+        );
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.revision),
+            before.1
+        );
+    }
+
+    #[gpui::test]
+    /// Extreme wheel deltas stay bounded and pointer/IME coordinates follow the translated viewport without editing an immutable or unsupported source.
+    fn scrolled_viewport_keeps_pointer_and_input_coordinates(cx: &mut TestAppContext) {
+        let original = scrolling_document();
+        let text = original.clone();
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let mut editor = NativeEditor::new(2 * 1024 * 1024, "text".into(), "limit".into(), cx);
+            assert!(editor.buffer.reset(text));
+            editor.buffer.select(0, false);
+            window.focus(&editor.focus);
+            editor
+        });
+        cx.simulate_resize(size(px(500.), px(220.)));
+        cx.run_until_parked();
+        let position = editor.read_with(cx, |editor, _| {
+            editor.bounds.unwrap().origin + point(px(5.), px(5.))
+        });
+        cx.simulate_event(ScrollWheelEvent {
+            position,
+            delta: gpui::ScrollDelta::Lines(point(0., -1_000_000.)),
+            ..Default::default()
+        });
+        editor.update(cx, |editor, _| {
+            let visible =
+                ((editor.bounds.unwrap().size.height / px(LINE_HEIGHT)).floor() as usize).max(1);
+            let maximum = editor.lines().unwrap().len().saturating_sub(visible);
+            assert_eq!(editor.scroll_row, maximum);
+            assert_eq!(editor.buffer.selection.range(), 0..0);
+        });
+        cx.simulate_event(ScrollWheelEvent {
+            position,
+            delta: gpui::ScrollDelta::Lines(point(0., 1_000_000.)),
+            ..Default::default()
+        });
+        assert_eq!(editor.read_with(cx, |editor, _| editor.scroll_row), 0);
+        cx.simulate_event(ScrollWheelEvent {
+            position,
+            delta: gpui::ScrollDelta::Pixels(point(px(-100_000.), px(0.))),
+            ..Default::default()
+        });
+        assert!(editor.read_with(cx, |editor, _| editor.horizontal > px(0.)
+            && editor.horizontal == editor.horizontal_maximum));
+        cx.simulate_event(MouseDownEvent {
+            position,
+            button: MouseButton::Left,
+            click_count: 1,
+            ..Default::default()
+        });
+        cx.simulate_event(MouseUpEvent {
+            position,
+            button: MouseButton::Left,
+            ..Default::default()
+        });
+        let cursor = editor.read_with(cx, |editor, _| editor.buffer.selection.cursor);
+        assert!(cursor > 1500 && cursor < original.find('\r').unwrap());
+        assert!(original.is_char_boundary(cursor));
+        cx.simulate_input("Ж🦀");
+        let mut desired = original;
+        desired.insert_str(cursor, "Ж🦀");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            desired
+        );
+        cx.update_window_entity(&editor, |editor, window, cx| {
+            let range = editor.buffer.selected_utf16().0;
+            let caret = editor
+                .bounds_for_range(range, Bounds::default(), window, cx)
+                .unwrap();
+            let bounds = editor.bounds.unwrap();
+            assert!(caret.origin.x >= bounds.left() && caret.origin.x < bounds.right());
+            editor.enabled = false;
+            cx.notify();
+        });
+        cx.simulate_input("refused");
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            desired
+        );
+        let oversized = "\n".repeat(2 * 1024 * 1024);
+        editor.update(cx, |editor, cx| {
+            assert!(editor.buffer.reset(oversized.clone()));
+            cx.notify();
+        });
+        cx.run_until_parked();
+        let revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        cx.simulate_event(ScrollWheelEvent {
+            position,
+            delta: gpui::ScrollDelta::Lines(point(4., -50.)),
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.revision),
+            revision
+        );
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            oversized
+        );
+        assert!(editor.read_with(cx, |editor, _| editor.rows.is_empty()));
+    }
 
     #[gpui::test]
     /// CRLF/emoji source ranges are shared through selection/locale changes and replaced after text revisions or undo.

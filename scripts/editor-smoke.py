@@ -47,6 +47,7 @@ def smoke(destination):
         assert result.returncode == 0, result.stderr.decode(errors="replace")
         evidence = json.loads(report.read_text())
         assert evidence["ok"] and evidence["native_display"] and evidence["text_retained"] and evidence["replacement_undo_redo"]
+        assert evidence["wheel_preserves_text_cursor_and_revision"] and evidence["explicit_home_restores_source_coordinates"]
         assert evidence["locales"] == ["Changes", "Изменения", "Изменения"]
         before_summary = evidence["marker_summary_before"]
         after_summary = evidence["marker_summary"]
