@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "native_display": true,
+  "scenario": "editor-layout",
+  "frames": 33,
+  "locales": [
+    "Changes",
+    "Изменения",
+    "Изменения"
+  ],
+  "giant_line_bytes": 32768,
+  "newline_document_bytes": 2097152,
+  "text_retained": true,
+  "notice_has_no_source_coordinates": true,
+  "replacement_undo_redo": true,
+  "large_result_bytes": 1599833,
+  "stable_result_phases": 16,
+  "marker_summary_before": {
+    "requests": 9,
+    "parser": {
+      "count": 5,
+      "mean_ms": 0.7380822,
+      "max_ms": 1.844214
+    },
+    "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+  },
+  "marker_summary": {
+    "requests": 26,
+    "parser": {
+      "count": 6,
+      "mean_ms": 1.6550906666666665,
+      "max_ms": 6.240133
+    },
+    "scope": "Result render marker summary only; CPU wall time; action validation and GPU execution excluded"
+  },
+  "grapheme_navigation": {
+    "text_bytes": 1599833,
+    "handler_calls": 32,
+    "total_ms": 0.030378,
+    "scope": "actual native left/right handler CPU-code wall time at end of unchanged Result; painting/scheduling/GPU excluded"
+  },
+  "utf16_queries": {
+    "text_bytes": 1599833,
+    "first_selection_query_ms": 5.469924,
+    "repeated_pairs": 32,
+    "repeated_selection_and_text_ms": 0.163666,
+    "scope": "actual native UTF-16 input-query callback CPU-code wall time at EOF; first request after text revision and unchanged repeated requests separated; text/selection restored; painting/scheduling/GPU excluded"
+  },
+  "word_navigation_preserves_graphemes_and_revision": true,
+  "multiple_click_selection_preserves_text_revision": true,
+  "wheel_preserves_text_cursor_and_revision": true,
+  "explicit_home_restores_source_coordinates": true,
+  "page_navigation_preserves_text_revision": true,
+  "page_selection_and_source_coordinates": true,
+  "read_only": true,
+  "scope": "actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+  "stable_marker_summary_parses": 1,
+  "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant",
+  "binary_sha256": "85959356bfa9c9ed9f35c53763d9195b7f053add8ca2961b2dc32605fea63af8",
+  "source_scope": "daf89ec plus owned whole-token/line compound pointer selections, captured drag revision and registered/native acceptance; debug binary",
+  "regressions": [
+    "Registered double click first selected19..19 instead of whole Unicode identifier13..27",
+    "Corrected registered token/line drags forward/backward, unchanged readonly source/revision and source-replacement anchor retirement pass",
+    "Native1.6MiB Result callback double-click selects text and triple-click selects the exact first CRLF row, then restores original caret; every private Git/worktree byte preserved"
+  ],
+  "selection_policy": "single click scalar caret; double click owned letters/numbers/underscore, punctuation/emoji or whitespace run bounded to current logical row; three or more clicks complete row including original newline; drags extend whole initial units and retain them inside the anchor; Shift retains previous anchor; current text revision required; exact Zed language/token parity not claimed",
+  "checks": {
+    "headless": 142,
+    "core": 109,
+    "app": 33,
+    "gpui_library": 47,
+    "gpui_host": 5,
+    "strict_clippy": "headless/gui/gui-tests passed",
+    "fmt_i18n_plan_build": "passed"
+  },
+  "measurement_scope": "functional native callback and isolated registered pointer acceptance only; retained timing observational, no comparison/physical/pixel/GPU claim",
+  "primary_api_sources": [
+    "https://docs.rs/gpui/0.2.2/gpui/struct.MouseDownEvent.html",
+    "https://zed.dev/docs/reference/all-settings"
+  ],
+  "native_regressions": {
+    "editor": 1,
+    "conflicts": 17,
+    "history": 12,
+    "staging_commit": 6,
+    "ux": 3,
+    "all_fixture_data": "independently preserved"
+  }
+}

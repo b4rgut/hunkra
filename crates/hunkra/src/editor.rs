@@ -23,6 +23,18 @@ struct Row {
     line: ShapedLine,
     origin: Point<Pixels>,
 }
+#[derive(Clone, Copy)]
+enum SelectionUnit {
+    Character,
+    Word,
+    Line,
+}
+#[derive(Clone)]
+struct DragSelection {
+    anchor: Range<usize>,
+    unit: SelectionUnit,
+    revision: u64,
+}
 pub struct NativeEditor {
     pub buffer: TextBuffer,
     pub placeholder: SharedString,
@@ -33,7 +45,7 @@ pub struct NativeEditor {
     rows: Vec<Row>,
     bounds: Option<Bounds<Pixels>>,
     layout_revision: u64,
-    dragging: bool,
+    dragging: Option<DragSelection>,
     preferred_column: Option<usize>,
     scroll_row: usize,
     horizontal: Pixels,
@@ -71,7 +83,7 @@ impl NativeEditor {
             rows: Vec::new(),
             bounds: None,
             layout_revision: u64::MAX,
-            dragging: false,
+            dragging: None,
             preferred_column: None,
             scroll_row: 0,
             horizontal: px(0.),
@@ -171,27 +183,98 @@ impl NativeEditor {
                     .min(row.end - row.start),
         )
     }
-    /// Focuses and starts a selection only against the frame matching the current text revision.
-    fn mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+    /// Resolves one selection unit against the current logical row, preserving original newlines for line selection and bounding word clicks to that row.
+    fn selection_unit(&mut self, index: usize, unit: SelectionUnit) -> Option<Range<usize>> {
+        if matches!(unit, SelectionUnit::Character) {
+            return Some(index..index);
+        }
+        let lines = self.lines()?;
+        let row = lines
+            .partition_point(|line| line.start <= index)
+            .saturating_sub(1);
+        let line = &lines[row];
+        if matches!(unit, SelectionUnit::Line) {
+            return Some(
+                line.start
+                    ..lines
+                        .get(row + 1)
+                        .map_or(self.buffer.text().len(), |next| next.start),
+            );
+        }
+        let byte = if index >= line.end && line.end > line.start {
+            self.buffer.previous(line.end)
+        } else {
+            index
+        };
+        let word = self.buffer.word_range(byte);
+        Some(word.start.max(line.start)..word.end.min(line.end))
+    }
+    /// Extends character/token/line selections in either direction, retaining the original whole unit while the pointer remains inside it.
+    fn select_from_anchor(&mut self, anchor: &Range<usize>, target: Range<usize>) {
+        let (start, end) = if target.end <= anchor.start {
+            (anchor.end, target.start)
+        } else if anchor.is_empty() || target.start >= anchor.end {
+            (anchor.start, target.end)
+        } else {
+            (anchor.start, anchor.end)
+        };
+        self.buffer.select(start, false);
+        self.buffer.select(end, true);
+    }
+    /// Focuses and starts a scalar, whole-token or whole-line selection only against the frame matching the current text revision.
+    pub fn mouse_down(
+        &mut self,
+        event: &MouseDownEvent,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         window.focus(&self.focus);
         if let Some(index) = self.index_at(event.position) {
             self.buffer.unmark();
-            self.buffer.select(index, event.modifiers.shift);
-            self.dragging = true;
+            let unit = match event.click_count {
+                2 => SelectionUnit::Word,
+                3.. => SelectionUnit::Line,
+                _ => SelectionUnit::Character,
+            };
+            let Some(range) = self.selection_unit(index, unit) else {
+                return;
+            };
+            let anchor = if event.modifiers.shift {
+                self.buffer.selection.anchor..self.buffer.selection.anchor
+            } else {
+                range.clone()
+            };
+            self.select_from_anchor(&anchor, range);
+            self.dragging = Some(DragSelection {
+                anchor,
+                unit,
+                revision: self.buffer.revision,
+            });
             self.preferred_column = None;
             cx.notify();
         }
     }
     /// Finishes dragging even when the pointer is released outside the field.
     fn mouse_up(&mut self, _: &MouseUpEvent, _: &mut Window, _: &mut Context<Self>) {
-        self.dragging = false;
+        self.dragging = None;
     }
     /// Extends a drag selection using actual shaped text positions, not approximate character widths.
     fn mouse_move(&mut self, event: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if self.dragging
-            && let Some(index) = self.index_at(event.position)
+        if event.pressed_button != Some(MouseButton::Left) {
+            self.dragging = None;
+            return;
+        }
+        let Some(drag) = self.dragging.clone() else {
+            return;
+        };
+        if drag.revision != self.buffer.revision {
+            self.dragging = None;
+            return;
+        }
+        if let Some(index) = self.index_at(event.position)
+            && let Some(range) = self.selection_unit(index, drag.unit)
         {
-            self.buffer.select(index, true);
+            self.select_from_anchor(&drag.anchor, range);
             cx.notify();
         }
     }
@@ -416,6 +499,7 @@ impl NativeEditor {
         }
         window.prevent_default();
         cx.stop_propagation();
+        self.dragging = None;
         if key != "c" {
             self.reveal_caret = true;
             self.wheel_remainder = px(0.);
@@ -845,6 +929,123 @@ mod tests {
         (0..200)
             .map(|number| format!("{number:03} Кириллица🦀 {}\r\n", "long text ".repeat(200)))
             .collect()
+    }
+
+    #[gpui::test]
+    /// Registered double/triple clicks and compound drags select complete Unicode tokens/CRLF rows in readonly sources and reject stale document anchors.
+    fn multiple_clicks_select_tokens_and_lines(cx: &mut TestAppContext) {
+        let original = "начало e\u{301}_слово 🦀\r\nпоследнее";
+        let start = "начало ".len();
+        let end = "начало e\u{301}_слово".len();
+        let next_line = "начало e\u{301}_слово 🦀\r\n".len();
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let mut editor = NativeEditor::new(65536, "text".into(), "limit".into(), cx);
+            editor.buffer.reset(original.into());
+            editor.buffer.select(0, false);
+            editor.enabled = false;
+            window.focus(&editor.focus);
+            editor
+        });
+        let revision = editor.read_with(cx, |editor, _| editor.buffer.revision);
+        let positions = editor.read_with(cx, |editor, _| {
+            [start + "e\u{301}_с".len(), next_line + "по".len(), 0].map(|index| {
+                let row = editor
+                    .rows
+                    .iter()
+                    .find(|row| index >= row.start && index <= row.end)
+                    .unwrap();
+                row.origin + point(row.line.x_for_index(index - row.start) + px(1.), px(5.))
+            })
+        });
+        cx.simulate_event(MouseDownEvent {
+            position: positions[0],
+            button: MouseButton::Left,
+            click_count: 2,
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            start..end,
+            "double click did not select the whole Unicode identifier"
+        );
+        cx.simulate_event(MouseMoveEvent {
+            position: positions[0],
+            pressed_button: Some(MouseButton::Left),
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            start..end
+        );
+        cx.simulate_event(MouseMoveEvent {
+            position: positions[1],
+            pressed_button: Some(MouseButton::Left),
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            start..original.len()
+        );
+        cx.simulate_event(MouseMoveEvent {
+            position: positions[2],
+            pressed_button: Some(MouseButton::Left),
+            ..Default::default()
+        });
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.anchor == end
+                && editor.buffer.selection.cursor == 0)
+        );
+        cx.simulate_event(MouseUpEvent {
+            position: positions[2],
+            button: MouseButton::Left,
+            ..Default::default()
+        });
+        cx.simulate_event(MouseDownEvent {
+            position: positions[0],
+            button: MouseButton::Left,
+            click_count: 3,
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            0..next_line
+        );
+        cx.simulate_event(MouseMoveEvent {
+            position: positions[1],
+            pressed_button: Some(MouseButton::Left),
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.selection.range()),
+            0..original.len()
+        );
+        assert!(
+            editor.read_with(cx, |editor, _| editor.buffer.text() == original
+                && editor.buffer.revision == revision)
+        );
+        editor.update(cx, |editor, cx| {
+            editor.buffer.reset("Другой\r\nисточник".into());
+            cx.notify();
+        });
+        let replacement = editor.read_with(cx, |editor, _| {
+            (editor.buffer.selection, editor.buffer.revision)
+        });
+        cx.simulate_event(MouseMoveEvent {
+            position: positions[0],
+            pressed_button: Some(MouseButton::Left),
+            ..Default::default()
+        });
+        assert_eq!(
+            editor.read_with(cx, |editor, _| (
+                editor.buffer.selection,
+                editor.buffer.revision
+            )),
+            replacement
+        );
+        assert_eq!(
+            editor.read_with(cx, |editor, _| editor.buffer.text().to_owned()),
+            "Другой\r\nисточник"
+        );
     }
 
     #[gpui::test]

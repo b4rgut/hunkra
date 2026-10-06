@@ -210,6 +210,35 @@ impl TextBuffer {
     pub fn previous_word(&self, byte: usize) -> usize {
         self.word_boundary(byte, false)
     }
+    /// Returns the complete identifier, punctuation/emoji or whitespace run containing a scalar-safe position, retaining global extended graphemes.
+    pub fn word_range(&self, byte: usize) -> Range<usize> {
+        let byte = self.boundary(byte);
+        if self.text.is_empty() {
+            return 0..0;
+        }
+        let mut end = if byte == self.text.len() {
+            byte
+        } else {
+            self.next(byte)
+        };
+        let mut start = self.previous(end);
+        let kind = WordClass::for_grapheme(&self.text[start..end]);
+        while start > 0 {
+            let previous = self.previous(start);
+            if WordClass::for_grapheme(&self.text[previous..start]) != kind {
+                break;
+            }
+            start = previous;
+        }
+        while end < self.text.len() {
+            let next = self.next(end);
+            if WordClass::for_grapheme(&self.text[end..next]) != kind {
+                break;
+            }
+            end = next;
+        }
+        start..end
+    }
     /// Walks only neighboring graphemes needed by the requested token; no document-wide word index or text copy is retained.
     fn word_boundary(&self, byte: usize, forward: bool) -> usize {
         let mut cursor = self.boundary(byte);
@@ -427,6 +456,29 @@ impl TextBuffer {
 mod tests {
     use super::*;
     use unicode_segmentation::UnicodeSegmentation;
+    #[test]
+    /// Every clicked byte, including scalar interiors, resolves the same whole Unicode token while preserving original text and selection.
+    fn clicked_word_ranges_keep_whole_graphemes() {
+        let tokens = ["Аe\u{301}_β99", "  ", "(::)", " ", "👩🏽\u{200d}💻", "\r\n"];
+        let text = tokens.concat();
+        let mut buffer = TextBuffer::new(65536);
+        assert!(buffer.reset(text.clone()));
+        let before = (buffer.selection, buffer.revision);
+        let mut offset = 0;
+        for token in tokens {
+            let range = offset..offset + token.len();
+            for byte in range.clone() {
+                assert_eq!(buffer.word_range(byte), range);
+            }
+            offset = range.end;
+        }
+        assert_eq!(buffer.word_range(usize::MAX), text.len() - 2..text.len());
+        assert_eq!((buffer.selection, buffer.revision), before);
+        assert_eq!(buffer.text(), text);
+        buffer.reset(String::new());
+        assert_eq!(buffer.word_range(usize::MAX), 0..0);
+    }
+
     #[test]
     /// Sparse coordinate lookup preserves every scalar/surrogate edge, reversed/native ranges and EOF around multibyte checkpoint boundaries.
     fn sparse_utf16_coordinates_match_full_prefixes() {

@@ -301,6 +301,50 @@ impl Hunkra {
                         cx,
                     );
                 });
+            } else if phase == 20 {
+                editor.update(cx, |editor, cx| {
+                    let native = editor.buffer.utf16_offset("unchanged te".len());
+                    let caret = editor
+                        .bounds_for_range(native..native, Bounds::default(), window, cx)
+                        .unwrap();
+                    let position = caret.origin + gpui::point(px(1.), px(5.));
+                    editor.mouse_down(
+                        &gpui::MouseDownEvent {
+                            position,
+                            button: gpui::MouseButton::Left,
+                            click_count: 2,
+                            ..Default::default()
+                        },
+                        window,
+                        cx,
+                    );
+                    assert_eq!(
+                        &editor.buffer.text()[editor.buffer.selection.range()],
+                        "text"
+                    );
+                    editor.mouse_down(
+                        &gpui::MouseDownEvent {
+                            position,
+                            button: gpui::MouseButton::Left,
+                            click_count: 3,
+                            ..Default::default()
+                        },
+                        window,
+                        cx,
+                    );
+                    assert_eq!(
+                        &editor.buffer.text()[editor.buffer.selection.range()],
+                        "unchanged text Кириллица 🦀\r\n"
+                    );
+                    editor.key_down(
+                        &KeyDownEvent {
+                            keystroke: Keystroke::parse("ctrl-home").unwrap(),
+                            is_held: false,
+                        },
+                        window,
+                        cx,
+                    );
+                });
             }
             if phase != 15 && phase != 16 {
                 assert_eq!(editor.read(cx).buffer.selection, selection);
@@ -312,7 +356,7 @@ impl Hunkra {
             assert!(conflict.read(cx).dirty(cx));
             assert!(!self.writing);
             let smoke = self.smoke.as_ref().unwrap();
-            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"grapheme_navigation":smoke.grapheme_navigation,"utf16_queries":smoke.utf16_queries,"word_navigation_preserves_graphemes_and_revision":true,"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
+            let report = serde_json::json!({"ok":true,"native_display":true,"scenario":"editor-layout","frames":self.frames,"locales":smoke.locales,"giant_line_bytes":32768,"newline_document_bytes":2097152,"text_retained":true,"notice_has_no_source_coordinates":true,"replacement_undo_redo":true,"large_result_bytes":large_marked_text().len(),"stable_result_phases":16,"marker_summary_before":smoke.marker_summary_before,"marker_summary":conflict.read(cx).chunk_measurements(),"grapheme_navigation":smoke.grapheme_navigation,"utf16_queries":smoke.utf16_queries,"word_navigation_preserves_graphemes_and_revision":true,"multiple_click_selection_preserves_text_revision":true,"wheel_preserves_text_cursor_and_revision":true,"explicit_home_restores_source_coordinates":true,"page_navigation_preserves_text_revision":true,"page_selection_and_source_coordinates":true,"read_only":true,"scope":"actual native Result input/layout/locale/undo/scroll/page/word handler callbacks; registered key/wheel event dispatch is checked separately on isolated GPUI; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured"});
             std::fs::write(&smoke.report, serde_json::to_vec_pretty(&report).unwrap()).unwrap();
             cx.quit();
             return;

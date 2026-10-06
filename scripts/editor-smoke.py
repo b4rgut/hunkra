@@ -50,6 +50,7 @@ def smoke(destination):
         assert evidence["wheel_preserves_text_cursor_and_revision"] and evidence["explicit_home_restores_source_coordinates"]
         assert evidence["page_navigation_preserves_text_revision"] and evidence["page_selection_and_source_coordinates"]
         assert evidence["word_navigation_preserves_graphemes_and_revision"]
+        assert evidence["multiple_click_selection_preserves_text_revision"]
         queries = evidence["utf16_queries"]
         assert queries["repeated_pairs"] == 32 and queries["text_bytes"] == evidence["large_result_bytes"]
         assert queries["first_selection_query_ms"] >= 0 and queries["repeated_selection_and_text_ms"] >= 0
