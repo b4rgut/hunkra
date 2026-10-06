@@ -21,7 +21,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "network_frames": null,
       "scenario": "network-clone",
       "locales": [
@@ -38,7 +38,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 11,
+      "frames": 10,
       "network_frames": null,
       "scenario": "network-init",
       "locales": [
@@ -282,8 +282,8 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
-      "network_frames": 7,
+      "frames": 9,
+      "network_frames": 6,
       "scenario": "network-init-refusal",
       "locales": [
         "Remotes",
@@ -299,7 +299,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 9,
+      "frames": 10,
       "network_frames": 6,
       "scenario": "network-clone-refusal",
       "locales": [

@@ -19,7 +19,7 @@ Reproduce with scripts/dev measure /ABS/baseline.json --uncached and scripts/dev
 
 Cache acceptance: five new core tests, 124 headless tests (107 core + 17 app), strict headless/UI Clippy, native build and all 69 prior native windows pass. Same-size/same-mtime external replacements, index/HEAD/mode changes, fresh attrs/filter output/failure, two hashes/comparison modes, conflict resolution, another repository and LRU/byte budgets are independently checked. Worker/UI share immutable Arc alignment, not deep row copies.
 
-HNK-006 refresh/load acceptance now passes; HNK-013 path filter/focus/recent/long-line UX remains in progress.
+HNK-006 refresh/load acceptance now passes; HNK-013 path filter/focus/recent/long-line UX native acceptance also passes (validation/ux.json).
 
 ## Native Wayland load evidence
 
@@ -27,10 +27,12 @@ Five finite debug-build windows, each with 3000 tracked BOM/CRLF/EOF files and i
 
 | Scenario | Final changed paths | Max visible files / diff rows | Status service mean ms | Main preparation mean ms | Next-frame callback mean ms | RSS KiB | Watch hints |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| load-watch | 4003 | 19 / 1 | 113.48 | 0.307 | 35.07 | 116676 | 1 |
-| load-mass | 5003 | 19 / 1 | 113.59 | 0.308 | 35.33 | 110952 | 1 |
-| load-large | 4003 | 19 / 13 | 117.54 | 0.339 | 37.14 | 127624 | 0 |
-| load-periodic | 4003 | 19 / 1 | 117.75 | 0.310 | 33.44 | 110304 | 0 |
-| load-draft | 4003 | 16 / 0 | 124.66 | 0.372 | 41.41 | 110068 | 1 |
+| load-watch | 4003 | 16 / 1 | 120.01 | 0.503 | 44.15 | 121980 | 1 |
+| load-mass | 5003 | 16 / 1 | 114.46 | 0.445 | 41.40 | 111912 | 1 |
+| load-large | 4003 | 16 / 11 | 131.14 | 0.444 | 44.86 | 127104 | 0 |
+| load-periodic | 4003 | 16 / 1 | 133.77 | 0.511 | 41.79 | 115340 | 0 |
+| load-draft | 4003 | 14 / 0 | 142.54 | 0.512 | 53.82 | 114756 | 1 |
 
 Main/visible-row values measure wall time spent in CPU preparation code; next-frame callback includes scheduling/vsync, not isolated GPU/paint execution. No physical input/X11/GPU performance claim. load-periodic intentionally has no native hints and still observes actual changed bytes through periodic reads. load-draft retains unsaved Result/selection while refusing stale external writes. Cache-hit alignment remains shared; changed content invalidates old row coordinates. Initial watch setup budgets do not promise a global bound on future library/OS directory maps.
+
+Current native report regenerated with the final UX graph; a separate two-job release compilation was active during the load runs. Latencies include that host load and are not a before/after speed comparison. Quiet native remeasurement remains part of final packaging/acceptance.

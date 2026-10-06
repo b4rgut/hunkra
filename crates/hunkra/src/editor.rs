@@ -179,6 +179,9 @@ impl NativeEditor {
     /// Handles editing keys locally while ordinary characters remain platform/IME input.
     pub fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
+        if self.single_line && matches!(key, "up" | "down") {
+            return;
+        }
         let modifiers = event.keystroke.modifiers;
         let command = modifiers.control || modifiers.platform;
         let extend = modifiers.shift;
@@ -651,6 +654,52 @@ impl Element for TextSurface {
 mod tests {
     use super::*;
     use gpui::TestAppContext;
+    struct NavigationHost {
+        input: Entity<NativeEditor>,
+        arrows: usize,
+    }
+    impl Render for NavigationHost {
+        /// Embeds the real field in a parent that owns list navigation, exercising GPUI bubbling rather than direct handler calls.
+        fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            div()
+                .size_full()
+                .child(self.input.clone())
+                .on_key_down(cx.listener(|host, event: &KeyDownEvent, _, cx| {
+                    if matches!(event.keystroke.key.as_str(), "up" | "down") {
+                        host.arrows += 1;
+                        cx.stop_propagation();
+                    }
+                }))
+        }
+    }
+    #[gpui::test]
+    /// Single-line arrows bubble to the visible list without changing native field text, selection or revision.
+    fn single_line_arrows_reach_parent(cx: &mut TestAppContext) {
+        let (host, cx) = cx.add_window_view(|window, cx| {
+            let input = cx.new(|cx| NativeEditor::single_line(4096, "filter".into(), cx));
+            window.focus(&input.read(cx).focus_handle(cx));
+            NavigationHost { input, arrows: 0 }
+        });
+        cx.simulate_input("src Ядро");
+        let input = host.read_with(cx, |host, _| host.input.clone());
+        let before = input.read_with(cx, |editor, _| {
+            (
+                editor.buffer.text().to_owned(),
+                editor.buffer.selection,
+                editor.buffer.revision,
+            )
+        });
+        cx.simulate_keystrokes("up down");
+        assert_eq!(host.read_with(cx, |host, _| host.arrows), 2);
+        assert_eq!(
+            before,
+            input.read_with(cx, |editor, _| (
+                editor.buffer.text().to_owned(),
+                editor.buffer.selection,
+                editor.buffer.revision
+            ))
+        );
+    }
     #[gpui::test]
     /// Single-line fields retain exact Unicode and selection when clipboard/native composition includes newlines.
     fn single_line_refuses_multiline_input(cx: &mut TestAppContext) {

@@ -2,6 +2,7 @@
 use crate::{
     editor::NativeEditor,
     history_state::{HistoryCache, HistoryService},
+    horizontal_diff::HorizontalDiff,
     i18n::{Locale, Translator},
     theme,
     worker::LatestWorker,
@@ -54,6 +55,7 @@ pub struct HistoryView {
     commit_scroll: UniformListScrollHandle,
     file_scroll: UniformListScrollHandle,
     diff_scroll: UniformListScrollHandle,
+    pub horizontal: HorizontalDiff,
     focus: FocusHandle,
     hunk: usize,
     pub frames: usize,
@@ -136,6 +138,7 @@ impl HistoryView {
             commit_scroll: UniformListScrollHandle::new(),
             file_scroll: UniformListScrollHandle::new(),
             diff_scroll: UniformListScrollHandle::new(),
+            horizontal: HorizontalDiff::default(),
             focus: cx.focus_handle(),
             hunk: 0,
             frames: 0,
@@ -247,6 +250,7 @@ impl HistoryView {
             return;
         };
         let path = file.path.clone();
+        self.horizontal.reset();
         self.selected_file = Some(path.clone());
         self.diff = None;
         self.hunk = 0;
@@ -323,7 +327,41 @@ impl HistoryView {
     /// Handles commit navigation and historical hunk movement without reaching host write shortcuts.
     fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
-        if matches!(key, "up" | "down") && !event.keystroke.modifiers.control {
+        if event.keystroke.modifiers.alt && matches!(key, "left" | "right" | "home") {
+            self.horizontal.shift(if key == "home" {
+                -px(f32::MAX)
+            } else if key == "left" {
+                -px(160.)
+            } else {
+                px(160.)
+            });
+            cx.notify();
+        } else if key == "f6" || key == "tab" && !event.keystroke.modifiers.control {
+            let handle = if self.focus.is_focused(window) {
+                self.message.read(cx).focus_handle(cx)
+            } else {
+                self.focus.clone()
+            };
+            window.focus(&handle);
+        } else if event.keystroke.modifiers.control && matches!(key, "up" | "down") {
+            if let Some(detail) = &self.details
+                && !detail.files.is_empty()
+            {
+                let current = detail
+                    .files
+                    .iter()
+                    .position(|file| Some(&file.path) == self.selected_file.as_ref())
+                    .unwrap_or(0);
+                let next = if key == "up" {
+                    current.saturating_sub(1)
+                } else {
+                    (current + 1).min(detail.files.len() - 1)
+                };
+                self.file_scroll
+                    .scroll_to_item(next, ScrollStrategy::Center);
+                self.select_file(next, cx);
+            }
+        } else if matches!(key, "up" | "down") && !event.keystroke.modifiers.control {
             if let Some(page) = self.cache.current() {
                 let current = self
                     .selected
@@ -453,7 +491,13 @@ impl HistoryView {
             }))
     }
     /// Displays one side of an aligned raw-blob row; line endings remain metadata, never normalized bytes.
-    fn cell(&self, line: &Option<Line>, changed: bool, left: bool) -> gpui::Div {
+    fn cell(
+        &self,
+        line: &Option<Line>,
+        changed: bool,
+        left: bool,
+        window: &mut Window,
+    ) -> gpui::Div {
         let mut cell = div()
             .flex_1()
             .min_w_0()
@@ -483,30 +527,44 @@ impl HistoryView {
                 } else {
                     " "
                 }))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w_0()
-                        .whitespace_nowrap()
-                        .overflow_hidden()
-                        .text_sm()
-                        .child(line.text.replace('\t', "    ")),
-                );
-            if line.ending == "EOF" {
-                cell = cell.child(div().px_1().text_color(rgb(theme::ACCENT)).child("∅"));
-            }
+                .child(self.horizontal.text(
+                    if line.ending == "EOF" {
+                        format!("{}  ∅", line.text.replace('\t', "    "))
+                    } else {
+                        line.text.replace('\t', "    ")
+                    },
+                    window,
+                ));
         }
         cell
     }
     /// Keeps additions/deletions aligned through one shared virtual row list.
-    fn diff_row(&self, row: &DiffRow) -> gpui::Div {
+    fn diff_row(
+        &self,
+        index: usize,
+        row: &DiffRow,
+        window: &mut Window,
+        cx: &Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
         div()
+            .id(("history-diff-row", index))
             .h(px(25.))
             .w_full()
             .flex()
             .overflow_hidden()
-            .child(self.cell(&row.left, row.changed && row.left.is_some(), true))
-            .child(self.cell(&row.right, row.changed && row.right.is_some(), false))
+            .child(self.cell(&row.left, row.changed && row.left.is_some(), true, window))
+            .child(self.cell(
+                &row.right,
+                row.changed && row.right.is_some(),
+                false,
+                window,
+            ))
+            .on_scroll_wheel(cx.listener(|view, event, _, cx| {
+                if view.horizontal.wheel(event) {
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }))
     }
     /// Builds selected-commit details, explicit parent controls and a read-only aligned diff.
     fn detail_panel(&self, cx: &Context<Self>) -> gpui::Div {
@@ -678,10 +736,15 @@ impl HistoryView {
                     uniform_list(
                         "history-diff",
                         diff.rows.len(),
-                        cx.processor(|view, range: std::ops::Range<usize>, _, _| {
+                        cx.processor(|view, range: std::ops::Range<usize>, window, cx| {
                             range
                                 .map(|index| {
-                                    view.diff_row(&view.diff.as_ref().unwrap().rows[index])
+                                    view.diff_row(
+                                        index,
+                                        &view.diff.as_ref().unwrap().rows[index],
+                                        window,
+                                        cx,
+                                    )
                                 })
                                 .collect::<Vec<_>>()
                         }),
@@ -691,6 +754,45 @@ impl HistoryView {
                     .track_scroll(self.diff_scroll.clone()),
                 );
             }
+            diff_panel = diff_panel.child(
+                div()
+                    .px_2()
+                    .py_1()
+                    .flex()
+                    .items_center()
+                    .gap_2()
+                    .text_xs()
+                    .text_color(rgb(theme::MUTED))
+                    .child(self.t("horizontal-hint"))
+                    .child(
+                        button("history-horizontal-left", "←".into(), false, true).on_click(
+                            cx.listener(|view, _, _, cx| {
+                                view.horizontal.shift(-px(160.));
+                                cx.notify();
+                            }),
+                        ),
+                    )
+                    .child(
+                        button("history-horizontal-right", "→".into(), false, true).on_click(
+                            cx.listener(|view, _, _, cx| {
+                                view.horizontal.shift(px(160.));
+                                cx.notify();
+                            }),
+                        ),
+                    )
+                    .child(
+                        button(
+                            "history-horizontal-reset",
+                            self.t("horizontal-reset"),
+                            false,
+                            true,
+                        )
+                        .on_click(cx.listener(|view, _, _, cx| {
+                            view.horizontal.shift(-px(f32::MAX));
+                            cx.notify();
+                        })),
+                    ),
+            );
             let mode = |mode: Option<u32>| {
                 mode.map(|mode| format!("{mode:06o}"))
                     .unwrap_or_else(|| self.t("absent"))

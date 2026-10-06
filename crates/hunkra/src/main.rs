@@ -1,6 +1,7 @@
 //! Native GPUI shell. Blocking repository reads run in separate bounded workers.
 mod load_smoke;
 mod network_smoke;
+mod ux_smoke;
 use gpui::{
     App, Application, Bounds, Context, Entity, EntityInputHandler, FocusHandle, Focusable,
     KeyDownEvent, Keystroke, PathPromptOptions, ScrollStrategy, SharedString, Subscription, Task,
@@ -11,10 +12,12 @@ use hunkra::{
     conflict_view::{ConflictEvent, ConflictView},
     editor::{NativeEditor, TextChanged, TextRejected, TextSubmitted},
     history_view::HistoryView,
+    horizontal_diff::HorizontalDiff,
     i18n::{Locale, Translator},
     measurements::Measurements,
     network_action::{self, NetworkCommand, NetworkOutcome},
     network_view::{NetworkEvent, NetworkPage, NetworkView},
+    path_filter::{PathFilter, PathIndex},
     settings::{self, Settings},
     state::ViewState,
     theme::{ACCENT, BACKGROUND as BG, BORDER as LINE, HOVER, MUTED, PANEL, SELECTED, TEXT},
@@ -76,6 +79,7 @@ struct StatusRead {
     branches: BranchSnapshot,
     operation: OperationSnapshot,
     elapsed: Duration,
+    paths: Arc<PathIndex>,
 }
 /// Reads a consistent status/branch/operation bundle through the one bounded status worker.
 fn read_status(root: &std::path::Path) -> Result<StatusRead, CoreError> {
@@ -86,7 +90,11 @@ fn read_status(root: &std::path::Path) -> Result<StatusRead, CoreError> {
     if repository.commit != branches.repository || repository.commit != operation.repository {
         return Err(CoreError::Stale);
     }
+    let paths = Arc::new(PathIndex::new(
+        repository.files.iter().map(|file| file.path.as_path()),
+    ));
     Ok(StatusRead {
+        paths,
         repository,
         branches,
         operation,
@@ -182,8 +190,15 @@ struct Hunkra {
     watch: RepositoryWatch,
     measurements: Measurements,
     load: Option<load_smoke::LoadState>,
+    ux: Option<ux_smoke::UxState>,
     write_worker: LatestWorker<WriteQuery, Result<WriteResult, CoreError>>,
     message: Entity<NativeEditor>,
+    filter_input: Entity<NativeEditor>,
+    path_filter: PathFilter,
+    filter_submitted: bool,
+    recent_open: bool,
+    recent_selected: usize,
+    horizontal: HorizontalDiff,
     branch_input: Entity<NativeEditor>,
     conflict: Option<Entity<ConflictView>>,
     conflict_subscription: Option<Subscription>,
@@ -351,6 +366,33 @@ impl Hunkra {
         let branch_submitted = cx.subscribe(&branch_input, |app, _, _: &TextSubmitted, cx| {
             app.create_branch(cx);
         });
+        let filter_input = cx.new(|cx| {
+            NativeEditor::single_line(4096, translator.text("filter-placeholder", None), cx)
+        });
+        let filter_changed = cx.subscribe(&filter_input, |app, editor, _: &TextChanged, cx| {
+            app.path_filter.query(editor.read(cx).buffer.text());
+            app.file_scroll
+                .scroll_to_item_strict(0, ScrollStrategy::Top);
+            cx.notify();
+        });
+        let filter_submitted = cx.subscribe(&filter_input, |app, _, _: &TextSubmitted, cx| {
+            app.filter_submitted = true;
+            if let Some(repo) = &app.view.repository {
+                let visible = app
+                    .path_filter
+                    .rows
+                    .iter()
+                    .any(|&index| Some(&repo.files[index].path) == app.view.selected.as_ref());
+                if !visible && let Some(&index) = app.path_filter.rows.first() {
+                    app.select(repo.files[index].path.clone(), cx);
+                }
+            }
+            cx.notify();
+        });
+        let filter_rejected = cx.subscribe(&filter_input, |app, _, _: &TextRejected, cx| {
+            app.error_key = Some("error-filter");
+            cx.notify();
+        });
         let mut app = Self {
             view: ViewState {
                 locale,
@@ -358,6 +400,12 @@ impl Hunkra {
             },
             translator,
             message,
+            filter_input,
+            path_filter: PathFilter::default(),
+            filter_submitted: false,
+            recent_open: false,
+            recent_selected: 0,
+            horizontal: HorizontalDiff::default(),
             branch_input,
             conflict: None,
             conflict_subscription: None,
@@ -383,6 +431,9 @@ impl Hunkra {
                 branch_changed,
                 branch_rejected,
                 branch_submitted,
+                filter_changed,
+                filter_submitted,
+                filter_rejected,
             ],
             committed: None,
             reviewed_commit: None,
@@ -397,6 +448,7 @@ impl Hunkra {
             watch: RepositoryWatch::default(),
             measurements: Measurements::default(),
             load: None,
+            ux: None,
             write_worker: LatestWorker::new("hunkra-write", |query: WriteQuery| match query {
                 WriteQuery::Index(root, diff, selection) => {
                     hunkra_core::update_index(&root, &diff, &selection).map(WriteResult::Index)
@@ -764,6 +816,11 @@ impl Hunkra {
             editor.placeholder = placeholder.into();
             cx.notify();
         });
+        let placeholder = self.t("filter-placeholder");
+        self.filter_input.update(cx, |editor, cx| {
+            editor.placeholder = placeholder.into();
+            cx.notify();
+        });
         self.settings.locale = locale;
         if self.smoke.is_none() {
             self.settings_worker.submit(0, self.settings.clone());
@@ -778,6 +835,14 @@ impl Hunkra {
         if self.guard_intent(Intent::Open(root.clone()), cx) {
             return;
         }
+        self.recent_open = false;
+        self.recent_selected = 0;
+        self.horizontal.reset();
+        self.path_filter.replace(None, "");
+        self.filter_input.update(cx, |editor, cx| {
+            editor.buffer.reset(String::new());
+            cx.notify();
+        });
         self.committed = None;
         self.conflict = None;
         self.conflict_subscription = None;
@@ -858,6 +923,85 @@ impl Hunkra {
             self.history = Some(cx.new(|cx| HistoryView::new(root, self.view.locale, cx)));
         }
         cx.notify();
+    }
+    /// Clears only the sidebar query, retaining the selected document, draft and undo history.
+    fn clear_filter(&mut self, cx: &mut Context<Self>) {
+        self.filter_input.update(cx, |editor, cx| {
+            editor.buffer.reset(String::new());
+            cx.notify();
+        });
+        self.path_filter.query("");
+        cx.notify();
+    }
+    /// Cycles meaningful native focus targets in the displayed panel; Result and message edits retain their selection.
+    fn cycle_focus(&self, reverse: bool, window: &mut Window, cx: &Context<Self>) {
+        if self.history_tab || self.network_tab {
+            self.focus_tab(window, cx);
+            return;
+        }
+        let mut handles = vec![self.focus.clone()];
+        if self.branch_tab {
+            handles.push(self.branch_input.read(cx).focus_handle(cx));
+        } else {
+            handles.push(self.filter_input.read(cx).focus_handle(cx));
+            if let Some(conflict) = &self.conflict {
+                handles.push(conflict.read(cx).result.read(cx).focus_handle(cx));
+            }
+        }
+        handles.push(self.message.read(cx).focus_handle(cx));
+        let current = handles
+            .iter()
+            .position(|handle| handle.is_focused(window))
+            .unwrap_or(0);
+        let next = if reverse {
+            (current + handles.len() - 1) % handles.len()
+        } else {
+            (current + 1) % handles.len()
+        };
+        window.focus(&handles[next]);
+    }
+    /// Accepts a recent project without reopening the already active repository or clearing its message/draft.
+    fn open_recent(&mut self, path: PathBuf, cx: &mut Context<Self>) {
+        if self.root.as_ref() == Some(&path) {
+            self.recent_open = false;
+            cx.notify();
+        } else {
+            self.open(path, cx);
+        }
+    }
+    /// Shows bounded recent projects in the open workspace; selecting another repository uses the existing dirty Result guard.
+    fn recent_panel(&self, cx: &Context<Self>) -> gpui::Div {
+        let mut panel = div()
+            .px_3()
+            .py_2()
+            .flex()
+            .flex_col()
+            .gap_1()
+            .bg(rgb(PANEL))
+            .border_b_1()
+            .border_color(rgb(LINE));
+        if self.settings.recent.is_empty() {
+            panel = panel.child(
+                div()
+                    .text_sm()
+                    .text_color(rgb(MUTED))
+                    .child(self.t("recent-empty")),
+            );
+        }
+        for (index, path) in self.settings.recent.iter().cloned().enumerate() {
+            panel = panel.child(
+                button(
+                    ("recent-project", index),
+                    path.to_string_lossy().into_owned(),
+                    self.recent_selected == index,
+                )
+                .on_click(cx.listener(move |app, _, window, cx| {
+                    app.open_recent(path.clone(), cx);
+                    window.focus(&app.focus);
+                })),
+            );
+        }
+        panel
     }
     /// Gives keyboard navigation to the displayed native tab rather than a hidden message editor.
     fn focus_tab(&self, window: &mut Window, cx: &Context<Self>) {
@@ -950,6 +1094,7 @@ impl Hunkra {
         let generation = self.view.select(path.clone(), self.mode);
         self.diff_loading = true;
         if changed_document {
+            self.horizontal.reset();
             self.hunk = 0;
             self.anchor_removed = None;
             self.anchor_added = None;
@@ -972,6 +1117,7 @@ impl Hunkra {
             return;
         }
         self.mode = mode;
+        self.horizontal.reset();
         self.anchor_removed = None;
         self.anchor_added = None;
         if let Some(path) = self.view.selected.clone() {
@@ -1185,7 +1331,7 @@ impl Hunkra {
     }
     /// Reads completed mailboxes, rejecting obsolete generations before touching UI state.
     fn poll(&mut self, cx: &mut Context<Self>) {
-        let mut changed = self.watch.poll();
+        let mut changed = self.watch.poll() | self.path_filter.poll();
         let auto_refresh = self.smoke.as_ref().is_none_or(|smoke| {
             smoke
                 .operation
@@ -1260,6 +1406,8 @@ impl Hunkra {
                         self.settings.recent.truncate(10);
                         self.settings_worker.submit(0, self.settings.clone());
                     }
+                    self.path_filter
+                        .replace(Some(read.paths), self.filter_input.read(cx).buffer.text());
                     self.view.repository = Some(snapshot);
                     if let Some(path) = selected {
                         if self.view.selected.as_ref() != Some(&path) || !self.diff_loading {
@@ -1501,6 +1649,51 @@ impl Hunkra {
             }
             return;
         }
+        if event.keystroke.modifiers.control && key == "r" {
+            self.recent_open = !self.recent_open;
+            window.focus(&self.focus);
+            cx.notify();
+            return;
+        }
+        if self.recent_open {
+            if matches!(key, "up" | "down") && !self.settings.recent.is_empty() {
+                self.recent_selected = if key == "up" {
+                    self.recent_selected.saturating_sub(1)
+                } else {
+                    (self.recent_selected + 1).min(self.settings.recent.len() - 1)
+                };
+                cx.notify();
+            } else if key == "enter"
+                && let Some(path) = self.settings.recent.get(self.recent_selected).cloned()
+            {
+                self.open_recent(path, cx);
+            }
+            if key == "escape" {
+                self.recent_open = false;
+                cx.notify();
+            }
+            return;
+        }
+        if event.keystroke.modifiers.control
+            && key == "f"
+            && !event.keystroke.modifiers.shift
+            && !self.history_tab
+            && !self.network_tab
+        {
+            self.select_tab(0, cx);
+            window.focus(&self.filter_input.read(cx).focus_handle(cx));
+            return;
+        }
+        if key == "escape" {
+            window.focus(&self.focus);
+            cx.stop_propagation();
+            return;
+        }
+        if key == "f6" || key == "tab" && !event.keystroke.modifiers.control {
+            self.cycle_focus(event.keystroke.modifiers.shift, window, cx);
+            cx.stop_propagation();
+            return;
+        }
         if event.keystroke.modifiers.control && !event.keystroke.modifiers.shift && key == "enter" {
             self.commit(cx);
             return;
@@ -1511,6 +1704,21 @@ impl Hunkra {
         }
         if key == "f5" {
             self.refresh_visible(cx);
+            return;
+        }
+        if event.keystroke.modifiers.alt
+            && matches!(key, "left" | "right" | "home")
+            && !self.history_tab
+            && !self.network_tab
+        {
+            self.horizontal.shift(if key == "home" {
+                -px(f32::MAX)
+            } else if key == "left" {
+                -px(160.)
+            } else {
+                px(160.)
+            });
+            cx.notify();
             return;
         }
         if key == "f7" {
@@ -1578,20 +1786,21 @@ impl Hunkra {
         if matches!(key, "up" | "down")
             && let Some(repo) = &self.view.repository
         {
-            if repo.files.is_empty() {
+            let rows = &self.path_filter.rows;
+            if rows.is_empty() {
                 return;
             }
-            let current = repo
-                .files
+            let current = rows
                 .iter()
-                .position(|file| Some(&file.path) == self.view.selected.as_ref())
-                .unwrap_or(0);
-            let next = if key == "up" {
-                current.saturating_sub(1)
-            } else {
-                (current + 1).min(repo.files.len() - 1)
-            };
-            let path = repo.files[next].path.clone();
+                .position(|&index| Some(&repo.files[index].path) == self.view.selected.as_ref());
+            let next = current.map_or(0, |current| {
+                if key == "up" {
+                    current.saturating_sub(1)
+                } else {
+                    (current + 1).min(rows.len() - 1)
+                }
+            });
+            let path = repo.files[rows[next]].path.clone();
             self.file_scroll
                 .scroll_to_item(next, ScrollStrategy::Center);
             self.select(path, cx);
@@ -1599,6 +1808,15 @@ impl Hunkra {
     }
     /// Runs a native scripted render scenario, with a finite timeout and isolated settings.
     fn smoke_tick(&mut self, cx: &mut Context<Self>) {
+        if self.smoke.as_ref().is_some_and(|smoke| {
+            smoke
+                .operation
+                .as_deref()
+                .is_some_and(|action| action.starts_with("ux-"))
+        }) {
+            cx.notify();
+            return;
+        }
         if self.smoke.as_ref().is_some_and(|smoke| {
             smoke
                 .operation
@@ -2163,6 +2381,7 @@ impl Hunkra {
                     || action == "history-draft"
                     || action.starts_with("network-draft")
                     || action == "load-draft"
+                    || action == "ux-draft"
             }) && !smoke.result_ready
         }) {
             return;
@@ -2591,7 +2810,8 @@ impl Hunkra {
     }
     /// Builds one virtualized file row with independent staged and unstaged indicators.
     fn file_row(&self, index: usize, cx: &Context<Self>) -> gpui::Stateful<gpui::Div> {
-        let file = &self.view.repository.as_ref().unwrap().files[index];
+        let source = self.path_filter.rows[index];
+        let file = &self.view.repository.as_ref().unwrap().files[source];
         let path = file.path.clone();
         let active = self.view.selected.as_ref() == Some(&path);
         let symbol = |change: Option<ChangeKind>| match change {
@@ -2632,10 +2852,18 @@ impl Hunkra {
                     .text_ellipsis()
                     .child(path.to_string_lossy().into_owned()),
             )
-            .on_click(cx.listener(move |app, _, _, cx| app.select(path.clone(), cx)))
+            .on_click(cx.listener(move |app, _, window, cx| {
+                window.focus(&app.focus);
+                app.select(path.clone(), cx);
+            }))
     }
     /// Renders one aligned pair with independently selected old and new lines.
-    fn diff_row(&self, index: usize, cx: &Context<Self>) -> gpui::Stateful<gpui::Div> {
+    fn diff_row(
+        &self,
+        index: usize,
+        window: &mut Window,
+        cx: &Context<Self>,
+    ) -> gpui::Stateful<gpui::Div> {
         let row = &self.view.diff.as_ref().unwrap().rows[index];
         div()
             .id(("diff", index))
@@ -2643,8 +2871,14 @@ impl Hunkra {
             .flex()
             .w_full()
             .overflow_hidden()
-            .child(self.diff_cell(&row.left, row, true, index, cx))
-            .child(self.diff_cell(&row.right, row, false, index, cx))
+            .child(self.diff_cell(&row.left, row, true, index, window, cx))
+            .child(self.diff_cell(&row.right, row, false, index, window, cx))
+            .on_scroll_wheel(cx.listener(|app, event, _, cx| {
+                if app.horizontal.wheel(event) {
+                    cx.stop_propagation();
+                    cx.notify();
+                }
+            }))
     }
     /// Keeps an empty side as an aligned blank; display text never changes document bytes.
     fn diff_cell(
@@ -2653,6 +2887,7 @@ impl Hunkra {
         row: &DiffRow,
         left: bool,
         index: usize,
+        window: &mut Window,
         cx: &Context<Self>,
     ) -> gpui::Stateful<gpui::Div> {
         let changed = row.changed && line.is_some();
@@ -2681,7 +2916,7 @@ impl Hunkra {
         });
         let line_number = line.as_ref().map(|line| line.number - 1);
         let version = self.view.diff.clone();
-        let mut cell = div()
+        div()
             .id((if left { "old-line" } else { "new-line" }, index))
             .on_click(cx.listener(move |app, event: &gpui::ClickEvent, _, cx| {
                 if changed
@@ -2724,18 +2959,14 @@ impl Hunkra {
                     .text_color(rgb(if left { 0xf29d9d } else { ACCENT }))
                     .child(marker),
             )
-            .child(
-                div()
-                    .flex_1()
-                    .min_w_0()
-                    .overflow_hidden()
-                    .whitespace_nowrap()
-                    .child(text),
-            );
-        if ending == "EOF" && line.is_some() {
-            cell = cell.child(div().px_2().text_color(rgb(0xe1be86)).child("∅"));
-        }
-        cell
+            .child(self.horizontal.text(
+                if ending == "EOF" && line.is_some() {
+                    format!("{text}  ∅")
+                } else {
+                    text
+                },
+                window,
+            ))
     }
     /// Builds the standalone sidebar, while lazily rendering only visible file rows.
     fn sidebar(&self, cx: &Context<Self>) -> gpui::Div {
@@ -2797,14 +3028,37 @@ impl Hunkra {
             self.t("staged"),
             self.t("unstaged")
         )));
-        sidebar = sidebar.child(info);
+        sidebar = sidebar.child(info).child(
+            div()
+                .px_2()
+                .pb_2()
+                .flex()
+                .flex_col()
+                .gap_1()
+                .child(div().h(px(34.)).child(self.filter_input.clone()))
+                .child(
+                    div()
+                        .flex()
+                        .items_center()
+                        .gap_2()
+                        .text_xs()
+                        .text_color(rgb(MUTED))
+                        .child(self.translator.count(self.path_filter.rows.len()))
+                        .child(div().flex_1())
+                        .child(
+                            button("clear-filter", self.t("filter-clear"), false)
+                                .on_click(cx.listener(|app, _, _, cx| app.clear_filter(cx))),
+                        ),
+                ),
+        );
         if let Some(repo) = &self.view.repository
             && !repo.files.is_empty()
+            && !self.path_filter.rows.is_empty()
         {
             sidebar = sidebar.child(
                 uniform_list(
                     "files",
-                    repo.files.len(),
+                    self.path_filter.rows.len(),
                     cx.processor(|app, range: std::ops::Range<usize>, _, cx| {
                         let start = Instant::now();
                         app.measurements.file_rows = app.measurements.file_rows.max(range.len());
@@ -2821,11 +3075,20 @@ impl Hunkra {
             );
         } else {
             sidebar = sidebar.child(
-                div()
-                    .p_4()
-                    .text_sm()
-                    .text_color(rgb(MUTED))
-                    .child(self.t("empty")),
+                div().p_4().text_sm().text_color(rgb(MUTED)).child(
+                    self.t(if self.path_filter.loading {
+                        "filter-loading"
+                    } else if self
+                        .view
+                        .repository
+                        .as_ref()
+                        .is_some_and(|repo| !repo.files.is_empty())
+                    {
+                        "filter-empty"
+                    } else {
+                        "empty"
+                    }),
+                ),
             );
         }
         sidebar
@@ -3213,11 +3476,11 @@ impl Hunkra {
                 uniform_list(
                     "diff-rows",
                     diff.rows.len(),
-                    cx.processor(|app, range: std::ops::Range<usize>, _, cx| {
+                    cx.processor(|app, range: std::ops::Range<usize>, window, cx| {
                         let start = Instant::now();
                         app.measurements.diff_rows = app.measurements.diff_rows.max(range.len());
                         let rows = range
-                            .map(|index| app.diff_row(index, cx))
+                            .map(|index| app.diff_row(index, window, cx))
                             .collect::<Vec<_>>();
                         app.measurements.diff_rows_prepare.record(start.elapsed());
                         rows
@@ -3278,6 +3541,37 @@ impl Hunkra {
                 ))
                 .child(format!("∅  {}", self.t("no-newline"))),
         );
+        footer = footer.child(
+            div()
+                .flex()
+                .items_center()
+                .gap_2()
+                .child(self.t("horizontal-hint"))
+                .child(
+                    button("horizontal-left", "←".into(), false).on_click(cx.listener(
+                        |app, _, _, cx| {
+                            app.horizontal.shift(-px(160.));
+                            cx.notify();
+                        },
+                    )),
+                )
+                .child(
+                    button("horizontal-right", "→".into(), false).on_click(cx.listener(
+                        |app, _, _, cx| {
+                            app.horizontal.shift(px(160.));
+                            cx.notify();
+                        },
+                    )),
+                )
+                .child(
+                    button("horizontal-reset", self.t("horizontal-reset"), false).on_click(
+                        cx.listener(|app, _, _, cx| {
+                            app.horizontal.shift(-px(f32::MAX));
+                            cx.notify();
+                        }),
+                    ),
+                ),
+        );
         panel.child(footer.child(self.t("select-lines")))
     }
 }
@@ -3286,8 +3580,13 @@ impl Render for Hunkra {
     /// Renders native elements from existing snapshots; no blocking Git work occurs here.
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let started = Instant::now();
+        if self.filter_submitted {
+            self.filter_submitted = false;
+            window.focus(&self.focus);
+        }
         self.frames += 1;
         self.smoke_input(window, cx);
+        self.smoke_ux_input(window, cx);
         self.reviewed_operation = self.operation.clone();
         self.reviewed_commit = self
             .view
@@ -3383,7 +3682,19 @@ impl Render for Hunkra {
                 .on_click(cx.listener(move |app, _, _, cx| app.set_locale(locale, cx))),
             );
         }
+        toolbar = toolbar.child(
+            button("recent-menu", self.t("recent"), self.recent_open).on_click(cx.listener(
+                |app, _, window, cx| {
+                    app.recent_open = !app.recent_open;
+                    window.focus(&app.focus);
+                    cx.notify();
+                },
+            )),
+        );
         content = content.child(toolbar);
+        if self.recent_open {
+            content = content.child(self.recent_panel(cx));
+        }
         if let Some(prompt) = self.confirmation_panel(cx) {
             content = content.child(prompt);
         }

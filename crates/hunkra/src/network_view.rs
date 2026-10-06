@@ -341,9 +341,36 @@ impl NetworkView {
         cx.emit(NetworkEvent(command));
     }
     /// Provides explicit shortcuts for visible actions while letting native editors retain ordinary text input.
-    fn key_down(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn key_down(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let key = event.keystroke.key.as_str();
-        if event.keystroke.modifiers.control && key == "enter" && self.page != NetworkPage::Remotes
+        if key == "f6" || key == "tab" && !event.keystroke.modifiers.control {
+            let mut handles = vec![self.focus.clone()];
+            match self.page {
+                NetworkPage::Clone => {
+                    handles.push(self.url.read(cx).focus_handle(cx));
+                    handles.push(self.destination.read(cx).focus_handle(cx));
+                }
+                NetworkPage::Init => {
+                    handles.push(self.destination.read(cx).focus_handle(cx));
+                    handles.push(self.initial_branch.read(cx).focus_handle(cx));
+                }
+                NetworkPage::Remotes => handles.push(self.branch.read(cx).focus_handle(cx)),
+            }
+            let current = handles
+                .iter()
+                .position(|handle| handle.is_focused(window))
+                .unwrap_or(0);
+            let next = if event.keystroke.modifiers.shift {
+                (current + handles.len() - 1) % handles.len()
+            } else {
+                (current + 1) % handles.len()
+            };
+            window.focus(&handles[next]);
+            window.prevent_default();
+            cx.stop_propagation();
+        } else if event.keystroke.modifiers.control
+            && key == "enter"
+            && self.page != NetworkPage::Remotes
         {
             self.create(cx);
             cx.stop_propagation();

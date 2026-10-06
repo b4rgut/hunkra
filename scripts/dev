@@ -27,6 +27,7 @@ case "$command" in
   smoke-conflicts) python3 scripts/conflicts-smoke.py "$@" ;;
   smoke-history) python3 scripts/history-smoke.py "$@" ;;
   smoke-network) python3 scripts/network-smoke.py "$@" ;;
+  smoke-ux) python3 scripts/ux-smoke.py "$@" ;;
   smoke-load) python3 scripts/load-smoke.py "$@" ;;
   measure) cargo build -p hunkra --bin measure --locked; python3 scripts/measure.py "$@" ;;
   check-release) python3 scripts/validate.py release ;;

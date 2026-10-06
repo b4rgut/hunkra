@@ -1,0 +1,222 @@
+{
+  "ok": true,
+  "runs": [
+    {
+      "ok": true,
+      "native_display": true,
+      "scenario": "ux-paths",
+      "frames": 22,
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "read_only": true,
+      "filter_native": true,
+      "draft_retained": false,
+      "shared_horizontal_native": true,
+      "measurements": {
+        "status_service": {
+          "count": 2,
+          "mean_ms": 13.837257000000001,
+          "max_ms": 16.206646000000003
+        },
+        "diff_sources": {
+          "count": 5,
+          "mean_ms": 1.6130118,
+          "max_ms": 1.964305
+        },
+        "diff_alignment_prepare": {
+          "count": 5,
+          "mean_ms": 0.055039000000000005,
+          "max_ms": 0.09885100000000001
+        },
+        "selected_diff_service": {
+          "count": 5,
+          "mean_ms": 1.6700894000000002,
+          "max_ms": 2.065137
+        },
+        "main_render_prepare_wall": {
+          "count": 21,
+          "mean_ms": 0.7551262380952382,
+          "max_ms": 3.0537110000000003
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 48,
+          "mean_ms": 0.053865541666666676,
+          "max_ms": 0.341196
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 33,
+          "mean_ms": 4.607419272727272,
+          "max_ms": 76.389222
+        },
+        "next_frame_callback_wall": {
+          "count": 21,
+          "mean_ms": 48.58523652380953,
+          "max_ms": 150.12479100000002
+        },
+        "maximum_file_rows_per_batch": 16,
+        "maximum_diff_rows_per_batch": 1,
+        "watch_hints": 0,
+        "cache": {
+          "entries": 4,
+          "allocated_bytes": 39899,
+          "hits": 1,
+          "misses": 4
+        },
+        "memory": {
+          "rss_kib": 121524,
+          "peak_rss_kib": 121524
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "scenario": "ux-history",
+      "frames": 25,
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "read_only": true,
+      "filter_native": true,
+      "draft_retained": false,
+      "shared_horizontal_native": true,
+      "measurements": {
+        "status_service": {
+          "count": 1,
+          "mean_ms": 23.905246,
+          "max_ms": 23.905246
+        },
+        "diff_sources": {
+          "count": 4,
+          "mean_ms": 3.11859725,
+          "max_ms": 4.122063
+        },
+        "diff_alignment_prepare": {
+          "count": 4,
+          "mean_ms": 0.0712835,
+          "max_ms": 0.106764
+        },
+        "selected_diff_service": {
+          "count": 4,
+          "mean_ms": 3.19261725,
+          "max_ms": 4.223547
+        },
+        "main_render_prepare_wall": {
+          "count": 24,
+          "mean_ms": 0.7764766666666666,
+          "max_ms": 3.321579
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 45,
+          "mean_ms": 0.060462911111111114,
+          "max_ms": 0.494877
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 33,
+          "mean_ms": 4.818390696969698,
+          "max_ms": 81.062796
+        },
+        "next_frame_callback_wall": {
+          "count": 24,
+          "mean_ms": 51.845149875,
+          "max_ms": 149.951889
+        },
+        "maximum_file_rows_per_batch": 16,
+        "maximum_diff_rows_per_batch": 1,
+        "watch_hints": 0,
+        "cache": {
+          "entries": 3,
+          "allocated_bytes": 38910,
+          "hits": 1,
+          "misses": 3
+        },
+        "memory": {
+          "rss_kib": 113356,
+          "peak_rss_kib": 113356
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    },
+    {
+      "ok": true,
+      "native_display": true,
+      "scenario": "ux-draft",
+      "frames": 14,
+      "locales": [
+        "Changes",
+        "Изменения",
+        "Изменения"
+      ],
+      "read_only": true,
+      "filter_native": true,
+      "draft_retained": true,
+      "shared_horizontal_native": false,
+      "measurements": {
+        "status_service": {
+          "count": 1,
+          "mean_ms": 24.760719,
+          "max_ms": 24.760719
+        },
+        "diff_sources": {
+          "count": 1,
+          "mean_ms": 2.138498,
+          "max_ms": 2.138498
+        },
+        "diff_alignment_prepare": {
+          "count": 1,
+          "mean_ms": 0.057116,
+          "max_ms": 0.057116
+        },
+        "selected_diff_service": {
+          "count": 1,
+          "mean_ms": 14.707634,
+          "max_ms": 14.707634
+        },
+        "main_render_prepare_wall": {
+          "count": 13,
+          "mean_ms": 0.8212480769230768,
+          "max_ms": 2.579666
+        },
+        "visible_file_rows_prepare_wall": {
+          "count": 24,
+          "mean_ms": 0.05077120833333334,
+          "max_ms": 0.384281
+        },
+        "visible_diff_rows_prepare_wall": {
+          "count": 0,
+          "mean_ms": null,
+          "max_ms": null
+        },
+        "next_frame_callback_wall": {
+          "count": 13,
+          "mean_ms": 48.3691273076923,
+          "max_ms": 96.09996199999999
+        },
+        "maximum_file_rows_per_batch": 14,
+        "maximum_diff_rows_per_batch": 0,
+        "watch_hints": 0,
+        "cache": {
+          "entries": 1,
+          "allocated_bytes": 552,
+          "hits": 0,
+          "misses": 1
+        },
+        "memory": {
+          "rss_kib": 109140,
+          "peak_rss_kib": 109140
+        },
+        "gpu_execution_measured": false,
+        "scope": "accepted workers; main/visible-row CPU-code preparation wall time; next-frame callback wall latency includes scheduling, not isolated GPU execution"
+      }
+    }
+  ],
+  "oracle": "independent Git HEAD/index/stages/status and every fixture worktree/settings byte invariant"
+}

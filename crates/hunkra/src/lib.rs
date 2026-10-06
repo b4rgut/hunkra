@@ -6,11 +6,14 @@ pub mod editor;
 pub mod history_state;
 #[cfg(feature = "gui")]
 pub mod history_view;
+#[cfg(feature = "gui")]
+pub mod horizontal_diff;
 pub mod i18n;
 pub mod measurements;
 pub mod network_action;
 #[cfg(feature = "gui")]
 pub mod network_view;
+pub mod path_filter;
 pub mod result_draft;
 pub mod settings;
 pub mod state;
