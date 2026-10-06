@@ -11,7 +11,7 @@ scripts/dev run /absolute/path/to/repository
 
 On this workspace, prepared demo: `scripts/dev run "$PWD/demo-repositories/preview/changes"`.
 
-Checks: `scripts/dev check`, `scripts/dev check-ui`, `scripts/dev check-editor`, `scripts/dev check-i18n`, `scripts/dev check-release`. Native scenarios: `scripts/dev smoke`, `smoke-operations`, `smoke-conflicts` `smoke-history` or `smoke-network`, each followed by an absolute report path, after build-ui (requires display; writes only disposable demos). Bundled UI resources work offline from any working directory. Bootstrap keeps tools and missing Fedora linker files project-local, without sudo.
+Checks: `scripts/dev check`, `scripts/dev check-ui`, `scripts/dev check-editor`, `scripts/dev check-i18n`, `scripts/dev check-release`. Backend load measurements: `scripts/dev measure /absolute/report.json` (add `--uncached` for the control path). Native scenarios: `scripts/dev smoke`, `smoke-operations`, `smoke-conflicts` `smoke-history` or `smoke-network`, each followed by an absolute report path, after build-ui (requires display; writes only disposable demos). Bundled UI resources work offline from any working directory. Bootstrap keeps tools and missing Fedora linker files project-local, without sudo.
 
 [What works, launch and known limits](docs/handoff.md) · [Tasks](TASKS.md) · [Full MVP](docs/requirements.md) · [Architecture](docs/architecture.md) · [Verified dependencies](docs/dependencies.md) · [gix-first evidence](docs/gix-capabilities.md) · [Development/release workflow](docs/workflow.md).
 

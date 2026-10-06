@@ -1,0 +1,841 @@
+{
+  "ok": true,
+  "tracked_files": 3003,
+  "cases": [
+    {
+      "bundle_ms": [
+        199.724248,
+        200.08409,
+        199.663252
+      ],
+      "cache": {
+        "allocated_bytes": 22803,
+        "entries": 2,
+        "hits": 13,
+        "misses": 2
+      },
+      "diffs": [
+        {
+          "elapsed_ms": 19.310436,
+          "path": "изменения.txt",
+          "prepare_ms": 0.098912,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.205167
+        },
+        {
+          "elapsed_ms": 19.055843,
+          "path": "sibling.txt",
+          "prepare_ms": 0.06572800000000001,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 18.98543
+        },
+        {
+          "elapsed_ms": 19.233749000000003,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0044870000000000005,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.224333
+        },
+        {
+          "elapsed_ms": 19.028845,
+          "path": "изменения.txt",
+          "prepare_ms": 0.003102,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.019958
+        },
+        {
+          "elapsed_ms": 19.255947,
+          "path": "sibling.txt",
+          "prepare_ms": 0.003698,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.247998999999997
+        },
+        {
+          "elapsed_ms": 19.538647,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0053739999999999994,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.527796
+        },
+        {
+          "elapsed_ms": 19.45795,
+          "path": "sibling.txt",
+          "prepare_ms": 0.006869,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.444955999999998
+        },
+        {
+          "elapsed_ms": 19.361123,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0040230000000000005,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.35242
+        },
+        {
+          "elapsed_ms": 19.442525,
+          "path": "изменения.txt",
+          "prepare_ms": 0.003185,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.433313000000002
+        },
+        {
+          "elapsed_ms": 19.468034,
+          "path": "sibling.txt",
+          "prepare_ms": 0.005312,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.456893
+        },
+        {
+          "elapsed_ms": 18.922044999999997,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004386,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 18.912033
+        },
+        {
+          "elapsed_ms": 19.24744,
+          "path": "sibling.txt",
+          "prepare_ms": 0.004398,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.237764000000002
+        },
+        {
+          "elapsed_ms": 19.298255,
+          "path": "изменения.txt",
+          "prepare_ms": 0.005802,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.286503
+        },
+        {
+          "elapsed_ms": 19.190545999999998,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0018470000000000001,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.184238999999998
+        },
+        {
+          "elapsed_ms": 19.502647000000003,
+          "path": "sibling.txt",
+          "prepare_ms": 0.004884,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.49247
+        }
+      ],
+      "files": 0,
+      "memory": {
+        "peak_rss_kib": 15440,
+        "rss_kib": 14104
+      },
+      "native_render_measured": false,
+      "scan_ms": [
+        187.444112,
+        185.646644,
+        185.272547
+      ],
+      "scope": "three warm-filesystem process-local rounds; read-only debug build",
+      "uncached": false,
+      "scenario": "first-open-and-repeat-refresh"
+    },
+    {
+      "bundle_ms": [
+        197.73562,
+        198.129157,
+        198.618916
+      ],
+      "cache": {
+        "allocated_bytes": 22885,
+        "entries": 2,
+        "hits": 13,
+        "misses": 2
+      },
+      "diffs": [
+        {
+          "elapsed_ms": 19.811913,
+          "path": "изменения.txt",
+          "prepare_ms": 0.07943700000000001,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.727099000000003
+        },
+        {
+          "elapsed_ms": 19.513105,
+          "path": "sibling.txt",
+          "prepare_ms": 0.06804500000000001,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.440804
+        },
+        {
+          "elapsed_ms": 19.596975999999998,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004214,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.588028
+        },
+        {
+          "elapsed_ms": 19.762858,
+          "path": "изменения.txt",
+          "prepare_ms": 0.003536,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.752665
+        },
+        {
+          "elapsed_ms": 19.817677999999997,
+          "path": "sibling.txt",
+          "prepare_ms": 0.004826,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.806919
+        },
+        {
+          "elapsed_ms": 19.425258,
+          "path": "изменения.txt",
+          "prepare_ms": 0.006136,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.413724000000002
+        },
+        {
+          "elapsed_ms": 19.75263,
+          "path": "sibling.txt",
+          "prepare_ms": 0.004221,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.743154999999998
+        },
+        {
+          "elapsed_ms": 19.440083,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004826,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.430343
+        },
+        {
+          "elapsed_ms": 19.630900999999998,
+          "path": "изменения.txt",
+          "prepare_ms": 0.002495,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.61888
+        },
+        {
+          "elapsed_ms": 19.665165,
+          "path": "sibling.txt",
+          "prepare_ms": 0.005248,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.654328
+        },
+        {
+          "elapsed_ms": 19.662268,
+          "path": "изменения.txt",
+          "prepare_ms": 0.003987,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.653395
+        },
+        {
+          "elapsed_ms": 19.46047,
+          "path": "sibling.txt",
+          "prepare_ms": 0.005727,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.449658000000003
+        },
+        {
+          "elapsed_ms": 19.570153,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004912,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.559572
+        },
+        {
+          "elapsed_ms": 19.391391000000002,
+          "path": "изменения.txt",
+          "prepare_ms": 0.003317,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.382343
+        },
+        {
+          "elapsed_ms": 19.752601000000002,
+          "path": "sibling.txt",
+          "prepare_ms": 0.0065699999999999995,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.739879
+        }
+      ],
+      "files": 1,
+      "memory": {
+        "peak_rss_kib": 15536,
+        "rss_kib": 13884
+      },
+      "native_render_measured": false,
+      "scan_ms": [
+        185.744486,
+        184.11539199999999,
+        184.87437300000002
+      ],
+      "scope": "three warm-filesystem process-local rounds; read-only debug build",
+      "uncached": false,
+      "scenario": "one-change-and-fast-switch"
+    },
+    {
+      "bundle_ms": [
+        198.307106,
+        198.811033,
+        199.04951200000002
+      ],
+      "cache": {
+        "allocated_bytes": 22885,
+        "entries": 2,
+        "hits": 7,
+        "misses": 2
+      },
+      "diffs": [
+        {
+          "elapsed_ms": 19.589907,
+          "path": "изменения.txt",
+          "prepare_ms": 0.090255,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.494042999999998
+        },
+        {
+          "elapsed_ms": 19.717651,
+          "path": "sibling.txt",
+          "prepare_ms": 0.077812,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.634553
+        },
+        {
+          "elapsed_ms": 19.353564,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004827,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.343508999999997
+        },
+        {
+          "elapsed_ms": 19.376467,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0033,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.368119999999998
+        },
+        {
+          "elapsed_ms": 19.46811,
+          "path": "sibling.txt",
+          "prepare_ms": 0.0045190000000000004,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.457855
+        },
+        {
+          "elapsed_ms": 19.752267,
+          "path": "изменения.txt",
+          "prepare_ms": 0.005853,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.740444
+        },
+        {
+          "elapsed_ms": 19.345224,
+          "path": "изменения.txt",
+          "prepare_ms": 0.002591,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.337763000000002
+        },
+        {
+          "elapsed_ms": 19.234875,
+          "path": "sibling.txt",
+          "prepare_ms": 0.004223,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.226211
+        },
+        {
+          "elapsed_ms": 19.343003,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004719,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.332867
+        }
+      ],
+      "files": 1,
+      "memory": {
+        "peak_rss_kib": 15212,
+        "rss_kib": 13676
+      },
+      "native_render_measured": false,
+      "scan_ms": [
+        186.055329,
+        185.066218,
+        186.85417800000002
+      ],
+      "scope": "three warm-filesystem process-local rounds; read-only debug build",
+      "uncached": false,
+      "scenario": "3000-unchanged-content-rewrites"
+    },
+    {
+      "bundle_ms": [
+        230.255787,
+        227.44873299999998,
+        228.032505
+      ],
+      "cache": {
+        "allocated_bytes": 22885,
+        "entries": 2,
+        "hits": 7,
+        "misses": 2
+      },
+      "diffs": [
+        {
+          "elapsed_ms": 19.584457,
+          "path": "изменения.txt",
+          "prepare_ms": 0.073163,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.506539
+        },
+        {
+          "elapsed_ms": 19.113532999999997,
+          "path": "sibling.txt",
+          "prepare_ms": 0.059205,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.050857
+        },
+        {
+          "elapsed_ms": 19.540367,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0065910000000000005,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.527037
+        },
+        {
+          "elapsed_ms": 19.309806,
+          "path": "изменения.txt",
+          "prepare_ms": 0.003367,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.300843
+        },
+        {
+          "elapsed_ms": 19.439194999999998,
+          "path": "sibling.txt",
+          "prepare_ms": 0.003948,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.430322999999998
+        },
+        {
+          "elapsed_ms": 19.44944,
+          "path": "изменения.txt",
+          "prepare_ms": 0.005808,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.437399000000003
+        },
+        {
+          "elapsed_ms": 19.411308,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0037570000000000004,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.402002000000003
+        },
+        {
+          "elapsed_ms": 19.610363,
+          "path": "sibling.txt",
+          "prepare_ms": 0.009317,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1612,
+          "source_ms": 19.595543
+        },
+        {
+          "elapsed_ms": 19.457067000000002,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004367,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.447343
+        }
+      ],
+      "files": 8001,
+      "memory": {
+        "peak_rss_kib": 22312,
+        "rss_kib": 22312
+      },
+      "native_render_measured": false,
+      "scan_ms": [
+        218.39989300000002,
+        214.57901800000002,
+        214.47584899999998
+      ],
+      "scope": "three warm-filesystem process-local rounds; read-only debug build",
+      "uncached": false,
+      "scenario": "8000-untracked-files"
+    },
+    {
+      "bundle_ms": [
+        208.65528,
+        209.711335,
+        207.48206199999998
+      ],
+      "cache": {
+        "allocated_bytes": 5836434,
+        "entries": 2,
+        "hits": 10,
+        "misses": 2
+      },
+      "diffs": [
+        {
+          "elapsed_ms": 34.639115999999994,
+          "path": "large.txt",
+          "prepare_ms": 12.052078000000002,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.579131999999998
+        },
+        {
+          "elapsed_ms": 23.032705,
+          "path": "large.txt",
+          "prepare_ms": 0.113017,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.912998
+        },
+        {
+          "elapsed_ms": 19.51837,
+          "path": "изменения.txt",
+          "prepare_ms": 0.078921,
+          "presentation": "Text",
+          "reused": false,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.434349
+        },
+        {
+          "elapsed_ms": 22.297252,
+          "path": "large.txt",
+          "prepare_ms": 0.09838799999999999,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.192953000000003
+        },
+        {
+          "elapsed_ms": 22.457521,
+          "path": "large.txt",
+          "prepare_ms": 0.10510699999999999,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.346602
+        },
+        {
+          "elapsed_ms": 22.583792,
+          "path": "large.txt",
+          "prepare_ms": 0.122807,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.453833
+        },
+        {
+          "elapsed_ms": 19.470607,
+          "path": "изменения.txt",
+          "prepare_ms": 0.004904,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.459491
+        },
+        {
+          "elapsed_ms": 22.527436,
+          "path": "large.txt",
+          "prepare_ms": 0.109005,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.412222
+        },
+        {
+          "elapsed_ms": 22.964935999999998,
+          "path": "large.txt",
+          "prepare_ms": 0.111383,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.846753
+        },
+        {
+          "elapsed_ms": 22.82036,
+          "path": "large.txt",
+          "prepare_ms": 0.099869,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.713907
+        },
+        {
+          "elapsed_ms": 19.782522,
+          "path": "изменения.txt",
+          "prepare_ms": 0.0047859999999999995,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 41,
+          "source_bytes": 1630,
+          "source_ms": 19.772302
+        },
+        {
+          "elapsed_ms": 22.944905000000002,
+          "path": "large.txt",
+          "prepare_ms": 0.132229,
+          "presentation": "Text",
+          "reused": true,
+          "rows": 18000,
+          "source_bytes": 936001,
+          "source_ms": 22.805109
+        }
+      ],
+      "files": 8002,
+      "memory": {
+        "peak_rss_kib": 29472,
+        "rss_kib": 29460
+      },
+      "native_render_measured": false,
+      "scan_ms": [
+        199.993032,
+        194.369708,
+        192.162821
+      ],
+      "scope": "three warm-filesystem process-local rounds; read-only debug build",
+      "uncached": false,
+      "scenario": "18000-line-diff"
+    },
+    {
+      "bundle_ms": [
+        209.386978,
+        205.91109,
+        206.409274
+      ],
+      "cache": {
+        "allocated_bytes": 4194736,
+        "entries": 1,
+        "hits": 5,
+        "misses": 1
+      },
+      "diffs": [
+        {
+          "elapsed_ms": 20.49416,
+          "path": "oversized",
+          "prepare_ms": 0.007606,
+          "presentation": "TooLarge",
+          "reused": false,
+          "rows": 0,
+          "source_bytes": 0,
+          "source_ms": 20.480564
+        },
+        {
+          "elapsed_ms": 20.612865,
+          "path": "oversized",
+          "prepare_ms": 0.18766,
+          "presentation": "TooLarge",
+          "reused": true,
+          "rows": 0,
+          "source_bytes": 0,
+          "source_ms": 20.417639
+        },
+        {
+          "elapsed_ms": 20.065154000000003,
+          "path": "oversized",
+          "prepare_ms": 0.153715,
+          "presentation": "TooLarge",
+          "reused": true,
+          "rows": 0,
+          "source_bytes": 0,
+          "source_ms": 19.905407999999998
+        },
+        {
+          "elapsed_ms": 19.838130999999997,
+          "path": "oversized",
+          "prepare_ms": 0.12260099999999999,
+          "presentation": "TooLarge",
+          "reused": true,
+          "rows": 0,
+          "source_bytes": 0,
+          "source_ms": 19.705297
+        },
+        {
+          "elapsed_ms": 19.792844,
+          "path": "oversized",
+          "prepare_ms": 0.142908,
+          "presentation": "TooLarge",
+          "reused": true,
+          "rows": 0,
+          "source_bytes": 0,
+          "source_ms": 19.643247
+        },
+        {
+          "elapsed_ms": 19.86342,
+          "path": "oversized",
+          "prepare_ms": 0.116716,
+          "presentation": "TooLarge",
+          "reused": true,
+          "rows": 0,
+          "source_bytes": 0,
+          "source_ms": 19.740965
+        }
+      ],
+      "files": 8003,
+      "memory": {
+        "peak_rss_kib": 27992,
+        "rss_kib": 27992
+      },
+      "native_render_measured": false,
+      "scan_ms": [
+        197.191333,
+        193.76503300000002,
+        191.999472
+      ],
+      "scope": "three warm-filesystem process-local rounds; read-only debug build",
+      "uncached": false,
+      "scenario": "oversized-file-refusal"
+    }
+  ],
+  "scope": "isolated Fedora debug backend only; native prepare/render/GPU and physical input unmeasured"
+}

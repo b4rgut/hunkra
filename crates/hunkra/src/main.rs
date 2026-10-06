@@ -35,12 +35,15 @@ const SMOKE_RESULT: &str = "Результат 🦀\r\nВведён вручну
 
 type DiffQuery = (PathBuf, PathBuf, DiffKind, bool);
 struct DiffRead {
-    diff: DiffSnapshot,
+    diff: Arc<DiffSnapshot>,
     conflict: Option<ConflictSnapshot>,
 }
 /// Reads a selected diff and recoverable conflict sources on the existing bounded worker.
-fn read_selected((root, path, kind, active_operation): DiffQuery) -> Result<DiffRead, CoreError> {
-    let diff = hunkra_core::read_diff(&root, &path, kind)?;
+fn read_selected(
+    reader: &mut hunkra_core::DiffReader,
+    (root, path, kind, active_operation): DiffQuery,
+) -> Result<DiffRead, CoreError> {
+    let diff = reader.read(&root, &path, kind)?.snapshot;
     let conflict = if !active_operation && diff.presentation != Presentation::Conflict {
         None
     } else {
@@ -363,7 +366,11 @@ impl Hunkra {
             reviewed_commit: None,
             settings,
             status_worker: LatestWorker::new("hunkra-status", |root: PathBuf| read_status(&root)),
-            diff_worker: LatestWorker::new("hunkra-diff", read_selected),
+            diff_worker: LatestWorker::with_state(
+                "hunkra-diff",
+                hunkra_core::DiffReader::default,
+                read_selected,
+            ),
             settings_worker: LatestWorker::new("hunkra-settings", settings::save),
             write_worker: LatestWorker::new("hunkra-write", |query: WriteQuery| match query {
                 WriteQuery::Index(root, diff, selection) => {
@@ -1254,7 +1261,7 @@ impl Hunkra {
                         self.anchor_removed = None;
                         self.anchor_added = None;
                     }
-                    self.view.apply_diff(generation, diff);
+                    self.view.apply_diff_shared(generation, diff);
                     if let Some(diff) = &self.view.diff {
                         self.hunk = self.hunk.min(diff.hunks.len().saturating_sub(1));
                     }

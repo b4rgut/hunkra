@@ -4,6 +4,7 @@ pub mod commit;
 pub mod conflict_chunks;
 pub mod conflicts;
 pub mod diff;
+pub mod diff_reader;
 pub mod history;
 mod index_format;
 pub mod network;
@@ -13,6 +14,7 @@ pub mod staging;
 pub mod transitions;
 
 pub use diff::{DiffKind, DiffRow, DiffSnapshot, Document, Line, Presentation};
+pub use diff_reader::{CachedDiff, DiffCacheStats, DiffReader};
 pub use repository::{
     ChangeKind, CoreError, FileStatus, IndexLimitation, Operation, RepositorySnapshot, read_diff,
     scan,

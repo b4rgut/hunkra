@@ -60,7 +60,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 18,
+      "frames": 19,
       "locales": [
         "Result",
         "Результат",
@@ -104,7 +104,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "locales": [
         "Result",
         "Результат",
@@ -140,7 +140,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 10,
+      "frames": 11,
       "locales": [
         "Result",
         "Результат",
@@ -212,7 +212,7 @@
     {
       "ok": true,
       "native_display": true,
-      "frames": 12,
+      "frames": 13,
       "locales": [
         "Result",
         "Результат",

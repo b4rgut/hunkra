@@ -37,6 +37,10 @@ impl ViewState {
     }
     /// Applies only the current selected-file request, ignoring delayed older replies.
     pub fn apply_diff(&mut self, generation: u64, diff: DiffSnapshot) -> bool {
+        self.apply_diff_shared(generation, Arc::new(diff))
+    }
+    /// Shares cached immutable alignment from the reader without duplicating all rows on the UI thread.
+    pub fn apply_diff_shared(&mut self, generation: u64, diff: Arc<DiffSnapshot>) -> bool {
         if generation != self.diff_generation || self.selected.as_ref() != Some(&diff.path) {
             return false;
         }
@@ -48,7 +52,7 @@ impl ViewState {
                 return true;
             }
         }
-        self.diff = Some(Arc::new(diff));
+        self.diff = Some(diff);
         true
     }
     /// Resets selection only for a genuinely different document or comparison.

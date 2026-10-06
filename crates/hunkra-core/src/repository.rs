@@ -444,6 +444,45 @@ pub(crate) fn at_worktree(
 
 /// Reads exactly HEAD→index or index→worktree for one repository-relative path.
 pub fn read_diff(root: &Path, path: &Path, kind: DiffKind) -> Result<DiffSnapshot, CoreError> {
+    Ok(read_diff_sources(root, path, kind)?.prepare())
+}
+
+pub(crate) struct DiffSources {
+    path: PathBuf,
+    kind: DiffKind,
+    left: Document,
+    right: Document,
+    guard: RepositoryGuard,
+    conflicted: bool,
+}
+impl DiffSources {
+    /// Reuses coordinates only after freshly converted documents and every actual write guard agree.
+    pub(crate) fn matches(&self, previous: &DiffSnapshot) -> bool {
+        self.path == previous.path
+            && self.kind == previous.kind
+            && self.left == previous.left
+            && self.right == previous.right
+            && previous.guard.as_ref() == Some(&self.guard)
+            && self.conflicted == (previous.presentation == crate::Presentation::Conflict)
+    }
+    /// Allocates alignment once for changed sources; conflicts retain the same checked index/HEAD/raw-file guard.
+    pub(crate) fn prepare(self) -> DiffSnapshot {
+        let mut diff = if self.conflicted {
+            DiffSnapshot::conflict(self.path, self.kind)
+        } else {
+            DiffSnapshot::new(self.path, self.kind, self.left, self.right)
+        };
+        diff.guard = Some(self.guard);
+        diff
+    }
+}
+
+/// Rereads exact sources and current attributes/filters, independent of timestamps and any alignment cache.
+pub(crate) fn read_diff_sources(
+    root: &Path,
+    path: &Path,
+    kind: DiffKind,
+) -> Result<DiffSources, CoreError> {
     let repo = open(root)?;
     let root = repo.workdir().ok_or(CoreError::Bare)?.canonicalize()?;
     check_path(&root, path)?;
@@ -454,23 +493,33 @@ pub fn read_diff(root: &Path, path: &Path, kind: DiffKind) -> Result<DiffSnapsho
         entry.path(&index) == bytes.as_bstr()
             && entry.stage() != gix::index::entry::Stage::Unconflicted
     });
-    if conflict {
-        return Ok(DiffSnapshot::conflict(path.to_path_buf(), kind));
-    }
-    let left = match kind {
-        DiffKind::Staged => at_head(&repo, path)?,
-        DiffKind::Unstaged => at_index(&repo, &index, path)?,
+    let left = if conflict {
+        Document::absent()
+    } else {
+        match kind {
+            DiffKind::Staged => at_head(&repo, path)?,
+            DiffKind::Unstaged => at_index(&repo, &index, path)?,
+        }
     };
-    let right = match kind {
-        DiffKind::Staged => at_index(&repo, &index, path)?,
-        DiffKind::Unstaged => at_worktree(&repo, &index, &root, path)?,
+    let right = if conflict {
+        Document::absent()
+    } else {
+        match kind {
+            DiffKind::Staged => at_index(&repo, &index, path)?,
+            DiffKind::Unstaged => at_worktree(&repo, &index, &root, path)?,
+        }
     };
     if capture_guard(&repo, &root, path)? != guard {
         return Err(CoreError::Stale);
     }
-    let mut snapshot = DiffSnapshot::new(path.to_path_buf(), kind, left, right);
-    snapshot.guard = Some(guard);
-    Ok(snapshot)
+    Ok(DiffSources {
+        path: path.to_path_buf(),
+        kind,
+        left,
+        right,
+        guard,
+        conflicted: conflict,
+    })
 }
 
 /// Opaque source precondition; domain/UI snapshots expose no gix IDs or index handles.
