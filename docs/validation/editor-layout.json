@@ -1,0 +1,19 @@
+{
+  "ok": true,
+  "native_display": true,
+  "scenario": "editor-layout",
+  "frames": 15,
+  "locales": [
+    "Changes",
+    "Изменения",
+    "Изменения"
+  ],
+  "giant_line_bytes": 32768,
+  "newline_document_bytes": 2097152,
+  "text_retained": true,
+  "notice_has_no_source_coordinates": true,
+  "replacement_undo_redo": true,
+  "read_only": true,
+  "scope": "actual native Result input/layout/locale/undo callbacks; owner clipboard and Git unchanged; physical input/pixels/GPU execution unmeasured",
+  "oracle": "independent Git HEAD/index/stages/status and every private worktree/Git metadata file byte invariant"
+}

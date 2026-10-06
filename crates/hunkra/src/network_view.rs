@@ -82,6 +82,7 @@ impl NetworkView {
             NativeEditor::single_line(
                 4096,
                 translator.text("network-branch-placeholder", None),
+                translator.text("editor-preview-limit", None),
                 cx,
             )
         });
@@ -89,6 +90,7 @@ impl NetworkView {
             NativeEditor::single_line(
                 16 * 1024,
                 translator.text("network-destination-placeholder", None),
+                translator.text("editor-preview-limit", None),
                 cx,
             )
         });
@@ -96,12 +98,17 @@ impl NetworkView {
             NativeEditor::single_line(
                 16 * 1024,
                 translator.text("network-url-placeholder", None),
+                translator.text("editor-preview-limit", None),
                 cx,
             )
         });
         let initial_branch = cx.new(|cx| {
-            let mut editor =
-                NativeEditor::single_line(4096, translator.text("branch-placeholder", None), cx);
+            let mut editor = NativeEditor::single_line(
+                4096,
+                translator.text("branch-placeholder", None),
+                translator.text("editor-preview-limit", None),
+                cx,
+            );
             editor.buffer.reset("main".into());
             editor
         });
@@ -152,8 +159,10 @@ impl NetworkView {
             (&self.initial_branch, "branch-placeholder"),
         ] {
             let placeholder = self.t(key);
+            let notice = self.t("editor-preview-limit");
             editor.update(cx, |editor, cx| {
                 editor.placeholder = placeholder.into();
+                editor.preview_notice = notice.into();
                 cx.notify();
             });
         }

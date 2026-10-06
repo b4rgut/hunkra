@@ -1,4 +1,5 @@
 //! Native GPUI shell. Blocking repository reads run in separate bounded workers.
+mod editor_layout_smoke;
 mod load_smoke;
 mod network_smoke;
 #[cfg(all(test, feature = "gui-tests"))]
@@ -353,7 +354,12 @@ impl Hunkra {
         let locale = settings.locale;
         let translator = Translator::new(locale);
         let message = cx.new(|cx| {
-            NativeEditor::new(64 * 1024, translator.text("commit-placeholder", None), cx)
+            NativeEditor::new(
+                64 * 1024,
+                translator.text("commit-placeholder", None),
+                translator.text("editor-preview-limit", None),
+                cx,
+            )
         });
         let message_subscription = cx.subscribe(&message, |_, _, _: &TextChanged, cx| cx.notify());
         let rejected_subscription = cx.subscribe(&message, |app, _, _: &TextRejected, cx| {
@@ -361,7 +367,12 @@ impl Hunkra {
             cx.notify();
         });
         let branch_input = cx.new(|cx| {
-            NativeEditor::single_line(4096, translator.text("branch-placeholder", None), cx)
+            NativeEditor::single_line(
+                4096,
+                translator.text("branch-placeholder", None),
+                translator.text("editor-preview-limit", None),
+                cx,
+            )
         });
         let branch_changed = cx.subscribe(&branch_input, |_, _, _: &TextChanged, cx| cx.notify());
         let branch_rejected = cx.subscribe(&branch_input, |app, _, _: &TextRejected, cx| {
@@ -372,7 +383,12 @@ impl Hunkra {
             app.create_branch(cx);
         });
         let filter_input = cx.new(|cx| {
-            NativeEditor::single_line(4096, translator.text("filter-placeholder", None), cx)
+            NativeEditor::single_line(
+                4096,
+                translator.text("filter-placeholder", None),
+                translator.text("editor-preview-limit", None),
+                cx,
+            )
         });
         let filter_changed = cx.subscribe(&filter_input, |app, editor, _: &TextChanged, cx| {
             app.path_filter.query(editor.read(cx).buffer.text());
@@ -830,6 +846,13 @@ impl Hunkra {
             editor.placeholder = placeholder.into();
             cx.notify();
         });
+        let notice = self.t("editor-preview-limit");
+        for editor in [&self.message, &self.branch_input, &self.filter_input] {
+            editor.update(cx, |editor, cx| {
+                editor.preview_notice = notice.clone().into();
+                cx.notify();
+            });
+        }
         self.settings.locale = locale;
         if self.smoke.is_none() {
             self.settings_worker.submit(0, self.settings.clone());
@@ -1877,6 +1900,14 @@ impl Hunkra {
     }
     /// Runs a native scripted render scenario, with a finite timeout and isolated settings.
     fn smoke_tick(&mut self, cx: &mut Context<Self>) {
+        if self
+            .smoke
+            .as_ref()
+            .is_some_and(|smoke| smoke.operation.as_deref() == Some("editor-layout"))
+        {
+            cx.notify();
+            return;
+        }
         if self.smoke.as_ref().is_some_and(|smoke| {
             smoke
                 .operation
@@ -3655,6 +3686,7 @@ impl Render for Hunkra {
         }
         self.frames += 1;
         self.smoke_input(window, cx);
+        self.smoke_editor_layout_input(window, cx);
         self.smoke_ux_input(window, cx);
         self.reviewed_operation = self.operation.clone();
         self.reviewed_commit = self

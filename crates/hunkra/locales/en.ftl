@@ -5,8 +5,11 @@ staged = Staged
 unstaged = Unstaged
 commit = Commit
 commit-created = Commit created
-view-only = Preview build · network operations and load validation pending
+view-only = Preview build
 commit-placeholder = Describe the staged changes…
+editor-preview-limit = Text exceeds the display limit.
+    Limit: 40,000 rows / 16 KiB per line.
+    Select all to copy or replace the text.
 error-branch-name = Enter a valid local branch name, without spaces or a leading dash.
 error-branch-exists = This local branch already exists. Refresh before selecting it.
 error-branch-unborn = Create the first commit before using this action.

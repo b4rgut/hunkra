@@ -85,8 +85,12 @@ impl HistoryView {
     ) -> Self {
         let translator = Translator::new(locale);
         let message = cx.new(|cx| {
-            let mut editor =
-                NativeEditor::new(1024 * 1024, translator.text("history-encoding", None), cx);
+            let mut editor = NativeEditor::new(
+                1024 * 1024,
+                translator.text("history-encoding", None),
+                translator.text("editor-preview-limit", None),
+                cx,
+            );
             editor.enabled = false;
             editor
         });
@@ -124,8 +128,10 @@ impl HistoryView {
     pub fn set_locale(&mut self, locale: Locale, cx: &mut Context<Self>) {
         self.translator = Translator::new(locale);
         let placeholder = self.t("history-encoding");
+        let notice = self.t("editor-preview-limit");
         self.message.update(cx, |editor, cx| {
             editor.placeholder = placeholder.into();
+            editor.preview_notice = notice.into();
             cx.notify();
         });
         cx.notify();

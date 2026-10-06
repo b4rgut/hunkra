@@ -117,7 +117,7 @@ def check(rpm, report_path, native):
         runs = {}
         if native:
             environment = os.environ | {"HUNKRA_TEST_BINARY": str(binary)}
-            for name, script in (("staging-commit", "smoke.py"), ("operations", "operations-smoke.py"), ("conflicts", "conflicts-smoke.py"), ("history", "history-smoke.py"), ("network", "network-smoke.py"), ("load", "load-smoke.py"), ("ux", "ux-smoke.py")):
+            for name, script in (("staging-commit", "smoke.py"), ("operations", "operations-smoke.py"), ("conflicts", "conflicts-smoke.py"), ("history", "history-smoke.py"), ("network", "network-smoke.py"), ("load", "load-smoke.py"), ("ux", "ux-smoke.py"), ("editor", "editor-smoke.py")):
                 destination = work / f"{name}.json"
                 print(f"Packaged native scenarios: {name}", flush=True)
                 result = subprocess.run([sys.executable, str(ROOT / "scripts" / script), str(destination)], cwd=work, env=environment, capture_output=True, text=True, timeout=300)

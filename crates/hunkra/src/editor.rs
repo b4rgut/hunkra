@@ -7,10 +7,12 @@ use gpui::{
     MouseUpEvent, Pixels, Point, ShapedLine, SharedString, Style, TextRun, UTF16Selection, Window,
     div, fill, point, prelude::*, px, relative, rgb, rgba, size,
 };
-use std::ops::Range;
+use std::{ops::Range, sync::Arc};
 use unicode_segmentation::UnicodeSegmentation;
 
 const LINE_HEIGHT: f32 = 22.;
+const MAX_LAYOUT_ROWS: usize = 40_000;
+const MAX_LAYOUT_LINE_BYTES: usize = 16_384;
 pub struct TextChanged;
 pub struct TextRejected;
 pub struct TextSubmitted;
@@ -24,6 +26,7 @@ struct Row {
 pub struct NativeEditor {
     pub buffer: TextBuffer,
     pub placeholder: SharedString,
+    pub preview_notice: SharedString,
     pub enabled: bool,
     pub single_line: bool,
     focus: FocusHandle,
@@ -34,6 +37,8 @@ pub struct NativeEditor {
     preferred_column: Option<usize>,
     scroll_row: usize,
     horizontal: Pixels,
+    line_revision: u64,
+    line_ranges: Option<Arc<[Range<usize>]>>,
 }
 impl EventEmitter<TextChanged> for NativeEditor {}
 impl EventEmitter<TextRejected> for NativeEditor {}
@@ -46,10 +51,16 @@ impl Focusable for NativeEditor {
 }
 impl NativeEditor {
     /// Creates an owned input whose placeholder may change independently of the user's text.
-    pub fn new(limit: usize, placeholder: String, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        limit: usize,
+        placeholder: String,
+        preview_notice: String,
+        cx: &mut Context<Self>,
+    ) -> Self {
         Self {
             buffer: TextBuffer::new(limit),
             placeholder: placeholder.into(),
+            preview_notice: preview_notice.into(),
             enabled: true,
             single_line: false,
             focus: cx.focus_handle(),
@@ -60,11 +71,18 @@ impl NativeEditor {
             preferred_column: None,
             scroll_row: 0,
             horizontal: px(0.),
+            line_revision: u64::MAX,
+            line_ranges: None,
         }
     }
     /// Creates a branch/filter input that rejects newline paste/composition and emits Enter separately.
-    pub fn single_line(limit: usize, placeholder: String, cx: &mut Context<Self>) -> Self {
-        let mut editor = Self::new(limit, placeholder, cx);
+    pub fn single_line(
+        limit: usize,
+        placeholder: String,
+        preview_notice: String,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let mut editor = Self::new(limit, placeholder, preview_notice, cx);
         editor.single_line = true;
         editor
     }
@@ -88,11 +106,22 @@ impl NativeEditor {
         cx.emit(TextChanged);
         cx.notify();
     }
-    /// Finds source line starts and visible ends, retaining CRLF bytes in the model.
-    fn lines(&self) -> Vec<Range<usize>> {
+    /// Shares one bounded line index per text revision; an unsupported layout never truncates or changes the model.
+    fn lines(&mut self) -> Option<Arc<[Range<usize>]>> {
+        if self.line_revision != self.buffer.revision {
+            self.line_ranges = Self::index_lines(self.buffer.text());
+            self.line_revision = self.buffer.revision;
+        }
+        self.line_ranges.clone()
+    }
+    /// Stops before retaining excessive ranges or shaping a long line, preserving original CRLF and terminal-empty-line positions.
+    fn index_lines(text: &str) -> Option<Arc<[Range<usize>]>> {
         let mut result = Vec::new();
         let mut start = 0;
-        for piece in self.buffer.text().split_inclusive('\n') {
+        for piece in text.split_inclusive('\n') {
+            if result.len() == MAX_LAYOUT_ROWS || piece.len() > MAX_LAYOUT_LINE_BYTES {
+                return None;
+            }
             let display = piece
                 .strip_suffix('\n')
                 .map(|line| line.strip_suffix('\r').unwrap_or(line))
@@ -100,10 +129,13 @@ impl NativeEditor {
             result.push(start..start + display.len());
             start += piece.len();
         }
-        if result.is_empty() || self.buffer.text().ends_with('\n') {
+        if result.is_empty() || text.ends_with('\n') {
+            if result.len() == MAX_LAYOUT_ROWS {
+                return None;
+            }
             result.push(start..start);
         }
-        result
+        Some(result.into())
     }
     /// Maps a current painted point to a valid source byte; stale frames cannot change selection.
     fn index_at(&self, position: Point<Pixels>) -> Option<usize> {
@@ -153,11 +185,12 @@ impl NativeEditor {
     }
     /// Moves vertically by a retained grapheme column, clamping only in the target line.
     fn vertical(&mut self, down: bool, extend: bool) {
-        let lines = self.lines();
+        let Some(lines) = self.lines() else {
+            return;
+        };
         let current = lines
-            .iter()
-            .rposition(|line| line.start <= self.buffer.selection.cursor)
-            .unwrap_or(0);
+            .partition_point(|line| line.start <= self.buffer.selection.cursor)
+            .saturating_sub(1);
         let column = *self.preferred_column.get_or_insert_with(|| {
             self.buffer.text()
                 [lines[current].start..self.buffer.selection.cursor.min(lines[current].end)]
@@ -276,21 +309,21 @@ impl NativeEditor {
             }
             (_, "home" | "end") => {
                 self.buffer.unmark();
-                let lines = self.lines();
-                let line = lines
-                    .iter()
-                    .rfind(|line| line.start <= self.buffer.selection.cursor)
-                    .unwrap();
                 let index = if command {
                     if key == "home" {
                         0
                     } else {
                         self.buffer.text().len()
                     }
+                } else if let Some(lines) = self.lines() {
+                    let line = &lines[lines
+                        .partition_point(|line| line.start <= self.buffer.selection.cursor)
+                        .saturating_sub(1)];
+                    if key == "home" { line.start } else { line.end }
                 } else if key == "home" {
-                    line.start
+                    0
                 } else {
-                    line.end
+                    self.buffer.text().len()
                 };
                 self.buffer.select(index, extend);
             }
@@ -449,6 +482,7 @@ struct PaintState {
     caret: Option<Bounds<Pixels>>,
     marked: Vec<Bounds<Pixels>>,
     revision: u64,
+    source_mapped: bool,
 }
 impl IntoElement for TextSurface {
     type Element = Self;
@@ -492,12 +526,51 @@ impl Element for TextSurface {
         cx: &mut App,
     ) -> PaintState {
         self.editor.update(cx, |editor, _| {
-            let lines = editor.lines();
+            let style = window.text_style();
+            let font_size = style.font_size.to_pixels(window.rem_size());
+            let Some(lines) = editor.lines() else {
+                let visible = ((bounds.size.height / px(LINE_HEIGHT)).floor() as usize).max(1);
+                let rows = editor
+                    .preview_notice
+                    .lines()
+                    .take(visible)
+                    .enumerate()
+                    .map(|(row, text)| {
+                        let text: SharedString = text.to_owned().into();
+                        let run = TextRun {
+                            len: text.len(),
+                            font: style.font(),
+                            color: rgb(theme::MUTED).into(),
+                            background_color: None,
+                            underline: None,
+                            strikethrough: None,
+                        };
+                        Row {
+                            start: 0,
+                            end: 0,
+                            line: window
+                                .text_system()
+                                .shape_line(text, font_size, &[run], None),
+                            origin: point(
+                                bounds.left(),
+                                bounds.top() + px(row as f32 * LINE_HEIGHT),
+                            ),
+                        }
+                    })
+                    .collect();
+                return PaintState {
+                    rows,
+                    selections: Vec::new(),
+                    caret: None,
+                    marked: Vec::new(),
+                    revision: editor.buffer.revision,
+                    source_mapped: false,
+                };
+            };
             let cursor = editor.buffer.selection.cursor;
             let cursor_row = lines
-                .iter()
-                .rposition(|line| line.start <= cursor)
-                .unwrap_or(0);
+                .partition_point(|line| line.start <= cursor)
+                .saturating_sub(1);
             let visible = ((bounds.size.height / px(LINE_HEIGHT)).floor() as usize).max(1);
             if cursor_row < editor.scroll_row {
                 editor.scroll_row = cursor_row;
@@ -506,8 +579,6 @@ impl Element for TextSurface {
                 editor.scroll_row = cursor_row + 1 - visible;
             }
             editor.scroll_row = editor.scroll_row.min(lines.len().saturating_sub(visible));
-            let style = window.text_style();
-            let font_size = style.font_size.to_pixels(window.rem_size());
             let mut rows: Vec<Row> = lines
                 .iter()
                 .skip(editor.scroll_row)
@@ -563,6 +634,7 @@ impl Element for TextSurface {
                 caret: None,
                 marked: Vec::new(),
                 revision: editor.buffer.revision,
+                source_mapped: true,
             };
             for row in &mut rows {
                 row.origin.x -= editor.horizontal;
@@ -643,7 +715,11 @@ impl Element for TextSurface {
             }
         });
         self.editor.update(cx, |editor, _| {
-            editor.rows = state.rows.clone();
+            editor.rows = if state.source_mapped {
+                state.rows.clone()
+            } else {
+                Vec::new()
+            };
             editor.bounds = Some(bounds);
             editor.layout_revision = state.revision;
         });
@@ -653,7 +729,103 @@ impl Element for TextSurface {
 #[cfg(all(test, feature = "gui-tests"))]
 mod tests {
     use super::*;
+    use crate::i18n::{Locale, Translator};
     use gpui::TestAppContext;
+
+    #[gpui::test]
+    /// CRLF/emoji source ranges are shared through selection/locale changes and replaced after text revisions or undo.
+    fn line_index_reuses_only_the_current_text_revision(cx: &mut TestAppContext) {
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let mut editor = NativeEditor::new(2 * 1024 * 1024, "text".into(), "limit".into(), cx);
+            editor.buffer.reset("A🦀\r\nБ\n".into());
+            window.focus(&editor.focus);
+            editor
+        });
+        let original = editor.update(cx, |editor, _| editor.lines().unwrap());
+        assert_eq!(&*original, &[0..5, 7..9, 10..10]);
+        editor.update(cx, |editor, cx| {
+            editor.buffer.select(0, false);
+            editor.buffer.select(5, true);
+            for locale in [Locale::En, Locale::Ru, Locale::RuDev] {
+                editor.preview_notice = Translator::new(locale)
+                    .text("editor-preview-limit", None)
+                    .into();
+                assert!(Arc::ptr_eq(&original, &editor.lines().unwrap()));
+            }
+            cx.notify();
+        });
+        cx.write_to_clipboard(ClipboardItem::new_string("Кириллица🙂".into()));
+        cx.simulate_keystrokes("ctrl-v");
+        let changed = editor.update(cx, |editor, _| editor.lines().unwrap());
+        assert!(!Arc::ptr_eq(&original, &changed));
+        assert!(editor.read_with(cx, |editor, _| editor.buffer.text() == "Кириллица🙂\r\nБ\n"));
+        cx.simulate_keystrokes("ctrl-z");
+        assert_eq!(
+            &*editor.update(cx, |editor, _| editor.lines().unwrap()),
+            &*original
+        );
+        assert!(!Arc::ptr_eq(
+            &changed,
+            &editor.update(cx, |editor, _| editor.lines().unwrap())
+        ));
+    }
+
+    #[gpui::test]
+    /// Byte-bounded giant lines/newline streams render only a notice, retain exact copyable bytes, and recover through replacement/undo/redo.
+    fn oversized_layout_preserves_native_text_and_undo(cx: &mut TestAppContext) {
+        let (editor, cx) = cx.add_window_view(|window, cx| {
+            let editor = NativeEditor::new(
+                2 * 1024 * 1024,
+                "text".into(),
+                "Display limit\nCopy or replace".into(),
+                cx,
+            );
+            window.focus(&editor.focus);
+            editor
+        });
+        for text in ["🦀".repeat(8192), "\n".repeat(2 * 1024 * 1024)] {
+            cx.write_to_clipboard(ClipboardItem::new_string(text.clone()));
+            cx.simulate_keystrokes("ctrl-a ctrl-v");
+            assert!(
+                editor.read_with(cx, |editor, _| editor.buffer.text() == text
+                    && editor.rows.is_empty())
+            );
+            editor.update(cx, |editor, _| {
+                assert!(editor.lines().is_none());
+                assert_eq!(editor.line_revision, editor.buffer.revision);
+                assert!(editor.index_at(point(px(0.), px(0.))).is_none());
+            });
+            cx.simulate_keystrokes("ctrl-a ctrl-c");
+            assert_eq!(
+                cx.read_from_clipboard()
+                    .and_then(|item| item.text())
+                    .as_deref(),
+                Some(text.as_str())
+            );
+            cx.write_to_clipboard(ClipboardItem::new_string("Снова🦀\r\nEOF".into()));
+            cx.simulate_keystrokes("ctrl-v");
+            assert!(
+                editor.read_with(cx, |editor, _| editor.buffer.text() == "Снова🦀\r\nEOF"
+                    && !editor.rows.is_empty())
+            );
+            cx.simulate_keystrokes("ctrl-z");
+            assert!(
+                editor.read_with(cx, |editor, _| editor.buffer.text() == text
+                    && editor.rows.is_empty())
+            );
+            cx.simulate_keystrokes("ctrl-shift-z");
+            assert!(
+                editor.read_with(cx, |editor, _| editor.buffer.text() == "Снова🦀\r\nEOF"
+                    && !editor.rows.is_empty())
+            );
+        }
+        editor.update(cx, |editor, cx| {
+            editor.enabled = false;
+            cx.notify();
+        });
+        cx.simulate_input("read-only");
+        assert!(editor.read_with(cx, |editor, _| editor.buffer.text() == "Снова🦀\r\nEOF"));
+    }
     struct NavigationHost {
         input: Entity<NativeEditor>,
         arrows: usize,
@@ -676,7 +848,8 @@ mod tests {
     /// Single-line arrows bubble to the visible list without changing native field text, selection or revision.
     fn single_line_arrows_reach_parent(cx: &mut TestAppContext) {
         let (host, cx) = cx.add_window_view(|window, cx| {
-            let input = cx.new(|cx| NativeEditor::single_line(4096, "filter".into(), cx));
+            let input =
+                cx.new(|cx| NativeEditor::single_line(4096, "filter".into(), "limit".into(), cx));
             window.focus(&input.read(cx).focus_handle(cx));
             NavigationHost { input, arrows: 0 }
         });
@@ -704,7 +877,7 @@ mod tests {
     /// Single-line fields retain exact Unicode and selection when clipboard/native composition includes newlines.
     fn single_line_refuses_multiline_input(cx: &mut TestAppContext) {
         let (editor, cx) = cx.add_window_view(|window, cx| {
-            let editor = NativeEditor::single_line(4096, "branch".into(), cx);
+            let editor = NativeEditor::single_line(4096, "branch".into(), "limit".into(), cx);
             window.focus(&editor.focus);
             editor
         });
@@ -732,7 +905,7 @@ mod tests {
     /// Exercises registered native keyboard, Unicode insertion and clipboard handlers on GPUI's isolated platform.
     fn keyboard_clipboard_and_disabled_input(cx: &mut TestAppContext) {
         let (editor, cx) = cx.add_window_view(|window, cx| {
-            let editor = NativeEditor::new(64 * 1024, "message".into(), cx);
+            let editor = NativeEditor::new(64 * 1024, "message".into(), "limit".into(), cx);
             window.focus(&editor.focus);
             editor
         });

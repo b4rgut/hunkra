@@ -49,7 +49,7 @@ F7/Shift+F7 hunk, Ctrl+O open, Ctrl+Enter Commit, Ctrl+Shift+Enter Continue.
 pending close и сохраняет пользовательский ввод.
 
 Проверено 2026-10-06: fmt/i18n/plan, strict headless/UI Clippy, 129 headless tests
-(107 core + 22 app), 26 gui-tests library tests including 3 isolated GPUI input/clipboard/undo/bubbling tests and a host-injected native HistoryView test; 3 host/executor opening tests, native build.
+(107 core + 22 app), 28 gui-tests library tests including 5 isolated GPUI editor input/clipboard/undo/bubbling/layout tests and a host-injected native HistoryView test; 3 host/executor opening tests, native build.
 12 real Wayland history windows, 17 conflict windows, 15 branch/operation и
 6 staging/Commit и 19 network/creation windows прошли с независимым Git-оракулом в disposable repos.
 Reports: docs/validation/history.json, conflicts.json, operations.json,
@@ -61,6 +61,8 @@ Owner clipboard не менялся. Directory picker, physical input, X11, из
 временные процессы/failed artifacts удалены.
 
 Async opening callbacks дополнительно проверены: один pending dialog, delayed answer не меняет новый проект, старый error не перекрывает product prompt; cancellation quiet, текущий path сохраняет message/selection/revision без Git read, dirty Result использует Save/Discard/Cancel. Это production host/executor acceptance с injected platform result; actual системный dialog не запускается, поскольку GPUI0.2.2 TestPlatform prompt_for_paths unimplemented. Native3UX+19network регрессий после исправления прошли.
+
+NativeEditor держит один bounded line index на revision. Для больше40 000 отображаемых строк или строки длиннее16 КиБ показывается переведённое ограничение; байты не обрезаются. Copy/replace/undo/redo сохраняют весь текст, а notice не выдаёт фиктивные caret/hit coordinates. Отдельное Wayland окно проверило32КиБ emoji line и2МиБ переводов строк, три языка и возврат обычного просмотра; every private Git/worktree byte invariant. Evidence docs/validation/editor-layout.json, запуск scripts/dev smoke-editor /ABS/report.json. В системный clipboard этот native сценарий не пишет.
 
 gix 0.88.0 читает status/diff/filters/history, пишет index/objects/refs/commit и
 resolve. Git CLI заранее выбран только для audited complete switch/merge/rebase

@@ -42,9 +42,9 @@ pub struct ConflictView {
 impl EventEmitter<ConflictEvent> for ConflictView {}
 
 /// Creates one read-only native surface without lossy conversion of Git or worktree bytes.
-fn source_editor(side: &ConflictSide, cx: &mut App) -> Entity<NativeEditor> {
+fn source_editor(side: &ConflictSide, notice: String, cx: &mut App) -> Entity<NativeEditor> {
     cx.new(|cx| {
-        let mut editor = NativeEditor::new(MAX_BYTES, String::new(), cx);
+        let mut editor = NativeEditor::new(MAX_BYTES, String::new(), notice, cx);
         editor.enabled = false;
         if let Ok(text) = std::str::from_utf8(&side.worktree.bytes) {
             editor.buffer.reset(text.to_owned());
@@ -76,12 +76,28 @@ impl ConflictView {
     /// Loads independently editable Result and immutable A/B/Base into owned GPUI entities.
     pub fn new(snapshot: Arc<ConflictSnapshot>, locale: Locale, cx: &mut Context<Self>) -> Self {
         let translator = Translator::new(locale);
-        let a = source_editor(&snapshot.a, cx);
-        let b = source_editor(&snapshot.b, cx);
-        let base = source_editor(&snapshot.base, cx);
+        let a = source_editor(
+            &snapshot.a,
+            translator.text("editor-preview-limit", None),
+            cx,
+        );
+        let b = source_editor(
+            &snapshot.b,
+            translator.text("editor-preview-limit", None),
+            cx,
+        );
+        let base = source_editor(
+            &snapshot.base,
+            translator.text("editor-preview-limit", None),
+            cx,
+        );
         let result = cx.new(|cx| {
-            let mut editor =
-                NativeEditor::new(MAX_BYTES, translator.text("result-placeholder", None), cx);
+            let mut editor = NativeEditor::new(
+                MAX_BYTES,
+                translator.text("result-placeholder", None),
+                translator.text("editor-preview-limit", None),
+                cx,
+            );
             editor.enabled = snapshot.presentation == Presentation::Text;
             if editor.enabled
                 && let Ok(text) = std::str::from_utf8(&snapshot.result.bytes)
@@ -141,6 +157,13 @@ impl ConflictView {
             editor.placeholder = placeholder.into();
             cx.notify();
         });
+        let notice = self.t("editor-preview-limit");
+        for editor in [&self.result, &self.a, &self.b, &self.base] {
+            editor.update(cx, |editor, cx| {
+                editor.preview_notice = notice.clone().into();
+                cx.notify();
+            });
+        }
         cx.notify();
     }
     /// Freezes edits while the host serializes an accepted write, leaving source selection/copy available.
